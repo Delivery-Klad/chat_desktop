@@ -1,4 +1,5 @@
 import psycopg2
+import bcrypt
 import tkinter as tk
 from tkinter import *
 from tkinter import messagebox
@@ -37,7 +38,7 @@ def pg_connect():
 def create_tables():
     connect, cursor = pg_connect()
     try:
-        # cursor.execute("DROP TABLE messages")
+        # cursor.execute("DROP TABLE users")
         cursor.execute('CREATE TABLE IF NOT EXISTS users(id INTEGER,' 
                        'login TEXT,'
                        'password TEXT)')
@@ -62,15 +63,15 @@ def login():
         try:
             cursor.execute("SELECT password FROM users WHERE login='{0}'".format(entry_log.get()))
             res = cursor.fetchall()[0][0]
-            if res != entry_pass.get():
+            hashed_password = res.encode('utf-8')
+            password = entry_pass.get().encode('utf-8')
+            if not bcrypt.checkpw(password, hashed_password):
                 cursor.close()
                 connect.close()
                 messagebox.showerror('Input error', 'Wrong password')
                 return
         except Exception as e:
-            print(e)
-            cursor.close()
-            connect.close()
+            exception_handler(e, connect, cursor)
             messagebox.showerror('Input error', 'User not found')
             return
         user_login = entry_log.get()
@@ -88,6 +89,8 @@ def register():
     try:
         if len(entry_log.get()) == 0 or len(entry_pass.get()) == 0:
             messagebox.showerror('Input error', 'Fill all input fields')
+            cursor.close()
+            connect.close()
             return
         try:
             cursor.execute("SELECT COUNT(*) FROM users WHERE login = '{0}'".format(str(entry_log.get())))
@@ -99,14 +102,15 @@ def register():
                 return
         except Exception as e:
             print(e)
-
+        hashed_pass = bcrypt.hashpw(entry_pass.get().encode('utf-8'), bcrypt.gensalt())
+        hashed_pass = str(hashed_pass)[2:-1]
         cursor.execute("SELECT MAX(id) FROM users")
         max_id = cursor.fetchall()[0][0]
         if max_id is not None:
             max_id += 1
         else:
             max_id = 0
-        cursor.execute("INSERT INTO users VALUES ({0}, '{1}', '{2}')".format(max_id, entry_log.get(), entry_pass.get()))
+        cursor.execute("INSERT INTO users VALUES ({0}, '{1}', '{2}')".format(max_id, entry_log.get(), hashed_pass))
         connect.commit()
         cursor.close()
         connect.close()
@@ -198,10 +202,8 @@ def get_message():
         res = cursor.fetchall()
         cursor.execute("DELETE FROM messages WHERE to_id={0}".format(user_id))
         connect.commit()
-        print(res)
         for i in res:
             nickname = get_user_nickname(i[0], cursor)
-            print(i[2])
             content = '{0}: {1}'.format(nickname, i[2])
             list_box2.insert(tk.END, content)
         cursor.close()
