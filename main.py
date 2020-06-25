@@ -8,6 +8,7 @@ from tkinter import messagebox
 root = tk.Tk()
 w = root.winfo_screenwidth() // 2 - 500
 h = root.winfo_screenheight() // 2 - 150
+crypt_step = 12
 user_login = ''
 user_id = ''
 
@@ -92,6 +93,18 @@ def register():
             cursor.close()
             connect.close()
             return
+        for i in entry_pass.get():
+            if ord(i) < 45 or ord(i) > 122:
+                messagebox.showerror('Input error', 'Unsupported symbols')
+                cursor.close()
+                connect.close()
+                return
+        for i in entry_log.get():
+            if ord(i) < 45 or ord(i) > 122:
+                messagebox.showerror('Input error', 'Unsupported symbols')
+                cursor.close()
+                connect.close()
+                return
         try:
             cursor.execute("SELECT COUNT(*) FROM users WHERE login = '{0}'".format(str(entry_log.get())))
             res = cursor.fetchall()[0][0]
@@ -182,10 +195,19 @@ def send_message():
     try:
         if len(entry_id.get()) == 0 or len(entry_msg.get()) == 0:
             messagebox.showerror('Input error', 'Fill all input fields')
+            cursor.close()
+            connect.close()
             return
+        for i in entry_msg.get():
+            if ord(i) < 32 or ord(i) > 1366:
+                messagebox.showerror('Input error', 'Unsupported symbols')
+                cursor.close()
+                connect.close()
+                return
         to_id = int(entry_id.get())
         msg = entry_msg.get()
-        cursor.execute("INSERT INTO messages VALUES ({0}, {1}, '{2}')".format(user_id, to_id, msg))
+        encrypt_msg = encrypt(to_id, int(user_id), msg)
+        cursor.execute("INSERT INTO messages VALUES ({0}, {1}, '{2}')".format(user_id, to_id, encrypt_msg))
         entry_msg.delete(0, tk.END)
         connect.commit()
         cursor.close()
@@ -203,13 +225,44 @@ def get_message():
         cursor.execute("DELETE FROM messages WHERE to_id={0}".format(user_id))
         connect.commit()
         for i in res:
+            decrypt_msg = decrypt(int(i[0]), int(user_id), i[2])
             nickname = get_user_nickname(i[0], cursor)
-            content = '{0}: {1}'.format(nickname, i[2])
+            content = '{0}: {1}'.format(nickname, decrypt_msg)
             list_box2.insert(tk.END, content)
         cursor.close()
         connect.close()
     except Exception as e:
         exception_handler(e, connect, cursor)
+
+
+def encrypt(to_id: int, users_id: int, message: str):
+    global crypt_step
+    encrypt_message = ''
+    try:
+        local_step = abs(to_id - users_id) % 20 + 300
+        for i in range(len(message)):
+            if i % 2 == 0:
+                encrypt_message += chr(ord(message[i]) + local_step)
+            else:
+                encrypt_message += chr(ord(message[i]) + crypt_step)
+        return encrypt_message
+    except Exception as e:
+        print(e)
+
+
+def decrypt(to_id: int, users_id: int, message: str):
+    global crypt_step
+    decrypt_message = ''
+    try:
+        local_step = abs(to_id - users_id) % 20 + 300
+        for i in range(len(message)):
+            if i % 2 == 0:
+                decrypt_message += chr(ord(message[i]) - local_step)
+            else:
+                decrypt_message += chr(ord(message[i]) - crypt_step)
+        return decrypt_message
+    except Exception as e:
+        print(e)
 
 
 create_tables()
@@ -223,7 +276,7 @@ entry_log = tk.Entry(auth_frame, font=12, width=20, fg="black")
 entry_log.pack(side=TOP)
 label_rep = tk.Label(auth_frame, font=10, text="Password:                       ", fg="black", width=18)
 label_rep.pack(side=TOP, anchor=S)
-entry_pass = tk.Entry(auth_frame, font=12, width=20, fg="black")
+entry_pass = tk.Entry(auth_frame, font=12, width=20, fg="black", show='*')
 entry_pass.pack(side=TOP)
 button_login = tk.Button(auth_frame, text="LOGIN", bg='#2E8B57', width=11, command=lambda: login())
 button_login.pack(side=LEFT, pady=2, anchor=CENTER)
