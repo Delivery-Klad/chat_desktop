@@ -6,8 +6,8 @@ from tkinter import messagebox
 
 
 root = tk.Tk()
-w = root.winfo_screenwidth() // 2 - 500
-h = root.winfo_screenheight() // 2 - 150
+w = root.winfo_screenwidth() // 2 - 140
+h = root.winfo_screenheight() // 2 - 100
 crypt_step = 12
 user_login = ''
 user_id = ''
@@ -53,7 +53,25 @@ def create_tables():
         exception_handler(e, connect, cursor)
 
 
-def login():
+def check_input(password: str, log: str):
+    if len(log) < 5:
+        messagebox.showerror('Input error', 'Login length must be more than 5 characters')
+        return False
+    if len(password) < 8:
+        messagebox.showerror('Input error', 'Password length must be more than 8 characters')
+        return False
+    for i in password:
+        if ord(i) < 45 or ord(i) > 122:
+            messagebox.showerror('Input error', 'Unsupported symbols')
+            return False
+    for i in log:
+        if ord(i) < 45 or ord(i) > 122:
+            messagebox.showerror('Input error', 'Unsupported symbols')
+            return False
+    return True
+
+
+def login(*args):
     global user_login
     global user_id
     connect, cursor = pg_connect()
@@ -93,18 +111,10 @@ def register():
             cursor.close()
             connect.close()
             return
-        for i in entry_pass.get():
-            if ord(i) < 45 or ord(i) > 122:
-                messagebox.showerror('Input error', 'Unsupported symbols')
-                cursor.close()
-                connect.close()
-                return
-        for i in entry_log.get():
-            if ord(i) < 45 or ord(i) > 122:
-                messagebox.showerror('Input error', 'Unsupported symbols')
-                cursor.close()
-                connect.close()
-                return
+        if not check_input(entry_pass.get(), entry_log.get()):
+            cursor.close()
+            connect.close()
+            return
         try:
             cursor.execute("SELECT COUNT(*) FROM users WHERE login = '{0}'".format(str(entry_log.get())))
             res = cursor.fetchall()[0][0]
@@ -142,8 +152,12 @@ def get_id(cursor):
 
 
 def hide_auth_menu():
+    global w
+    global h
+    w -= 200
     auth_frame.pack_forget()
     root.geometry("600x270+{}+{}".format(w, h))
+    entry_id.focus_set()
     main_frame.pack(side=TOP, anchor=CENTER)
 
 
@@ -265,18 +279,52 @@ def decrypt(to_id: int, users_id: int, message: str):
         print(e)
 
 
-create_tables()
+def login_handler(*args):
+    if len(entry_log.get()) == 0:
+        messagebox.showerror('Input error', 'Fill all input fields')
+        return
+    elif len(entry_pass.get()) != 0:
+        login()
+    else:
+        entry_pass.focus_set()
 
+
+def send_message_handler(*args):
+    if str(root.focus_get()) == ".!labelframe2.!entry":
+        if len(entry_id.get()) != 0 and len(entry_msg.get()) != 0:
+            send_message()
+        elif len(entry_id.get()) == 0:
+            pass
+        elif len(entry_msg.get()) == 0:
+            entry_msg.focus_set()
+    elif str(root.focus_get()) == ".!labelframe2.!entry2":
+        if len(entry_id.get()) != 0 and len(entry_msg.get()) != 0:
+            send_message()
+        elif len(entry_msg.get()) == 0:
+            pass
+        elif len(entry_id.get()) == 0:
+            entry_id.focus_set()
+
+
+def loop(*args):
+    while True:
+        print(1)
+        root.update()
+
+
+create_tables()
 # region auth
 auth_frame = LabelFrame(root, width=200, height=130, relief=FLAT)
 auth_frame.pack(side=TOP, anchor=CENTER)
 label_rep = tk.Label(auth_frame, font=10, text="Username:                       ", fg="black", width=18)
 label_rep.pack(side=TOP, anchor=S)
 entry_log = tk.Entry(auth_frame, font=12, width=20, fg="black")
+entry_log.bind("<Return>", login_handler)
 entry_log.pack(side=TOP)
 label_rep = tk.Label(auth_frame, font=10, text="Password:                       ", fg="black", width=18)
 label_rep.pack(side=TOP, anchor=S)
 entry_pass = tk.Entry(auth_frame, font=12, width=20, fg="black", show='*')
+entry_pass.bind("<Return>", login)
 entry_pass.pack(side=TOP)
 button_login = tk.Button(auth_frame, text="LOGIN", bg='#2E8B57', width=11, command=lambda: login())
 button_login.pack(side=LEFT, pady=2, anchor=CENTER)
@@ -304,11 +352,16 @@ list_box2.pack(side=LEFT)
 button_refresh = tk.Button(main_frame, text="REFRESH", bg='#2E8B57', width=85, command=lambda: get_message())
 button_refresh.pack(side=TOP, pady=3, anchor=CENTER)
 entry_id = tk.Entry(main_frame, font=10, width=8)
+entry_id.bind("<Return>", send_message_handler)
 entry_id.pack(side=LEFT, padx=2)
 entry_msg = tk.Entry(main_frame, font=10, width=50)
+entry_msg.bind("<Return>", send_message_handler)
 entry_msg.pack(side=LEFT, padx=2)
 button_send = tk.Button(main_frame, text="SEND", bg='#2E8B57', width=7, command=lambda: send_message())
 button_send.pack(side=LEFT, anchor=E)
+
+entry_log.focus_set()
+# root.after(500, loop)
 # endregion
 
 if __name__ == "__main__":
