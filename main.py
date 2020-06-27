@@ -1,5 +1,6 @@
 import psycopg2
 import bcrypt
+import rsa
 import tkinter as tk
 from tkinter import *
 from tkinter import messagebox
@@ -10,6 +11,7 @@ h = root.winfo_screenheight() // 2 - 100
 crypt_step = 12
 user_login = ''
 user_id = ''
+private_key = 0
 
 
 def exception_handler(e, connect, cursor):
@@ -39,12 +41,14 @@ def create_tables():
     connect, cursor = pg_connect()
     try:
         # cursor.execute("DROP TABLE users")
+        # cursor.execute("DROP TABLE messages")
         cursor.execute('CREATE TABLE IF NOT EXISTS users(id INTEGER,'
                        'login TEXT,'
-                       'password TEXT)')
+                       'password TEXT,'
+                       'pubkey TEXT)')
         cursor.execute('CREATE TABLE IF NOT EXISTS messages(from_id INTEGER,'
                        'to_id INTEGER,'
-                       'message TEXT)')
+                       'message BYTEA)')
         connect.commit()
         cursor.close()
         connect.close()
@@ -95,6 +99,7 @@ def login(*args):
         user_login = entry_log.get()
         user_id = get_id(cursor)
         get_message()
+        get_private_key()
         hide_auth_menu()
         cursor.close()
         connect.close()
@@ -132,7 +137,8 @@ def register():
             max_id += 1
         else:
             max_id = 0
-        cursor.execute("INSERT INTO users VALUES ({0}, '{1}', '{2}')".format(max_id, entry_log.get(), hashed_pass))
+        cursor.execute("INSERT INTO users VALUES ({0}, '{1}', '{2}', '{3}')".format(max_id, entry_log.get(),
+                                                                                    hashed_pass, keys_generation()))
         connect.commit()
         cursor.close()
         connect.close()
@@ -244,8 +250,10 @@ def send_message():
                 return
         to_id = int(entry_id.get())
         msg = entry_msg.get()
-        encrypt_msg = encrypt(to_id, int(user_id), msg)
-        cursor.execute("INSERT INTO messages VALUES ({0}, {1}, '{2}')".format(user_id, to_id, encrypt_msg))
+        cursor.execute("SELECT pubkey FROM users WHERE id={0}".format(to_id))
+        res = cursor.fetchall()[0][0]
+        encrypt_msg = encrypt(msg, res)
+        cursor.execute("INSERT INTO messages VALUES ({0}, {1}, {2})".format(user_id, to_id, encrypt_msg))
         entry_msg.delete(0, tk.END)
         connect.commit()
         cursor.close()
@@ -263,7 +271,7 @@ def get_message():
         cursor.execute("DELETE FROM messages WHERE to_id={0}".format(user_id))
         connect.commit()
         for i in res:
-            decrypt_msg = decrypt(int(i[0]), int(user_id), i[2])
+            decrypt_msg = decrypt(i[2])
             nickname = get_user_nickname(i[0], cursor)
             content = '{0}: {1}'.format(nickname, decrypt_msg)
             list_box2.insert(tk.END, content)
@@ -273,32 +281,22 @@ def get_message():
         exception_handler(e, connect, cursor)
 
 
-def encrypt(to_id: int, users_id: int, message: str):
-    global crypt_step
-    encrypt_message = ''
+def encrypt(msg: str, pubkey):
     try:
-        local_step = abs(to_id - users_id) % 20 + 300
-        for i in range(len(message)):
-            if i % 2 == 0:
-                encrypt_message += chr(ord(message[i]) + local_step)
-            else:
-                encrypt_message += chr(ord(message[i]) + crypt_step)
-        return encrypt_message
+        pubkey = pubkey.split(', ')
+        pubkey = rsa.PublicKey(int(pubkey[0]), int(pubkey[1]))
+        encrypt_message = rsa.encrypt(msg.encode('utf-8'), pubkey)
+        encrypt_message = encrypt_message
+        return psycopg2.Binary(encrypt_message)
     except Exception as e:
         print(e)
 
 
-def decrypt(to_id: int, users_id: int, message: str):
-    global crypt_step
-    decrypt_message = ''
+def decrypt(msg: bytes):
+    global private_key
     try:
-        local_step = abs(to_id - users_id) % 20 + 300
-        for i in range(len(message)):
-            if i % 2 == 0:
-                decrypt_message += chr(ord(message[i]) - local_step)
-            else:
-                decrypt_message += chr(ord(message[i]) - crypt_step)
-        return decrypt_message
+        decrypted_message = rsa.decrypt(msg, private_key)
+        return decrypted_message.decode('utf-8')
     except Exception as e:
         print(e)
 
@@ -328,6 +326,26 @@ def send_message_handler(*args):
             pass
         elif len(entry_id.get()) == 0:
             entry_id.focus_set()
+
+
+def keys_generation():
+    global private_key
+    (pubkey, privkey) = rsa.newkeys(512)
+    pubkey = str(pubkey)[10:-1]
+    with open("priv_key.PEM", 'w') as file:
+        file.write(privkey.save_pkcs1().decode('ascii'))
+    private_key = privkey
+    return pubkey
+
+
+def get_private_key():
+    try:
+        global private_key
+        with open("priv_key.PEM", 'rb') as file:
+            data = file.read()
+        private_key = rsa.PrivateKey.load_pkcs1(data)
+    except FileNotFoundError:
+        pass
 
 
 def change_text_font():

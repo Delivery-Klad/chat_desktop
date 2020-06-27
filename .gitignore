@@ -8,6 +8,7 @@ builder.py
 
 # Distribution / packaging
 .Python
+*.PEM
 build/
 /build/
 develop-eggs/
