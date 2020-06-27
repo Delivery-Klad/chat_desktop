@@ -4,7 +4,6 @@ import tkinter as tk
 from tkinter import *
 from tkinter import messagebox
 
-
 root = tk.Tk()
 w = root.winfo_screenwidth() // 2 - 140
 h = root.winfo_screenheight() // 2 - 100
@@ -40,7 +39,7 @@ def create_tables():
     connect, cursor = pg_connect()
     try:
         # cursor.execute("DROP TABLE users")
-        cursor.execute('CREATE TABLE IF NOT EXISTS users(id INTEGER,' 
+        cursor.execute('CREATE TABLE IF NOT EXISTS users(id INTEGER,'
                        'login TEXT,'
                        'password TEXT)')
         cursor.execute('CREATE TABLE IF NOT EXISTS messages(from_id INTEGER,'
@@ -156,9 +155,34 @@ def hide_auth_menu():
     global h
     w -= 200
     auth_frame.pack_forget()
-    root.geometry("600x270+{}+{}".format(w, h))
+    root.geometry("750x270+{}+{}".format(w, h))
     entry_id.focus_set()
-    main_frame.pack(side=TOP, anchor=CENTER)
+    menu_frame.pack(side=LEFT, pady=5, anchor=N)
+    main_frame.pack(side=LEFT, anchor=CENTER)
+
+
+def menu_navigation(menu: str):
+    if menu == "chat":
+        button_chat.configure(bg="#2E8B57")
+        button_info.configure(bg="#A9A9A9")
+        button_settings.configure(bg="#A9A9A9")
+        main1_frame.pack_forget()
+        settings_frame.pack_forget()
+        main_frame.pack(side=LEFT, anchor=CENTER)
+    elif menu == "set":
+        button_chat.configure(bg="#A9A9A9")
+        button_info.configure(bg="#A9A9A9")
+        button_settings.configure(bg="#2E8B57")
+        main_frame.pack_forget()
+        main1_frame.pack_forget()
+        settings_frame.pack(side=LEFT, anchor=N)
+    elif menu == "info":
+        button_chat.configure(bg="#A9A9A9")
+        button_info.configure(bg="#2E8B57")
+        button_settings.configure(bg="#A9A9A9")
+        main_frame.pack_forget()
+        settings_frame.pack_forget()
+        main1_frame.pack(side=LEFT, anchor=NW)
 
 
 def get_user_info():
@@ -170,7 +194,7 @@ def get_user_info():
             res = get_user_id(entry_id_or_nick.get(), cursor)
         cursor.close()
         connect.close()
-        if res == 0:
+        if res is None:
             messagebox.showerror('Input error', 'User not found')
             return
         entry_res.configure(state='normal')
@@ -187,7 +211,7 @@ def get_user_nickname(user, cursor):
         res = cursor.fetchall()
         return res[0][0]
     except IndexError:
-        return 0
+        return None
     except Exception as e:
         print(e)
 
@@ -198,7 +222,7 @@ def get_user_id(user, cursor):
         res = cursor.fetchall()
         return res[0][0]
     except IndexError:
-        return 0
+        return None
     except Exception as e:
         print(e)
 
@@ -306,6 +330,14 @@ def send_message_handler(*args):
             entry_id.focus_set()
 
 
+def change_text_font():
+    messagebox.showerror("error", "not worked")
+
+
+def change_but_font():
+    messagebox.showerror("error", "not worked")
+
+
 def loop(*args):
     while True:
         print(1)
@@ -327,17 +359,60 @@ entry_pass = tk.Entry(auth_frame, font=12, width=20, fg="black", show='*')
 entry_pass.bind("<Return>", login)
 entry_pass.pack(side=TOP)
 button_login = tk.Button(auth_frame, text="LOGIN", bg='#2E8B57', width=11, command=lambda: login())
-button_login.pack(side=LEFT, pady=2, anchor=CENTER)
+button_login.pack(side=LEFT, pady=3, anchor=CENTER)
 button_reg = tk.Button(auth_frame, text="REGISTER", bg='#2E8B57', width=11, command=lambda: register())
-button_reg.pack(side=RIGHT, pady=2, anchor=CENTER)
+button_reg.pack(side=RIGHT, pady=3, anchor=CENTER)
 # endregion
-
 # region main menu
-main_frame = LabelFrame(root, width=600, height=350)
+main_frame = LabelFrame(root, width=600, height=270)
+settings_frame = LabelFrame(root, width=600, height=270)
+menu_frame = LabelFrame(root, width=150, height=270, relief=FLAT)
+button_chat = tk.Button(menu_frame, text="CHAT", bg='#2E8B57', width=17, command=lambda: menu_navigation("chat"))
+button_chat.pack(side=TOP, anchor=N)
+button_info = tk.Button(menu_frame, text="INFO", bg='#A9A9A9', width=17, command=lambda: menu_navigation("info"))
+button_info.pack(side=TOP, pady=5, anchor=N)
+button_settings = tk.Button(menu_frame, text="SETTINGS", bg='#A9A9A9', width=17, command=lambda: menu_navigation("set"))
+button_settings.pack(side=TOP, anchor=N)
 main2_frame = LabelFrame(main_frame, width=600, height=350, relief=FLAT)
 main2_frame.pack(side=TOP, anchor=CENTER)
-main1_frame = LabelFrame(main2_frame, width=600, height=350, relief=SUNKEN)
-main1_frame.pack(side=LEFT, anchor=CENTER)
+# endregion
+# region chat
+list_box2 = Listbox(main2_frame, selectmode=EXTENDED, font=10, width=67, height=10, fg="black")
+list_box2.pack(side=LEFT)
+button_refresh = tk.Button(main_frame, text="REFRESH", bg='#2E8B57', width=85, command=lambda: get_message())
+button_refresh.pack(side=TOP, pady=3, anchor=CENTER)
+entry_id = tk.Entry(main_frame, font=10, width=8)
+entry_id.bind("<Return>", send_message_handler)
+entry_id.pack(side=LEFT, padx=6)
+entry_msg = tk.Entry(main_frame, font=10, width=50)
+entry_msg.bind("<Return>", send_message_handler)
+entry_msg.pack(side=LEFT, padx=3)
+button_send = tk.Button(main_frame, text="SEND", bg='#2E8B57', width=7, command=lambda: send_message())
+button_send.pack(side=LEFT, anchor=E)
+
+entry_log.focus_set()
+# root.after(500, loop)
+# endregion
+# region settings
+settings_frame1 = LabelFrame(settings_frame, width=600, height=25, relief=FLAT)
+settings_frame1.pack(side=TOP, pady=2, anchor=N)
+label_font = tk.Label(settings_frame1, font=10, text="  Text font:", fg="black", width=18, anchor=W)
+label_font.pack(side=LEFT, anchor=W)
+entry_font = tk.Entry(settings_frame1, font=12, width=20, fg="black")
+entry_font.pack(side=LEFT, padx=80, anchor=CENTER)
+button_font = tk.Button(settings_frame1, text="SET", bg='#2E8B57', width=15, command=lambda: change_text_font())
+button_font.pack(side=RIGHT, anchor=E)
+settings_frame2 = LabelFrame(settings_frame, width=600, height=25, relief=FLAT)
+settings_frame2.pack(side=TOP, pady=2, anchor=N)
+label_b_font = tk.Label(settings_frame2, font=10, text="  Buttons font:", fg="black", width=18, anchor=W)
+label_b_font.pack(side=LEFT, anchor=W)
+entry_b_font = tk.Entry(settings_frame2, font=12, width=20, fg="black")
+entry_b_font.pack(side=LEFT, padx=80, anchor=CENTER)
+button_b_font = tk.Button(settings_frame2, text="SET", bg='#2E8B57', width=15, command=lambda: change_but_font())
+button_b_font.pack(side=RIGHT, anchor=E)
+# endregion
+# region info
+main1_frame = LabelFrame(root, width=600, height=350, relief=SUNKEN)
 label_rep = tk.Label(main1_frame, font=10, text="ID/Nickname", fg="black", width=18)
 label_rep.pack(side=TOP, anchor=CENTER)
 entry_res = tk.Entry(main1_frame, font=10, width=20, state='disabled')
@@ -346,22 +421,6 @@ entry_id_or_nick = tk.Entry(main1_frame, font=10, width=20)
 entry_id_or_nick.pack(side=TOP, padx=2, anchor=CENTER)
 button_check = tk.Button(main1_frame, text="CHECK", bg='#2E8B57', width=25, command=lambda: get_user_info())
 button_check.pack(side=TOP, anchor=CENTER)
-list_box2 = Listbox(main2_frame, selectmode=EXTENDED, font=10, width=50, height=10, fg="black")
-list_box2.pack(side=LEFT)
-
-button_refresh = tk.Button(main_frame, text="REFRESH", bg='#2E8B57', width=85, command=lambda: get_message())
-button_refresh.pack(side=TOP, pady=3, anchor=CENTER)
-entry_id = tk.Entry(main_frame, font=10, width=8)
-entry_id.bind("<Return>", send_message_handler)
-entry_id.pack(side=LEFT, padx=2)
-entry_msg = tk.Entry(main_frame, font=10, width=50)
-entry_msg.bind("<Return>", send_message_handler)
-entry_msg.pack(side=LEFT, padx=2)
-button_send = tk.Button(main_frame, text="SEND", bg='#2E8B57', width=7, command=lambda: send_message())
-button_send.pack(side=LEFT, anchor=E)
-
-entry_log.focus_set()
-# root.after(500, loop)
 # endregion
 
 if __name__ == "__main__":
