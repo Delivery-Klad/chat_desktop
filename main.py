@@ -8,10 +8,9 @@ from tkinter import messagebox
 root = tk.Tk()
 w = root.winfo_screenwidth() // 2 - 140
 h = root.winfo_screenheight() // 2 - 100
-crypt_step = 12
 user_login = ''
 user_id = ''
-private_key = 0
+private_key = rsa.PrivateKey(1, 2, 3, 4, 5)
 
 
 def exception_handler(e, connect, cursor):
@@ -92,8 +91,9 @@ def login(*args):
                 connect.close()
                 messagebox.showerror('Input error', 'Wrong password')
                 return
-        except Exception as e:
-            exception_handler(e, connect, cursor)
+        except IndexError:
+            cursor.close()
+            connect.close()
             messagebox.showerror('Input error', 'User not found')
             return
         user_login = entry_log.get()
@@ -328,6 +328,18 @@ def send_message_handler(*args):
             entry_id.focus_set()
 
 
+def regenerate_keys():
+    global user_id
+    connect, cursor = pg_connect()
+    try:
+        cursor.execute("UPDATE users SET pubkey='{0}' WHERE id={1}".format(keys_generation(), user_id))
+        connect.commit()
+        cursor.close()
+        connect.close()
+    except Exception as e:
+        exception_handler(e, connect, cursor)
+
+
 def keys_generation():
     global private_key
     (pubkey, privkey) = rsa.newkeys(512)
@@ -349,11 +361,34 @@ def get_private_key():
 
 
 def change_text_font():
-    messagebox.showerror("error", "not worked")
+    if len(entry_font.get()) == 0:
+        messagebox.showerror("Input error", "Input field must be filled")
+        return
+    if not entry_font.get().isdigit():
+        messagebox.showerror("Input error", "Font must be a number")
+        return
+    for i in labels:
+        i.configure(font=int(entry_font.get()))
+    messagebox.showinfo("OOPS", "Not worked yet")
 
 
 def change_but_font():
-    messagebox.showerror("error", "not worked")
+    if len(entry_b_font.get()) == 0:
+        messagebox.showerror("Input error", "Input field must be filled")
+        return
+    if not entry_b_font.get().isdigit():
+        messagebox.showerror("Input error", "Font must be a number")
+        return
+    for i in buttons:
+        i.configure(font=int(entry_b_font.get()))
+    messagebox.showinfo("OOPS", "Not worked yet")
+
+
+def change_password():
+    try:
+        messagebox.showinfo("OOPS", "Not worked yet")
+    except Exception as e:
+        print(e)
 
 
 def loop(*args):
@@ -366,13 +401,13 @@ create_tables()
 # region auth
 auth_frame = LabelFrame(root, width=200, height=130, relief=FLAT)
 auth_frame.pack(side=TOP, anchor=CENTER)
-label_rep = tk.Label(auth_frame, font=10, text="Username:                       ", fg="black", width=18)
-label_rep.pack(side=TOP, anchor=S)
+label_user = tk.Label(auth_frame, font=10, text="Username:                       ", fg="black", width=18)
+label_user.pack(side=TOP, anchor=S)
 entry_log = tk.Entry(auth_frame, font=12, width=20, fg="black")
 entry_log.bind("<Return>", login_handler)
 entry_log.pack(side=TOP)
-label_rep = tk.Label(auth_frame, font=10, text="Password:                       ", fg="black", width=18)
-label_rep.pack(side=TOP, anchor=S)
+label_password = tk.Label(auth_frame, font=10, text="Password:                       ", fg="black", width=18)
+label_password.pack(side=TOP, anchor=S)
 entry_pass = tk.Entry(auth_frame, font=12, width=20, fg="black", show='*')
 entry_pass.bind("<Return>", login)
 entry_pass.pack(side=TOP)
@@ -407,7 +442,6 @@ entry_msg.bind("<Return>", send_message_handler)
 entry_msg.pack(side=LEFT, padx=3)
 button_send = tk.Button(main_frame, text="SEND", bg='#2E8B57', width=7, command=lambda: send_message())
 button_send.pack(side=LEFT, anchor=E)
-
 entry_log.focus_set()
 # root.after(500, loop)
 # endregion
@@ -428,11 +462,36 @@ entry_b_font = tk.Entry(settings_frame2, font=12, width=20, fg="black")
 entry_b_font.pack(side=LEFT, padx=80, anchor=CENTER)
 button_b_font = tk.Button(settings_frame2, text="SET", bg='#2E8B57', width=15, command=lambda: change_but_font())
 button_b_font.pack(side=RIGHT, anchor=E)
+settings_frame3 = LabelFrame(settings_frame, width=600, height=25, relief=FLAT)
+settings_frame3.pack(side=TOP, pady=2, anchor=N)
+
+settings_frame5 = LabelFrame(settings_frame3, width=600, height=25, relief=FLAT)
+settings_frame5.pack(side=LEFT, pady=2, padx=2, anchor=N)
+label_old_pass = tk.Label(settings_frame5, font=10, text="Old password:", fg="black", width=18, anchor=W)
+label_old_pass.pack(side=TOP, anchor=W)
+entry_old_pass = tk.Entry(settings_frame5, font=12, width=20, fg="black")
+entry_old_pass.pack(side=TOP, anchor=CENTER)
+
+settings_frame6 = LabelFrame(settings_frame3, width=600, height=25, relief=FLAT)
+settings_frame6.pack(side=LEFT, pady=2, padx=53, anchor=N)
+label_new_pass = tk.Label(settings_frame6, font=10, text="New password:", fg="black", width=18, anchor=W)
+label_new_pass.pack(side=TOP, anchor=W)
+entry_new_pass = tk.Entry(settings_frame6, font=12, width=20, fg="black")
+entry_new_pass.pack(side=TOP, anchor=CENTER)
+
+button_pass_font = tk.Button(settings_frame3, text="CHANGE", bg='#2E8B57', width=17, command=lambda: change_but_font())
+button_pass_font.pack(side=RIGHT, anchor=S)
+
+settings_frame4 = LabelFrame(settings_frame, width=600, height=25, relief=FLAT)
+settings_frame4.pack(side=TOP, pady=2, anchor=N)
+button_b_font = tk.Button(settings_frame4, text="REGENERATE CRYPT KEYS", bg='#2E8B57', width=100,
+                          command=lambda: regenerate_keys())
+button_b_font.pack(side=TOP, anchor=CENTER)
 # endregion
 # region info
 main1_frame = LabelFrame(root, width=600, height=350, relief=SUNKEN)
-label_rep = tk.Label(main1_frame, font=10, text="ID/Nickname", fg="black", width=18)
-label_rep.pack(side=TOP, anchor=CENTER)
+label_info = tk.Label(main1_frame, font=10, text="ID/Nickname", fg="black", width=18)
+label_info.pack(side=TOP, anchor=CENTER)
 entry_res = tk.Entry(main1_frame, font=10, width=20, state='disabled')
 entry_res.pack(side=TOP, padx=2, pady=3, anchor=CENTER)
 entry_id_or_nick = tk.Entry(main1_frame, font=10, width=20)
@@ -440,6 +499,10 @@ entry_id_or_nick.pack(side=TOP, padx=2, anchor=CENTER)
 button_check = tk.Button(main1_frame, text="CHECK", bg='#2E8B57', width=25, command=lambda: get_user_info())
 button_check.pack(side=TOP, anchor=CENTER)
 # endregion
+
+labels = [label_user, label_password, list_box2, entry_id, entry_msg, label_old_pass, entry_old_pass, entry_id_or_nick,
+          label_info, entry_res, entry_new_pass, label_new_pass, entry_font, entry_b_font, label_font, label_b_font]
+buttons = []
 
 if __name__ == "__main__":
     root.title("Chat")
