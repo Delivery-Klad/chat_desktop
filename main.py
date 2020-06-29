@@ -1,3 +1,4 @@
+import os
 import psycopg2
 import bcrypt
 import rsa
@@ -10,7 +11,15 @@ w = root.winfo_screenwidth() // 2 - 140
 h = root.winfo_screenheight() // 2 - 100
 user_login = ''
 user_id = ''
+var = IntVar()
 private_key = rsa.PrivateKey(1, 2, 3, 4, 5)
+files_dir = 'files'
+auto_fill_data_file = files_dir + '/rem.rm'
+private_key_file = files_dir + '/priv_key.PEM'
+try:
+    os.mkdir(files_dir)
+except FileExistsError:
+    pass
 
 
 def exception_handler(e, connect, cursor):
@@ -60,7 +69,7 @@ def check_input(password: str, log: str):
         messagebox.showerror('Input error', 'Login length must be more than 5 characters')
         return False
     if len(password) < 8:
-        messagebox.showerror('Input error', 'Password length must be more than 8 characters')
+        messagebox.showerror('Input error', 'Password does not meet the requirements')
         return False
     for i in password:
         if ord(i) < 45 or ord(i) > 122:
@@ -73,6 +82,61 @@ def check_input(password: str, log: str):
     return True
 
 
+def check_password(cursor, log, pas):
+    try:
+        cursor.execute("SELECT password FROM users WHERE login='{0}'".format(log))
+        res = cursor.fetchall()[0][0]
+        hashed_password = res.encode('utf-8')
+        if bcrypt.checkpw(pas, hashed_password):
+            return "True"
+        return "False"
+    except IndexError:
+        return "None"
+    except Exception as e:
+        print(e)
+
+
+def auto_login():
+    global user_login
+    global user_id
+    psw, lgn = '', ''
+    try:
+        with open(auto_fill_data_file, 'r') as file:
+            res = file.read().split('  ', 1)
+        if len(res) == 1:
+            return
+        tmp = res[0].split(' ')
+        for i in tmp:
+            lgn += chr(int(i) - 1)
+        tmp = res[1].split(' ')
+        tmp.pop(len(tmp) - 1)
+        for i in tmp:
+            psw += chr(int(i) - 2)
+        entry_log.insert(0, lgn)
+        entry_pass.insert(0, psw)
+        var.set(1)
+    except FileNotFoundError:
+        pass
+    except Exception as e:
+        print(e)
+
+
+def clear_auto_login():
+    with open(auto_fill_data_file, 'w') as file:
+        file.write('')
+
+
+def fill_auto_login_file(lgn, psw):
+    with open(auto_fill_data_file, 'w') as file:
+        file.write('')
+    with open(auto_fill_data_file, 'a') as file:
+        for i in lgn:
+            file.write(str(ord(i) + 1) + ' ')
+        file.write(' ')
+        for i in psw:
+            file.write(str(ord(i) + 2) + ' ')
+
+
 def login(*args):
     global user_login
     global user_id
@@ -81,21 +145,21 @@ def login(*args):
         if len(entry_log.get()) == 0 or len(entry_pass.get()) == 0:
             messagebox.showerror('Input error', 'Fill all input fields')
             return
-        try:
-            cursor.execute("SELECT password FROM users WHERE login='{0}'".format(entry_log.get()))
-            res = cursor.fetchall()[0][0]
-            hashed_password = res.encode('utf-8')
-            password = entry_pass.get().encode('utf-8')
-            if not bcrypt.checkpw(password, hashed_password):
-                cursor.close()
-                connect.close()
-                messagebox.showerror('Input error', 'Wrong password')
-                return
-        except IndexError:
+        res = check_password(cursor, entry_log.get(), entry_pass.get().encode('utf-8'))
+        if res == "False":
+            cursor.close()
+            connect.close()
+            messagebox.showerror('Input error', 'Wrong password')
+            return
+        elif res == "None":
             cursor.close()
             connect.close()
             messagebox.showerror('Input error', 'User not found')
             return
+        if var.get() == 0:
+            clear_auto_login()
+        else:
+            fill_auto_login_file(entry_log.get(), entry_pass.get())
         user_login = entry_log.get()
         user_id = get_id(cursor)
         get_message()
@@ -362,18 +426,21 @@ def regenerate_keys():
 
 def keys_generation():
     global private_key
-    (pubkey, privkey) = rsa.newkeys(512)
-    pubkey = str(pubkey)[10:-1]
-    with open("priv_key.PEM", 'w') as file:
-        file.write(privkey.save_pkcs1().decode('ascii'))
-    private_key = privkey
-    return pubkey
+    try:
+        (pubkey, privkey) = rsa.newkeys(512)
+        pubkey = str(pubkey)[10:-1]
+        with open(private_key_file, 'w') as file:
+            file.write(privkey.save_pkcs1().decode('ascii'))
+        private_key = privkey
+        return pubkey
+    except Exception as e:
+        print(e)
 
 
 def get_private_key():
     try:
         global private_key
-        with open("priv_key.PEM", 'rb') as file:
+        with open(private_key_file, 'rb') as file:
             data = file.read()
         private_key = rsa.PrivateKey.load_pkcs1(data)
     except FileNotFoundError:
@@ -405,12 +472,42 @@ def change_but_font():
 
 
 def change_password():
+    global user_login
+    connect, cursor = pg_connect()
     try:
-        print(check_input(entry_new_pass.get(), entry_old_pass.get()))
-        messagebox.showinfo("OOPS", "Not worked yet")
-
+        res = check_password(cursor, user_login, entry_old_pass.get().encode('utf-8'))
+        if res == "False":
+            messagebox.showerror("Input error", "Current password is wrong")
+            cursor.close()
+            connect.close()
+            return
+        if check_input(entry_new_pass.get(), entry_old_pass.get()):
+            hashed_pass = bcrypt.hashpw(entry_new_pass.get().encode('utf-8'), bcrypt.gensalt())
+            hashed_pass = str(hashed_pass)[2:-1]
+            cursor.execute("UPDATE users SET password='{0}' WHERE login='{1}'".format(hashed_pass, user_login))
+            connect.commit()
+            messagebox.showinfo("Success", "Password has been changed")
+        cursor.close()
+        connect.close()
+        with open(auto_fill_data_file, 'r') as file:
+            res = file.read().split('  ', 1)
+        if len(res) == 1:
+            return
+        fill_auto_login_file(user_login, entry_new_pass.get())
     except Exception as e:
-        print(e)
+        exception_handler(e, connect, cursor)
+
+
+def logout():
+    global w
+    global h
+    w += 200
+    menu_navigation("chat")
+    menu_frame.pack_forget()
+    main_frame.pack_forget()
+    root.geometry("200x160+{}+{}".format(w, h))
+    entry_log.focus_set()
+    auth_frame.pack(side=TOP, anchor=CENTER)
 
 
 def loop(*args):
@@ -433,6 +530,8 @@ label_password.pack(side=TOP, anchor=S)
 entry_pass = tk.Entry(auth_frame, font=12, width=20, fg="black", show='•')
 entry_pass.bind("<Return>", login)
 entry_pass.pack(side=TOP)
+check_remember = tk.Checkbutton(auth_frame, font=10, fg='black', text='Remember me', variable=var)
+check_remember.pack(side=TOP, anchor=S)
 button_login = tk.Button(auth_frame, text="LOGIN", bg='#2E8B57', width=11, command=lambda: login())
 button_login.pack(side=LEFT, pady=3, anchor=CENTER)
 button_reg = tk.Button(auth_frame, text="REGISTER", bg='#2E8B57', width=11, command=lambda: register())
@@ -448,6 +547,8 @@ button_info = tk.Button(menu_frame, text="INFO", bg='#A9A9A9', width=17, command
 button_info.pack(side=TOP, pady=5, anchor=N)
 button_settings = tk.Button(menu_frame, text="SETTINGS", bg='#A9A9A9', width=17, command=lambda: menu_navigation("set"))
 button_settings.pack(side=TOP, anchor=N)
+button_logout = tk.Button(menu_frame, text="LOGOUT", bg='#A9A9A9', width=17, command=lambda: logout())
+button_logout.pack(side=TOP, pady=5, anchor=N)
 main2_frame = LabelFrame(main_frame, width=600, height=350, relief=FLAT)
 main2_frame.pack(side=TOP, anchor=CENTER)
 # endregion
@@ -489,7 +590,7 @@ settings_frame3.pack(side=TOP, pady=2, anchor=N)
 
 settings_frame5 = LabelFrame(settings_frame3, width=600, height=25, relief=FLAT)
 settings_frame5.pack(side=LEFT, pady=2, padx=2, anchor=N)
-label_old_pass = tk.Label(settings_frame5, font=10, text="Old password:", fg="black", width=18, anchor=W)
+label_old_pass = tk.Label(settings_frame5, font=10, text="Current password:", fg="black", width=18, anchor=W)
 label_old_pass.pack(side=TOP, anchor=W)
 entry_old_pass = tk.Entry(settings_frame5, font=12, width=20, fg="black", show='•')
 entry_old_pass.bind("<Return>", change_pass_handler)
@@ -526,9 +627,10 @@ button_check.pack(side=TOP, anchor=CENTER)
 labels = [label_user, label_password, list_box2, entry_id, entry_msg, label_old_pass, entry_old_pass, entry_id_or_nick,
           label_info, entry_res, entry_new_pass, label_new_pass, entry_font, entry_b_font, label_font, label_b_font]
 buttons = []
+auto_login()
 
 if __name__ == "__main__":
     root.title("Chat")
-    root.geometry("200x130+{}+{}".format(w, h))
+    root.geometry("200x160+{}+{}".format(w, h))
     root.resizable(False, False)
     root.mainloop()
