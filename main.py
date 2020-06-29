@@ -328,6 +328,26 @@ def send_message_handler(*args):
             entry_id.focus_set()
 
 
+def change_pass_handler(*args):
+    if str(root.focus_get()) == ".!labelframe3.!labelframe3.!labelframe.!entry":
+        if len(entry_old_pass.get()) != 0:
+            entry_new_pass.focus_set()
+            return
+        elif len(entry_old_pass.get()) != 0 and len(entry_new_pass.get()) != 0:
+            change_password()
+            return
+    elif str(root.focus_get()) == ".!labelframe3.!labelframe3.!labelframe2.!entry":
+        if len(entry_new_pass.get()) == 0:
+            messagebox.showerror("Input error", "Fill all input fields")
+            return
+        elif len(entry_old_pass.get()) == 0:
+            entry_old_pass.focus_set()
+            return
+        elif len(entry_old_pass.get()) != 0 and len(entry_new_pass.get()) != 0:
+            change_password()
+            return
+
+
 def regenerate_keys():
     global user_id
     connect, cursor = pg_connect()
@@ -386,7 +406,9 @@ def change_but_font():
 
 def change_password():
     try:
+        print(check_input(entry_new_pass.get(), entry_old_pass.get()))
         messagebox.showinfo("OOPS", "Not worked yet")
+
     except Exception as e:
         print(e)
 
@@ -408,7 +430,7 @@ entry_log.bind("<Return>", login_handler)
 entry_log.pack(side=TOP)
 label_password = tk.Label(auth_frame, font=10, text="Password:                       ", fg="black", width=18)
 label_password.pack(side=TOP, anchor=S)
-entry_pass = tk.Entry(auth_frame, font=12, width=20, fg="black", show='*')
+entry_pass = tk.Entry(auth_frame, font=12, width=20, fg="black", show='•')
 entry_pass.bind("<Return>", login)
 entry_pass.pack(side=TOP)
 button_login = tk.Button(auth_frame, text="LOGIN", bg='#2E8B57', width=11, command=lambda: login())
@@ -469,22 +491,23 @@ settings_frame5 = LabelFrame(settings_frame3, width=600, height=25, relief=FLAT)
 settings_frame5.pack(side=LEFT, pady=2, padx=2, anchor=N)
 label_old_pass = tk.Label(settings_frame5, font=10, text="Old password:", fg="black", width=18, anchor=W)
 label_old_pass.pack(side=TOP, anchor=W)
-entry_old_pass = tk.Entry(settings_frame5, font=12, width=20, fg="black")
+entry_old_pass = tk.Entry(settings_frame5, font=12, width=20, fg="black", show='•')
+entry_old_pass.bind("<Return>", change_pass_handler)
 entry_old_pass.pack(side=TOP, anchor=CENTER)
-
 settings_frame6 = LabelFrame(settings_frame3, width=600, height=25, relief=FLAT)
 settings_frame6.pack(side=LEFT, pady=2, padx=53, anchor=N)
 label_new_pass = tk.Label(settings_frame6, font=10, text="New password:", fg="black", width=18, anchor=W)
 label_new_pass.pack(side=TOP, anchor=W)
-entry_new_pass = tk.Entry(settings_frame6, font=12, width=20, fg="black")
+entry_new_pass = tk.Entry(settings_frame6, font=12, width=20, fg="black", show='•')
+entry_new_pass.bind("<Return>", change_pass_handler)
 entry_new_pass.pack(side=TOP, anchor=CENTER)
 
-button_pass_font = tk.Button(settings_frame3, text="CHANGE", bg='#2E8B57', width=17, command=lambda: change_but_font())
+button_pass_font = tk.Button(settings_frame3, text="CHANGE", bg='#2E8B57', width=17, command=lambda: change_password())
 button_pass_font.pack(side=RIGHT, anchor=S)
 
 settings_frame4 = LabelFrame(settings_frame, width=600, height=25, relief=FLAT)
 settings_frame4.pack(side=TOP, pady=2, anchor=N)
-button_b_font = tk.Button(settings_frame4, text="REGENERATE CRYPT KEYS", bg='#2E8B57', width=100,
+button_b_font = tk.Button(settings_frame4, text="REGENERATE ENCRYPTION KEYS", bg='#2E8B57', width=100,
                           command=lambda: regenerate_keys())
 button_b_font.pack(side=TOP, anchor=CENTER)
 # endregion
