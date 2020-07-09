@@ -5,8 +5,12 @@ import rsa
 import tkinter as tk
 from tkinter import *
 from tkinter import messagebox
+from PIL import Image as image1
+from PIL import ImageTk as image2
+import base64
 
 root = tk.Tk()
+spacing = 0
 w = root.winfo_screenwidth() // 2 - 140
 h = root.winfo_screenheight() // 2 - 100
 user_login = ''
@@ -44,6 +48,13 @@ def pg_connect():
     except Exception as e:
         print(e)
 
+
+def auto_check_message():
+    try:
+        get_message()
+    except Exception as e:
+        print(e)
+        
 
 def create_tables():
     connect, cursor = pg_connect()
@@ -316,7 +327,7 @@ def send_message():
         msg = entry_msg.get()
         cursor.execute("SELECT pubkey FROM users WHERE id={0}".format(to_id))
         res = cursor.fetchall()[0][0]
-        encrypt_msg = encrypt(msg, res)
+        encrypt_msg = encrypt(msg.encode('utf-8'), res)
         cursor.execute("INSERT INTO messages VALUES ({0}, {1}, {2})".format(user_id, to_id, encrypt_msg))
         entry_msg.delete(0, tk.END)
         connect.commit()
@@ -327,7 +338,7 @@ def send_message():
 
 
 def get_message():
-    global user_id
+    global user_id, spacing
     connect, cursor = pg_connect()
     try:
         cursor.execute("SELECT * FROM messages WHERE to_id={0}".format(user_id))
@@ -338,18 +349,21 @@ def get_message():
             decrypt_msg = decrypt(i[2])
             nickname = get_user_nickname(i[0], cursor)
             content = '{0}: {1}'.format(nickname, decrypt_msg)
-            list_box2.insert(tk.END, content)
+            widget = Label(canvas, text=content, bg='white', fg='black', font=14)
+            canvas.create_window(0, spacing, window=widget, anchor='nw')
+            spacing += 25
+            canvas.config(scrollregion=canvas.bbox("all"))
         cursor.close()
         connect.close()
     except Exception as e:
         exception_handler(e, connect, cursor)
 
 
-def encrypt(msg: str, pubkey):
+def encrypt(msg: bytes, pubkey):
     try:
         pubkey = pubkey.split(', ')
         pubkey = rsa.PublicKey(int(pubkey[0]), int(pubkey[1]))
-        encrypt_message = rsa.encrypt(msg.encode('utf-8'), pubkey)
+        encrypt_message = rsa.encrypt(msg, pubkey)
         encrypt_message = encrypt_message
         return psycopg2.Binary(encrypt_message)
     except Exception as e:
@@ -552,9 +566,42 @@ button_logout.pack(side=TOP, pady=5, anchor=N)
 main2_frame = LabelFrame(main_frame, width=600, height=350, relief=FLAT)
 main2_frame.pack(side=TOP, anchor=CENTER)
 # endregion
+
+
+def wind():
+
+    with open('photo.png', 'rb') as file:
+        b64 = base64.b64encode(file.read())
+        print(b64)
+        print(type(b64))
+        print(base64.b64decode(b64))
+        print(type(base64.b64decode(b64)))
+        print('flex'.encode('utf-8'))
+        print(type('flex'.encode('utf-8')))
+    # return
+
+    global spacing
+    im = image1.open('photo.png')
+    photo = image2.PhotoImage(im)
+    widget = Label(canvas, image=photo, fg='black')
+    widget.image = photo
+    canvas.create_window(0, spacing, window=widget, anchor='nw')
+    spacing += photo.height() + 25
+    widget = Label(canvas, text='flex', fg='black')
+    canvas.create_window(0, spacing, window=widget, anchor='nw')
+    canvas.config(scrollregion=canvas.bbox("all"))
+
+
 # region chat
-list_box2 = Listbox(main2_frame, selectmode=EXTENDED, font=10, width=67, height=10, fg="black")
-list_box2.pack(side=LEFT)
+frame = Frame(main2_frame, width=600, height=200)
+frame.pack(expand=True, fill=BOTH)
+canvas = Canvas(frame, bg='#FFFFFF', width=600, height=200, scrollregion=(0, 0, 500, 500))
+vbar = Scrollbar(frame, orient=VERTICAL)
+vbar.pack(side=RIGHT, fill=Y)
+vbar.config(command=canvas.yview)
+canvas.config(width=600, height=200)
+canvas.config(yscrollcommand=vbar.set)
+canvas.pack(side=TOP, expand=True, fill=BOTH)
 button_refresh = tk.Button(main_frame, text="REFRESH", bg='#2E8B57', width=85, command=lambda: get_message())
 button_refresh.pack(side=TOP, pady=3, anchor=CENTER)
 entry_id = tk.Entry(main_frame, font=10, width=8)
@@ -624,7 +671,7 @@ button_check = tk.Button(main1_frame, text="CHECK", bg='#2E8B57', width=25, comm
 button_check.pack(side=TOP, anchor=CENTER)
 # endregion
 
-labels = [label_user, label_password, list_box2, entry_id, entry_msg, label_old_pass, entry_old_pass, entry_id_or_nick,
+labels = [label_user, label_password, entry_id, entry_msg, label_old_pass, entry_old_pass, entry_id_or_nick,
           label_info, entry_res, entry_new_pass, label_new_pass, entry_font, entry_b_font, label_font, label_b_font]
 buttons = []
 auto_login()
