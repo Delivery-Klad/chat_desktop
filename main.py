@@ -8,6 +8,7 @@ from tkinter import messagebox
 from PIL import Image as image1
 from PIL import ImageTk as image2
 import base64
+import os
 
 root = tk.Tk()
 spacing = 0
@@ -337,6 +338,19 @@ def send_message():
         exception_handler(e, connect, cursor)
 
 
+def send_image():
+    connect, cursor = pg_connect()
+    try:
+        with open('1.png', 'rb') as file:
+            b64 = base64.b64encode(file.read())
+        cursor.execute("INSERT INTO messages VALUES ({0}, {1}, {2})".format(0, 0, psycopg2.Binary(b64)))
+        connect.commit()
+        cursor.close()
+        connect.close()
+    except Exception as e:
+        exception_handler(e, connect, cursor)
+
+
 def get_message():
     global user_id, spacing
     connect, cursor = pg_connect()
@@ -348,11 +362,28 @@ def get_message():
         for i in res:
             decrypt_msg = decrypt(i[2])
             nickname = get_user_nickname(i[0], cursor)
-            content = '{0}: {1}'.format(nickname, decrypt_msg)
-            widget = Label(canvas, text=content, bg='white', fg='black', font=14)
-            canvas.create_window(0, spacing, window=widget, anchor='nw')
-            spacing += 25
-            canvas.config(scrollregion=canvas.bbox("all"))
+            if decrypt_msg is None:
+                content = '{0}: photo image'.format(nickname)
+                widget = Label(canvas, text=content, bg='white', fg='black', font=14)
+                canvas.create_window(0, spacing, window=widget, anchor='nw')
+                spacing += 25
+                canvas.config(scrollregion=canvas.bbox("all"))
+                with open('2.png', 'wb') as file:
+                    file.write(base64.b64decode(i[2]))
+                im = image1.open('2.png')
+                photo = image2.PhotoImage(im)
+                im.close()
+                os.remove('2.png')
+                widget = Label(canvas, image=photo, fg='black')
+                widget.image = photo
+                canvas.create_window(0, spacing, window=widget, anchor='nw')
+                spacing += photo.height() + 25
+            else:
+                content = '{0}: {1}'.format(nickname, decrypt_msg)
+                widget = Label(canvas, text=content, bg='white', fg='black', font=14)
+                canvas.create_window(0, spacing, window=widget, anchor='nw')
+                spacing += 25
+        canvas.config(scrollregion=canvas.bbox("all"))
         cursor.close()
         connect.close()
     except Exception as e:
@@ -377,6 +408,7 @@ def decrypt(msg: bytes):
         return decrypted_message.decode('utf-8')
     except Exception as e:
         print(e)
+        return None
 
 
 def login_handler(*args):
@@ -566,32 +598,6 @@ button_logout.pack(side=TOP, pady=5, anchor=N)
 main2_frame = LabelFrame(main_frame, width=600, height=350, relief=FLAT)
 main2_frame.pack(side=TOP, anchor=CENTER)
 # endregion
-
-
-def wind():
-
-    with open('photo.png', 'rb') as file:
-        b64 = base64.b64encode(file.read())
-        print(b64)
-        print(type(b64))
-        print(base64.b64decode(b64))
-        print(type(base64.b64decode(b64)))
-        print('flex'.encode('utf-8'))
-        print(type('flex'.encode('utf-8')))
-    # return
-
-    global spacing
-    im = image1.open('photo.png')
-    photo = image2.PhotoImage(im)
-    widget = Label(canvas, image=photo, fg='black')
-    widget.image = photo
-    canvas.create_window(0, spacing, window=widget, anchor='nw')
-    spacing += photo.height() + 25
-    widget = Label(canvas, text='flex', fg='black')
-    canvas.create_window(0, spacing, window=widget, anchor='nw')
-    canvas.config(scrollregion=canvas.bbox("all"))
-
-
 # region chat
 frame = Frame(main2_frame, width=600, height=200)
 frame.pack(expand=True, fill=BOTH)
@@ -602,16 +608,19 @@ vbar.config(command=canvas.yview)
 canvas.config(width=600, height=200)
 canvas.config(yscrollcommand=vbar.set)
 canvas.pack(side=TOP, expand=True, fill=BOTH)
+canvas.config(scrollregion=canvas.bbox("all"))
 button_refresh = tk.Button(main_frame, text="REFRESH", bg='#2E8B57', width=85, command=lambda: get_message())
 button_refresh.pack(side=TOP, pady=3, anchor=CENTER)
 entry_id = tk.Entry(main_frame, font=10, width=8)
 entry_id.bind("<Return>", send_message_handler)
-entry_id.pack(side=LEFT, padx=6)
-entry_msg = tk.Entry(main_frame, font=10, width=50)
+entry_id.pack(side=LEFT, padx=5)
+entry_msg = tk.Entry(main_frame, font=10, width=49)
 entry_msg.bind("<Return>", send_message_handler)
 entry_msg.pack(side=LEFT, padx=3)
-button_send = tk.Button(main_frame, text="SEND", bg='#2E8B57', width=7, command=lambda: send_message())
-button_send.pack(side=LEFT, anchor=E)
+button_img = tk.Button(main_frame, text="I", bg='#2E8B57', width=2, command=lambda: send_message())
+button_img.pack(side=LEFT, anchor=E)
+button_send = tk.Button(main_frame, text="SEND", bg='#2E8B57', width=5, command=lambda: send_message())
+button_send.pack(side=LEFT, anchor=E, padx=3)
 entry_log.focus_set()
 # root.after(500, loop)
 # endregion
