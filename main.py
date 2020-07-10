@@ -5,10 +5,10 @@ import rsa
 import tkinter as tk
 from tkinter import *
 from tkinter import messagebox
+from tkinter import filedialog
 from PIL import Image as image1
 from PIL import ImageTk as image2
 import base64
-import os
 
 root = tk.Tk()
 spacing = 0
@@ -237,7 +237,7 @@ def hide_auth_menu():
     global h
     w -= 200
     auth_frame.pack_forget()
-    root.geometry("750x270+{}+{}".format(w, h))
+    root.geometry("1000x500+{}+{}".format(w, h))
     entry_id.focus_set()
     menu_frame.pack(side=LEFT, pady=5, anchor=N)
     main_frame.pack(side=LEFT, anchor=CENTER)
@@ -318,6 +318,8 @@ def send_message():
             cursor.close()
             connect.close()
             return
+        if not entry_id.get().isdigit():
+            messagebox.showerror('Input error', 'Id must be a number')
         for i in entry_msg.get():
             if ord(i) < 32 or ord(i) > 1366:
                 messagebox.showerror('Input error', 'Unsupported symbols')
@@ -339,11 +341,26 @@ def send_message():
 
 
 def send_image():
+    global user_id
     connect, cursor = pg_connect()
     try:
-        with open('1.png', 'rb') as file:
+        if len(entry_id.get()) == 0:
+            messagebox.showerror('Input error', 'Fill "id" input field')
+            return
+        path = filedialog.askopenfilename(filetypes=(("image", "*.png"), ("image", "*.jpg")))
+
+        original_img = image1.open(path)
+        width, height = original_img.size
+        while width > 840:
+            width = round(width * 0.8)
+            height = round(height * 0.8)
+        original_img.thumbnail((width, height), image1.ANTIALIAS)
+        original_img.save('resized_image.png')
+        original_img.close()
+        with open('resized_image.png', 'rb') as file:
             b64 = base64.b64encode(file.read())
-        cursor.execute("INSERT INTO messages VALUES ({0}, {1}, {2})".format(0, 0, psycopg2.Binary(b64)))
+        cursor.execute("INSERT INTO messages VALUES ({0}, {1}, {2})".format(user_id, entry_id.get(), psycopg2.Binary(b64)))
+        os.remove('resized_image.png')
         connect.commit()
         cursor.close()
         connect.close()
@@ -377,7 +394,7 @@ def get_message():
                 widget = Label(canvas, image=photo, fg='black')
                 widget.image = photo
                 canvas.create_window(0, spacing, window=widget, anchor='nw')
-                spacing += photo.height() + 25
+                spacing += photo.height() + 2
             else:
                 content = '{0}: {1}'.format(nickname, decrypt_msg)
                 widget = Label(canvas, text=content, bg='white', fg='black', font=14)
@@ -473,7 +490,7 @@ def regenerate_keys():
 def keys_generation():
     global private_key
     try:
-        (pubkey, privkey) = rsa.newkeys(512)
+        (pubkey, privkey) = rsa.newkeys(1024)
         pubkey = str(pubkey)[10:-1]
         with open(private_key_file, 'w') as file:
             file.write(privkey.save_pkcs1().decode('ascii'))
@@ -562,6 +579,11 @@ def loop(*args):
         root.update()
 
 
+def OnMouseWheel(event):
+    canvas.yview("scroll", event.delta, "units")
+    return "break"
+
+
 create_tables()
 # region auth
 auth_frame = LabelFrame(root, width=200, height=130, relief=FLAT)
@@ -584,9 +606,9 @@ button_reg = tk.Button(auth_frame, text="REGISTER", bg='#2E8B57', width=11, comm
 button_reg.pack(side=RIGHT, pady=3, anchor=CENTER)
 # endregion
 # region main menu
-main_frame = LabelFrame(root, width=600, height=270)
-settings_frame = LabelFrame(root, width=600, height=270)
-menu_frame = LabelFrame(root, width=150, height=270, relief=FLAT)
+main_frame = LabelFrame(root, width=850, height=500)
+settings_frame = LabelFrame(root, width=600, height=500)
+menu_frame = LabelFrame(root, width=150, height=500, relief=FLAT)
 button_chat = tk.Button(menu_frame, text="CHAT", bg='#2E8B57', width=17, command=lambda: menu_navigation("chat"))
 button_chat.pack(side=TOP, anchor=N)
 button_info = tk.Button(menu_frame, text="INFO", bg='#A9A9A9', width=17, command=lambda: menu_navigation("info"))
@@ -598,28 +620,33 @@ button_logout.pack(side=TOP, pady=5, anchor=N)
 main2_frame = LabelFrame(main_frame, width=600, height=350, relief=FLAT)
 main2_frame.pack(side=TOP, anchor=CENTER)
 # endregion
+
 # region chat
-frame = Frame(main2_frame, width=600, height=200)
+frame = Frame(main2_frame, width=850, height=500)
 frame.pack(expand=True, fill=BOTH)
-canvas = Canvas(frame, bg='#FFFFFF', width=600, height=200, scrollregion=(0, 0, 500, 500))
+canvas = Canvas(frame, bg='#FFFFFF', width=850, height=410, scrollregion=(0, 0, 500, 500))
 vbar = Scrollbar(frame, orient=VERTICAL)
 vbar.pack(side=RIGHT, fill=Y)
 vbar.config(command=canvas.yview)
-canvas.config(width=600, height=200)
-canvas.config(yscrollcommand=vbar.set)
+hbar = Scrollbar(frame, orient=HORIZONTAL)
+hbar.pack(side=BOTTOM, fill=X)
+hbar.config(command=canvas.xview)
+canvas.config(width=850, height=410)
+canvas.config(xscrollcommand=hbar.set, yscrollcommand=vbar.set)
 canvas.pack(side=TOP, expand=True, fill=BOTH)
+canvas.bind("<MouseWheel>", OnMouseWheel)
 canvas.config(scrollregion=canvas.bbox("all"))
-button_refresh = tk.Button(main_frame, text="REFRESH", bg='#2E8B57', width=85, command=lambda: get_message())
+button_refresh = tk.Button(main_frame, text="REFRESH", bg='#2E8B57', width=128, command=lambda: get_message())
 button_refresh.pack(side=TOP, pady=3, anchor=CENTER)
 entry_id = tk.Entry(main_frame, font=10, width=8)
 entry_id.bind("<Return>", send_message_handler)
 entry_id.pack(side=LEFT, padx=5)
-entry_msg = tk.Entry(main_frame, font=10, width=49)
+entry_msg = tk.Entry(main_frame, font=10, width=75)
 entry_msg.bind("<Return>", send_message_handler)
 entry_msg.pack(side=LEFT, padx=3)
-button_img = tk.Button(main_frame, text="I", bg='#2E8B57', width=2, command=lambda: send_message())
+button_img = tk.Button(main_frame, text="➕", bg='#2E8B57', width=3, command=lambda: send_image())
 button_img.pack(side=LEFT, anchor=E)
-button_send = tk.Button(main_frame, text="SEND", bg='#2E8B57', width=5, command=lambda: send_message())
+button_send = tk.Button(main_frame, text="SEND", bg='#2E8B57', width=8, command=lambda: send_message())
 button_send.pack(side=LEFT, anchor=E, padx=3)
 entry_log.focus_set()
 # root.after(500, loop)
