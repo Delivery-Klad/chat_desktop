@@ -348,10 +348,14 @@ def send_image():
             messagebox.showerror('Input error', 'Fill "id" input field')
             return
         path = filedialog.askopenfilename(filetypes=(("image", "*.png"), ("image", "*.jpg")))
-
+        if len(path) == 0:
+            return
         original_img = image1.open(path)
         width, height = original_img.size
         while width > 840:
+            width = round(width * 0.8)
+            height = round(height * 0.8)
+        while height > 400:
             width = round(width * 0.8)
             height = round(height * 0.8)
         original_img.thumbnail((width, height), image1.ANTIALIAS)
@@ -380,17 +384,17 @@ def get_message():
             decrypt_msg = decrypt(i[2])
             nickname = get_user_nickname(i[0], cursor)
             if decrypt_msg is None:
-                content = '{0}: photo image'.format(nickname)
+                content = '{0}: attachment'.format(nickname)
                 widget = Label(canvas, text=content, bg='white', fg='black', font=14)
                 canvas.create_window(0, spacing, window=widget, anchor='nw')
                 spacing += 25
                 canvas.config(scrollregion=canvas.bbox("all"))
-                with open('2.png', 'wb') as file:
+                with open('tmp_img.png', 'wb') as file:
                     file.write(base64.b64decode(i[2]))
-                im = image1.open('2.png')
+                im = image1.open('tmp_img.png')
                 photo = image2.PhotoImage(im)
                 im.close()
-                os.remove('2.png')
+                os.remove('tmp_img.png')
                 widget = Label(canvas, image=photo, fg='black')
                 widget.image = photo
                 canvas.create_window(0, spacing, window=widget, anchor='nw')
@@ -584,6 +588,11 @@ def OnMouseWheel(event):
     return "break"
 
 
+def auto_check():
+    button_check.configure(text='11 Min')
+    print(1)
+
+
 create_tables()
 # region auth
 auth_frame = LabelFrame(root, width=200, height=130, relief=FLAT)
@@ -652,12 +661,12 @@ entry_log.focus_set()
 # root.after(500, loop)
 # endregion
 # region settings
-settings_frame1 = LabelFrame(settings_frame, width=600, height=25, relief=FLAT)
+settings_frame1 = LabelFrame(settings_frame, width=850, height=410, relief=FLAT)
 settings_frame1.pack(side=TOP, pady=2, anchor=N)
 label_font = tk.Label(settings_frame1, font=10, text="  Text font:", fg="black", width=18, anchor=W)
 label_font.pack(side=LEFT, anchor=W)
 entry_font = tk.Entry(settings_frame1, font=12, width=20, fg="black")
-entry_font.pack(side=LEFT, padx=80, anchor=CENTER)
+entry_font.pack(side=LEFT, padx=170, anchor=CENTER)
 button_font = tk.Button(settings_frame1, text="SET", bg='#2E8B57', width=15, command=lambda: change_text_font())
 button_font.pack(side=RIGHT, anchor=E)
 settings_frame2 = LabelFrame(settings_frame, width=600, height=25, relief=FLAT)
@@ -665,30 +674,36 @@ settings_frame2.pack(side=TOP, pady=2, anchor=N)
 label_b_font = tk.Label(settings_frame2, font=10, text="  Buttons font:", fg="black", width=18, anchor=W)
 label_b_font.pack(side=LEFT, anchor=W)
 entry_b_font = tk.Entry(settings_frame2, font=12, width=20, fg="black")
-entry_b_font.pack(side=LEFT, padx=80, anchor=CENTER)
+entry_b_font.pack(side=LEFT, padx=170, anchor=CENTER)
 button_b_font = tk.Button(settings_frame2, text="SET", bg='#2E8B57', width=15, command=lambda: change_but_font())
 button_b_font.pack(side=RIGHT, anchor=E)
+settings_frame_2 = LabelFrame(settings_frame, width=600, height=25, relief=FLAT)
+settings_frame_2.pack(side=TOP, pady=2, anchor=N)
+label_check = tk.Label(settings_frame_2, font=10, text="  Update frequency:", fg="black", width=18, anchor=W)
+label_check.pack(side=LEFT, anchor=W)
+label_check2 = tk.Label(settings_frame_2, font=12, width=20, fg="black")
+label_check2.pack(side=LEFT, padx=170, anchor=CENTER)
+button_check = tk.Button(settings_frame_2, text="10 Min", bg='#2E8B57', width=15, command=lambda: auto_check())
+button_check.pack(side=RIGHT, anchor=E)
 settings_frame3 = LabelFrame(settings_frame, width=600, height=25, relief=FLAT)
 settings_frame3.pack(side=TOP, pady=2, anchor=N)
 
 settings_frame5 = LabelFrame(settings_frame3, width=600, height=25, relief=FLAT)
-settings_frame5.pack(side=LEFT, pady=2, padx=2, anchor=N)
-label_old_pass = tk.Label(settings_frame5, font=10, text="Current password:", fg="black", width=18, anchor=W)
+settings_frame5.pack(side=LEFT, pady=2, anchor=N)
+label_old_pass = tk.Label(settings_frame5, font=10, text="  Current password:", fg="black", width=18, anchor=W)
 label_old_pass.pack(side=TOP, anchor=W)
 entry_old_pass = tk.Entry(settings_frame5, font=12, width=20, fg="black", show='•')
 entry_old_pass.bind("<Return>", change_pass_handler)
 entry_old_pass.pack(side=TOP, anchor=CENTER)
 settings_frame6 = LabelFrame(settings_frame3, width=600, height=25, relief=FLAT)
-settings_frame6.pack(side=LEFT, pady=2, padx=53, anchor=N)
+settings_frame6.pack(side=LEFT, pady=2, padx=158, anchor=N)
 label_new_pass = tk.Label(settings_frame6, font=10, text="New password:", fg="black", width=18, anchor=W)
 label_new_pass.pack(side=TOP, anchor=W)
 entry_new_pass = tk.Entry(settings_frame6, font=12, width=20, fg="black", show='•')
 entry_new_pass.bind("<Return>", change_pass_handler)
 entry_new_pass.pack(side=TOP, anchor=CENTER)
-
-button_pass_font = tk.Button(settings_frame3, text="CHANGE", bg='#2E8B57', width=17, command=lambda: change_password())
+button_pass_font = tk.Button(settings_frame3, text="CHANGE", bg='#2E8B57', width=15, command=lambda: change_password())
 button_pass_font.pack(side=RIGHT, anchor=S)
-
 settings_frame4 = LabelFrame(settings_frame, width=600, height=25, relief=FLAT)
 settings_frame4.pack(side=TOP, pady=2, anchor=N)
 button_b_font = tk.Button(settings_frame4, text="REGENERATE ENCRYPTION KEYS", bg='#2E8B57', width=100,
