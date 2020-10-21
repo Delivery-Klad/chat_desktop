@@ -11,7 +11,7 @@ from PIL import ImageTk as image2
 import base64
 
 
-chats = []
+chats = {}
 current_chat = "g0"
 root = tk.Tk()
 spacing = 0
@@ -58,6 +58,14 @@ def auto_check_message():
         get_message()
     except Exception as e:
         print(e)
+
+
+def debug(cursor):
+    cursor.execute("SELECT * FROM chats")
+    print(cursor.fetchall())
+    cursor.execute("SELECT table_name FROM information_schema.tables WHERE table_schema NOT IN ("
+                   "'information_schema', 'pg_catalog') AND table_schema IN('public', 'myschema');")
+    print(cursor.fetchall())
         
 
 def create_tables():
@@ -65,7 +73,11 @@ def create_tables():
     try:
         # cursor.execute("DROP TABLE users")
         # cursor.execute("DROP TABLE messages")
-        # cursor.execute("DROP TABLE chats")
+        # cursor.execute("DROP TABLE msg_gr")
+        # debug(cursor)
+        # listf = {}
+        # listf['{0}'.format('butth')] = 1
+        # print(listf[1])
         cursor.execute('CREATE TABLE IF NOT EXISTS users(id INTEGER,'
                        'login TEXT,'
                        'password TEXT,'
@@ -411,9 +423,9 @@ def get_message():
     global user_id, spacing
     connect, cursor = pg_connect()
     try:
-        cursor.execute("SELECT * FROM messages WHERE to_id={0}".format(user_id))
+        cursor.execute("SELECT * FROM messages WHERE to_id={0} AND NOT from_id LIKE 'g%'".format(user_id))
         res = cursor.fetchall()
-        cursor.execute("DELETE FROM messages WHERE to_id={0}".format(user_id))
+        cursor.execute("DELETE FROM messages WHERE to_id={0} AND NOT from_id LIKE 'g%'".format(user_id))
         connect.commit()
         for i in res:
             decrypt_msg = decrypt(i[2])
@@ -667,11 +679,12 @@ def get_max_chat_id(cursor):
     return int(str(res)[1:])
 
 
-def get_chat_users():
+def get_chat_users(name: str):
     global user_id
     connect, cursor = pg_connect()
     try:
-        pass
+        cursor.execute("SELECT id FROM {0}".format(name))
+        return cursor.fetchall()
     except Exception as e:
         exception_handler(e, connect, cursor)
 
@@ -693,7 +706,8 @@ def send_chat_message(message: str):
     global user_id, current_chat
     connect, cursor = pg_connect()
     try:
-        pass
+        name = get_chat_name(current_chat)
+        users = get_chat_users(name)
     except Exception as e:
         exception_handler(e, connect, cursor)
 
