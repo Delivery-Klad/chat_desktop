@@ -10,6 +10,9 @@ from PIL import Image as image1
 from PIL import ImageTk as image2
 import base64
 
+
+chats = []
+current_chat = "g0"
 root = tk.Tk()
 spacing = 0
 w = root.winfo_screenwidth() // 2 - 140
@@ -62,11 +65,15 @@ def create_tables():
     try:
         # cursor.execute("DROP TABLE users")
         # cursor.execute("DROP TABLE messages")
+        # cursor.execute("DROP TABLE chats")
         cursor.execute('CREATE TABLE IF NOT EXISTS users(id INTEGER,'
                        'login TEXT,'
                        'password TEXT,'
                        'pubkey TEXT)')
-        cursor.execute('CREATE TABLE IF NOT EXISTS messages(from_id INTEGER,'
+        cursor.execute('CREATE TABLE IF NOT EXISTS chats(id TEXT,'
+                       'name TEXT,'
+                       'owner INTEGER)')
+        cursor.execute('CREATE TABLE IF NOT EXISTS messages(from_id TEXT,'
                        'to_id INTEGER,'
                        'message BYTEA)')
         connect.commit()
@@ -244,36 +251,64 @@ def hide_auth_menu():
 
 
 def menu_navigation(menu: str):
+    global current_chat
     if menu == "chat":
+        button_chat.pack(side=TOP, anchor=N)
+        button_info.pack(side=TOP, pady=5, anchor=N)
+        button_settings.pack(side=TOP, anchor=N)
+        button_groups.pack(side=TOP, pady=5, anchor=N)
+        button_logout.pack(side=TOP, anchor=N)
+        button_back.pack_forget()
         button_chat.configure(bg="#2E8B57")
         button_info.configure(bg="#A9A9A9")
         button_settings.configure(bg="#A9A9A9")
+        button_groups.configure(bg="#A9A9A9")
         main1_frame.pack_forget()
         settings_frame.pack_forget()
+        group_frame.pack_forget()
         main_frame.pack(side=LEFT, anchor=CENTER)
+        current_chat = "g0"
     elif menu == "set":
         button_chat.configure(bg="#A9A9A9")
         button_info.configure(bg="#A9A9A9")
         button_settings.configure(bg="#2E8B57")
+        button_groups.configure(bg="#A9A9A9")
         main_frame.pack_forget()
         main1_frame.pack_forget()
+        group_frame.pack_forget()
         settings_frame.pack(side=LEFT, anchor=N)
     elif menu == "info":
         button_chat.configure(bg="#A9A9A9")
         button_info.configure(bg="#2E8B57")
         button_settings.configure(bg="#A9A9A9")
+        button_groups.configure(bg="#A9A9A9")
         main_frame.pack_forget()
         settings_frame.pack_forget()
+        group_frame.pack_forget()
         main1_frame.pack(side=LEFT, anchor=NW)
+    elif menu == "group":
+        button_chat.pack_forget()
+        button_settings.pack_forget()
+        button_info.pack_forget()
+        button_logout.pack_forget()
+        button_groups.pack_forget()
+        main_frame.pack_forget()
+        main1_frame.pack_forget()
+        settings_frame.pack_forget()
+        group_frame.pack(side=LEFT, anchor=CENTER)
+        button_back.pack(side=TOP, anchor=N)
 
 
 def get_user_info():
     connect, cursor = pg_connect()
     try:
-        if entry_id_or_nick.get().isdigit():
-            res = get_user_nickname(int(entry_id_or_nick.get()), cursor)
+        _input = entry_id_or_nick.get()
+        if _input.isdigit():
+            res = get_user_nickname(int(_input), cursor)
+        elif _input[-3:] == '_gr':
+            res = get_chat_id(_input)
         else:
-            res = get_user_id(entry_id_or_nick.get(), cursor)
+            res = get_user_id(_input, cursor)
         cursor.close()
         connect.close()
         if res is None:
@@ -331,7 +366,7 @@ def send_message():
         cursor.execute("SELECT pubkey FROM users WHERE id={0}".format(to_id))
         res = cursor.fetchall()[0][0]
         encrypt_msg = encrypt(msg.encode('utf-8'), res)
-        cursor.execute("INSERT INTO messages VALUES ({0}, {1}, {2})".format(user_id, to_id, encrypt_msg))
+        cursor.execute("INSERT INTO messages VALUES ('{0}', {1}, {2})".format(user_id, to_id, encrypt_msg))
         entry_msg.delete(0, tk.END)
         connect.commit()
         cursor.close()
@@ -363,7 +398,7 @@ def send_image():
         original_img.close()
         with open('resized_image.png', 'rb') as file:
             b64 = base64.b64encode(file.read())
-        cursor.execute("INSERT INTO messages VALUES ({0}, {1}, {2})".format(user_id, entry_id.get(), psycopg2.Binary(b64)))
+        cursor.execute("INSERT INTO messages VALUES ('{0}', {1}, {2})".format(user_id, entry_id.get(), psycopg2.Binary(b64)))
         os.remove('resized_image.png')
         connect.commit()
         cursor.close()
@@ -565,6 +600,135 @@ def change_password():
         exception_handler(e, connect, cursor)
 
 
+def create_chat():
+    global user_id
+    connect, cursor = pg_connect()
+    try:
+        name = entry_chat.get()
+        if len(name) < 5:
+            messagebox.showerror("Input error", "Name lenght must be more than 5 characters")
+            cursor.close()
+            connect.close()
+            return
+        if name[-3:] != '_gr':
+            messagebox.showerror("Input error", "Name must contain '_gr' in the end")
+            cursor.close()
+            connect.close()
+            return
+        for i in name:
+            if ord(i) < 45 or ord(i) > 122:
+                messagebox.showerror('Input error', 'Unsupported symbols')
+                cursor.close()
+                connect.close()
+                return
+        cursor.execute("SELECT table_name FROM information_schema.tables WHERE table_schema NOT IN ("
+                       "'information_schema', 'pg_catalog') AND table_schema IN('public', 'myschema');")
+        print(cursor.fetchall())
+        if ('{0}'.format(name),) in cursor.fetchall():
+            messagebox.showerror('Name error', 'Name exists')
+            cursor.close()
+            connect.close()
+            return
+        max_id = get_max_chat_id(cursor) + 1
+        print(max_id)
+        cursor.execute("INSERT INTO chats VALUES ('g{0}', '{1}', {2})".format(max_id, name, user_id))
+        cursor.execute('CREATE TABLE IF NOT EXISTS {0}(id INTEGER)'.format(name))
+        connect.commit()
+        cursor.execute("INSERT INTO {0} VALUES({1})".format(name, user_id))
+        connect.commit()
+        cursor.close()
+        connect.close()
+    except Exception as e:
+        exception_handler(e, connect, cursor)
+
+
+def get_chat_id(name: str):
+    connect, cursor = pg_connect()
+    cursor.execute("SELECT id FROM chats WHERE name='{0}'".format(name))
+    group_id = cursor.fetchall()[0][0]
+    cursor.close()
+    connect.close()
+    return group_id
+
+
+def get_chat_name(group_id: str):
+    connect, cursor = pg_connect()
+    cursor.execute("SELECT name FROM chats WHERE id='{0}'".format(group_id))
+    name = cursor.fetchall()[0][0]
+    cursor.close()
+    connect.close()
+    return name
+
+
+def get_max_chat_id(cursor):
+    cursor.execute("SELECT COUNT(*) FROM chats")
+    res = cursor.fetchall()[0]
+    res = str(res).split(',', 1)[0]
+    return int(str(res)[1:])
+
+
+def get_chat_users():
+    global user_id
+    connect, cursor = pg_connect()
+    try:
+        pass
+    except Exception as e:
+        exception_handler(e, connect, cursor)
+
+
+def get_chat_owner(group_id: str):
+    global user_id
+    connect, cursor = pg_connect()
+    try:
+        cursor.execute("SELECT owner FROM chats WHERE id='{0}'".format(group_id))
+        res = cursor.fetchall()[0][0]
+        cursor.close()
+        connect.close()
+        return res
+    except Exception as e:
+        exception_handler(e, connect, cursor)
+
+
+def send_chat_message(message: str):
+    global user_id, current_chat
+    connect, cursor = pg_connect()
+    try:
+        pass
+    except Exception as e:
+        exception_handler(e, connect, cursor)
+
+
+def get_chat_message():
+    global user_id
+    connect, cursor = pg_connect()
+    try:
+        pass
+    except Exception as e:
+        exception_handler(e, connect, cursor)
+
+
+def invite_to_group():
+    global user_id
+    inv_user = entry_inv_id.get()
+    inv_group = entry_gr_toinv.get()
+    if len(inv_user) == 0 and len(inv_group) == 0:
+        messagebox.showerror('Input error', 'Entries lenght must be more than 0 characters')
+        return
+    connect, cursor = pg_connect()
+    try:
+        if user_id != int(get_chat_owner(inv_group)):
+            messagebox.showerror('Access error', "You are not chat's owner")
+            return
+        name = get_chat_name(inv_group)
+        cursor.execute("INSERT INTO {0} VALUES({1})".format(name, int(inv_user)))
+        connect.commit()
+        messagebox.showinfo('Success', "Success")
+        cursor.close()
+        connect.close()
+    except Exception as e:
+        exception_handler(e, connect, cursor)
+
+
 def logout():
     global w
     global h
@@ -616,6 +780,7 @@ button_reg.pack(side=RIGHT, pady=3, anchor=CENTER)
 # endregion
 # region main menu
 main_frame = LabelFrame(root, width=850, height=500)
+group_frame = LabelFrame(root, width=850, height=500)
 settings_frame = LabelFrame(root, width=600, height=500)
 menu_frame = LabelFrame(root, width=150, height=500, relief=FLAT)
 button_chat = tk.Button(menu_frame, text="CHAT", bg='#2E8B57', width=17, command=lambda: menu_navigation("chat"))
@@ -624,8 +789,11 @@ button_info = tk.Button(menu_frame, text="INFO", bg='#A9A9A9', width=17, command
 button_info.pack(side=TOP, pady=5, anchor=N)
 button_settings = tk.Button(menu_frame, text="SETTINGS", bg='#A9A9A9', width=17, command=lambda: menu_navigation("set"))
 button_settings.pack(side=TOP, anchor=N)
+button_groups = tk.Button(menu_frame, text="GROUPS", bg='#A9A9A9', width=17, command=lambda: menu_navigation("group"))
+button_groups.pack(side=TOP, pady=5, anchor=N)
 button_logout = tk.Button(menu_frame, text="LOGOUT", bg='#A9A9A9', width=17, command=lambda: logout())
-button_logout.pack(side=TOP, pady=5, anchor=N)
+button_logout.pack(side=TOP, anchor=N)
+button_back = tk.Button(menu_frame, text="BACK", bg='#A9A9A9', width=17, command=lambda: menu_navigation("chat"))
 main2_frame = LabelFrame(main_frame, width=600, height=350, relief=FLAT)
 main2_frame.pack(side=TOP, anchor=CENTER)
 # endregion
@@ -685,9 +853,9 @@ label_check2 = tk.Label(settings_frame_2, font=12, width=20, fg="black")
 label_check2.pack(side=LEFT, padx=170, anchor=CENTER)
 button_check = tk.Button(settings_frame_2, text="10 Min", bg='#2E8B57', width=15, command=lambda: auto_check())
 button_check.pack(side=RIGHT, anchor=E)
+
 settings_frame3 = LabelFrame(settings_frame, width=600, height=25, relief=FLAT)
 settings_frame3.pack(side=TOP, pady=2, anchor=N)
-
 settings_frame5 = LabelFrame(settings_frame3, width=600, height=25, relief=FLAT)
 settings_frame5.pack(side=LEFT, pady=2, anchor=N)
 label_old_pass = tk.Label(settings_frame5, font=10, text="  Current password:", fg="black", width=18, anchor=W)
@@ -704,6 +872,32 @@ entry_new_pass.bind("<Return>", change_pass_handler)
 entry_new_pass.pack(side=TOP, anchor=CENTER)
 button_pass_font = tk.Button(settings_frame3, text="CHANGE", bg='#2E8B57', width=15, command=lambda: change_password())
 button_pass_font.pack(side=RIGHT, anchor=S)
+
+settings_frame8 = LabelFrame(settings_frame, width=600, height=25, relief=FLAT)
+settings_frame8.pack(side=TOP, pady=2, anchor=N)
+settings_frame9 = LabelFrame(settings_frame8, width=600, height=25, relief=FLAT)
+settings_frame9.pack(side=LEFT, pady=2, anchor=N)
+label_inv_id = tk.Label(settings_frame9, font=10, text="  ID to invite:", fg="black", width=18, anchor=W)
+label_inv_id.pack(side=TOP, anchor=W)
+entry_inv_id = tk.Entry(settings_frame9, font=12, width=20, fg="black")
+entry_inv_id.pack(side=TOP, anchor=CENTER)
+settings_frame10 = LabelFrame(settings_frame8, width=600, height=25, relief=FLAT)
+settings_frame10.pack(side=LEFT, pady=2, padx=158, anchor=N)
+label_gr_toinv = tk.Label(settings_frame10, font=10, text="Group id:", fg="black", width=18, anchor=W)
+label_gr_toinv.pack(side=TOP, anchor=W)
+entry_gr_toinv = tk.Entry(settings_frame10, font=12, width=20, fg="black")
+entry_gr_toinv.pack(side=TOP, anchor=CENTER)
+button_invite = tk.Button(settings_frame8, text="INVITE", bg='#2E8B57', width=15, command=lambda: invite_to_group())
+button_invite.pack(side=RIGHT, anchor=S)
+
+settings_frame7 = LabelFrame(settings_frame, width=600, height=25, relief=FLAT)
+settings_frame7.pack(side=TOP, pady=2, anchor=N)
+label_chat = tk.Label(settings_frame7, font=10, text="  Create chat:", fg="black", width=18, anchor=W)
+label_chat.pack(side=LEFT, anchor=W)
+entry_chat = tk.Entry(settings_frame7, font=12, width=20, fg="black")
+entry_chat.pack(side=LEFT, padx=170, anchor=CENTER)
+button_c_chat = tk.Button(settings_frame7, text="CREATE", bg='#2E8B57', width=15, command=lambda: create_chat())
+button_c_chat.pack(side=RIGHT, anchor=E)
 settings_frame4 = LabelFrame(settings_frame, width=600, height=25, relief=FLAT)
 settings_frame4.pack(side=TOP, pady=2, anchor=N)
 button_b_font = tk.Button(settings_frame4, text="REGENERATE ENCRYPTION KEYS", bg='#2E8B57', width=100,
