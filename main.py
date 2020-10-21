@@ -263,8 +263,10 @@ def hide_auth_menu():
 
 
 def menu_navigation(menu: str):
-    global current_chat
+    global current_chat, chats
     if menu == "chat":
+        for key in chats:
+            chats[key].pack_forget()
         button_chat.pack(side=TOP, anchor=N)
         button_info.pack(side=TOP, pady=5, anchor=N)
         button_settings.pack(side=TOP, anchor=N)
@@ -307,8 +309,52 @@ def menu_navigation(menu: str):
         main_frame.pack_forget()
         main1_frame.pack_forget()
         settings_frame.pack_forget()
+        connect, cursor = pg_connect()
+        groups = get_users_groups(cursor)
+        counter = 0
+        for i in groups:
+            counter += 1
+            chats[i] = tk.Button(menu_frame, text=i, bg='#A9A9A9', width=17)
+            if counter % 2 == 0:
+                chats[i].pack(side=TOP, anchor=N)
+            else:
+                chats[i].pack(side=TOP, pady=5, anchor=N)
+        config(groups)
         group_frame.pack(side=LEFT, anchor=CENTER)
-        button_back.pack(side=TOP, anchor=N)
+        if counter % 2 == 0:
+            button_back.pack(side=TOP, pady=5, anchor=N)
+        else:
+            button_back.pack(side=TOP, anchor=N)
+
+
+def config(groups):
+    global chats
+    try:
+        chats[groups[0]].configure(command=lambda: change_group(get_chat_id(groups[0])))
+    except IndexError:
+        pass
+    try:
+        chats[groups[1]].configure(command=lambda: change_group(get_chat_id(groups[1])))
+    except IndexError:
+        pass
+    try:
+        chats[groups[2]].configure(command=lambda: change_group(get_chat_id(groups[2])))
+    except IndexError:
+        pass
+    try:
+        chats[groups[3]].configure(command=lambda: change_group(get_chat_id(groups[3])))
+    except IndexError:
+        pass
+    try:
+        chats[groups[4]].configure(command=lambda: change_group(get_chat_id(groups[4])))
+    except IndexError:
+        pass
+
+
+def change_group(gr_id: str):
+    global current_chat
+    current_chat = gr_id
+    print(current_chat)
 
 
 def get_user_info():
@@ -721,6 +767,21 @@ def get_chat_message():
         exception_handler(e, connect, cursor)
 
 
+def get_users_groups(cursor):
+    try:
+        groups = []
+        cursor.execute("SELECT name FROM chats")
+        res = cursor.fetchall()
+        for el in res:
+            cursor.execute("SELECT COUNT(id) FROM {0} WHERE id='{1}'".format(el[0], user_id))
+            tmp = cursor.fetchall()[0][0]
+            if tmp == 1:
+                groups.append(el[0])
+        return groups
+    except Exception as e:
+        print(e)
+
+
 def invite_to_group():
     global user_id
     inv_user = entry_inv_id.get()
@@ -810,6 +871,8 @@ button_logout.pack(side=TOP, anchor=N)
 button_back = tk.Button(menu_frame, text="BACK", bg='#A9A9A9', width=17, command=lambda: menu_navigation("chat"))
 main2_frame = LabelFrame(main_frame, width=600, height=350, relief=FLAT)
 main2_frame.pack(side=TOP, anchor=CENTER)
+main2_frame2 = LabelFrame(group_frame, width=600, height=350, relief=FLAT)
+main2_frame2.pack(side=TOP, anchor=CENTER)
 # endregion
 
 # region chat
@@ -827,6 +890,22 @@ canvas.config(xscrollcommand=hbar.set, yscrollcommand=vbar.set)
 canvas.pack(side=TOP, expand=True, fill=BOTH)
 canvas.bind("<MouseWheel>", OnMouseWheel)
 canvas.config(scrollregion=canvas.bbox("all"))
+
+frame_2 = Frame(main2_frame2, width=850, height=500)
+frame_2.pack(expand=True, fill=BOTH)
+canvas_2 = Canvas(frame_2, bg='#FFFFFF', width=850, height=410, scrollregion=(0, 0, 500, 500))
+vbar_2 = Scrollbar(frame_2, orient=VERTICAL)
+vbar_2.pack(side=RIGHT, fill=Y)
+vbar_2.config(command=canvas_2.yview)
+hbar_2 = Scrollbar(frame_2, orient=HORIZONTAL)
+hbar_2.pack(side=BOTTOM, fill=X)
+hbar_2.config(command=canvas_2.xview)
+canvas_2.config(width=850, height=410)
+canvas_2.config(xscrollcommand=hbar_2.set, yscrollcommand=vbar_2.set)
+canvas_2.pack(side=TOP, expand=True, fill=BOTH)
+canvas_2.bind("<MouseWheel>", OnMouseWheel)
+canvas_2.config(scrollregion=canvas_2.bbox("all"))
+
 button_refresh = tk.Button(main_frame, text="REFRESH", bg='#2E8B57', width=128, command=lambda: get_message())
 button_refresh.pack(side=TOP, pady=3, anchor=CENTER)
 entry_id = tk.Entry(main_frame, font=10, width=8)
@@ -839,6 +918,17 @@ button_img = tk.Button(main_frame, text="➕", bg='#2E8B57', width=3, command=la
 button_img.pack(side=LEFT, anchor=E)
 button_send = tk.Button(main_frame, text="SEND", bg='#2E8B57', width=8, command=lambda: send_message())
 button_send.pack(side=LEFT, anchor=E, padx=3)
+
+button_refresh2 = tk.Button(group_frame, text="REFRESH", bg='#2E8B57', width=128, command=lambda: get_chat_message())
+button_refresh2.pack(side=TOP, pady=3, anchor=CENTER)
+entry_msg2 = tk.Entry(group_frame, font=10, width=85)
+entry_msg2.bind("<Return>", send_chat_message(entry_msg2.get()))
+entry_msg2.pack(side=LEFT, padx=3)
+button_img2 = tk.Button(group_frame, text="➕", bg='#2E8B57', width=3) #, command=lambda: send_image())
+button_img2.pack(side=LEFT, anchor=E)
+button_send2 = tk.Button(group_frame, text="SEND", bg='#2E8B57', width=8, command=lambda: send_chat_message(entry_msg2.get()))
+button_send2.pack(side=LEFT, anchor=E, padx=3)
+
 entry_log.focus_set()
 # root.after(500, loop)
 # endregion
