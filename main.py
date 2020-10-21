@@ -330,31 +330,35 @@ def menu_navigation(menu: str):
 def config(groups):
     global chats
     try:
-        chats[groups[0]].configure(command=lambda: change_group(get_chat_id(groups[0])))
+        chats[groups[0]].configure(command=lambda: change_group(get_chat_id(groups[0]), chats[groups[0]]))
     except IndexError:
         pass
     try:
-        chats[groups[1]].configure(command=lambda: change_group(get_chat_id(groups[1])))
+        chats[groups[1]].configure(command=lambda: change_group(get_chat_id(groups[1]), chats[groups[1]]))
     except IndexError:
         pass
     try:
-        chats[groups[2]].configure(command=lambda: change_group(get_chat_id(groups[2])))
+        chats[groups[2]].configure(command=lambda: change_group(get_chat_id(groups[2]), chats[groups[2]]))
     except IndexError:
         pass
     try:
-        chats[groups[3]].configure(command=lambda: change_group(get_chat_id(groups[3])))
+        chats[groups[3]].configure(command=lambda: change_group(get_chat_id(groups[3]), chats[groups[3]]))
     except IndexError:
         pass
     try:
-        chats[groups[4]].configure(command=lambda: change_group(get_chat_id(groups[4])))
+        chats[groups[4]].configure(command=lambda: change_group(get_chat_id(groups[4]), chats[groups[4]]))
     except IndexError:
         pass
 
 
-def change_group(gr_id: str):
-    global current_chat
+def change_group(gr_id: str, button):
+    global current_chat, chats
     current_chat = gr_id
     print(current_chat)
+    for key in chats:
+        chats[key].configure(bg='#A9A9A9')
+    button.configure(bg="#2E8B57")
+    get_chat_message()
 
 
 def get_user_info():
@@ -413,6 +417,9 @@ def send_message():
             return
         if not entry_id.get().isdigit():
             messagebox.showerror('Input error', 'Id must be a number')
+            cursor.close()
+            connect.close()
+            return
         for i in entry_msg.get():
             if ord(i) < 32 or ord(i) > 1366:
                 messagebox.showerror('Input error', 'Unsupported symbols')
@@ -748,21 +755,51 @@ def get_chat_owner(group_id: str):
         exception_handler(e, connect, cursor)
 
 
-def send_chat_message(message: str):
+def send_chat_message():
     global user_id, current_chat
     connect, cursor = pg_connect()
+    message = entry_msg2.get()
     try:
+        if len(message) == 0:
+            messagebox.showerror('Input error', 'Fill all input fields')
+            cursor.close()
+            connect.close()
+            return
         name = get_chat_name(current_chat)
         users = get_chat_users(name)
+        for i in users:
+            cursor.execute("SELECT pubkey FROM users WHERE id={0}".format(i[0]))
+            res = cursor.fetchall()[0][0]
+            encrypt_msg = encrypt(message.encode('utf-8'), res)
+            cursor.execute("INSERT INTO messages VALUES ('{0}', {1}, {2})".format(current_chat + '_' + str(user_id),
+                                                                                  i[0], encrypt_msg))
+            entry_msg2.delete(0, tk.END)
+        connect.commit()
+        cursor.close()
+        connect.close()
     except Exception as e:
         exception_handler(e, connect, cursor)
 
 
 def get_chat_message():
-    global user_id
+    global user_id, spacing, current_chat
     connect, cursor = pg_connect()
     try:
-        pass
+        cursor.execute("SELECT * FROM messages WHERE to_id={0} AND from_id LIKE '{1}%'".format(user_id, current_chat))
+        res = cursor.fetchall()
+        cursor.execute("DELETE FROM messages WHERE to_id={0} AND from_id LIKE '{1}%'".format(user_id, current_chat))
+        connect.commit()
+        for i in res:
+            decrypt_msg = decrypt(i[2])
+            nickname = get_user_nickname(i[0].split('_', 1)[1], cursor)
+
+            content = '{0}: {1}'.format(nickname, decrypt_msg)
+            widget = Label(canvas_2, text=content, bg='white', fg='black', font=14)
+            canvas_2.create_window(0, spacing, window=widget, anchor='nw')
+            spacing += 25
+        canvas_2.config(scrollregion=canvas_2.bbox("all"))
+        cursor.close()
+        connect.close()
     except Exception as e:
         exception_handler(e, connect, cursor)
 
@@ -922,11 +959,11 @@ button_send.pack(side=LEFT, anchor=E, padx=3)
 button_refresh2 = tk.Button(group_frame, text="REFRESH", bg='#2E8B57', width=128, command=lambda: get_chat_message())
 button_refresh2.pack(side=TOP, pady=3, anchor=CENTER)
 entry_msg2 = tk.Entry(group_frame, font=10, width=85)
-entry_msg2.bind("<Return>", send_chat_message(entry_msg2.get()))
+# entry_msg2.bind("<Return>", send_chat_message())
 entry_msg2.pack(side=LEFT, padx=3)
 button_img2 = tk.Button(group_frame, text="➕", bg='#2E8B57', width=3) #, command=lambda: send_image())
 button_img2.pack(side=LEFT, anchor=E)
-button_send2 = tk.Button(group_frame, text="SEND", bg='#2E8B57', width=8, command=lambda: send_chat_message(entry_msg2.get()))
+button_send2 = tk.Button(group_frame, text="SEND", bg='#2E8B57', width=8, command=lambda: send_chat_message())
 button_send2.pack(side=LEFT, anchor=E, padx=3)
 
 entry_log.focus_set()
@@ -958,6 +995,32 @@ label_check2.pack(side=LEFT, padx=170, anchor=CENTER)
 button_check = tk.Button(settings_frame_2, text="10 Min", bg='#2E8B57', width=15, command=lambda: auto_check())
 button_check.pack(side=RIGHT, anchor=E)
 
+settings_frame7 = LabelFrame(settings_frame, width=600, height=25, relief=FLAT)
+settings_frame7.pack(side=TOP, pady=2, anchor=N)
+label_chat = tk.Label(settings_frame7, font=10, text="  Create chat:", fg="black", width=18, anchor=W)
+label_chat.pack(side=LEFT, anchor=W)
+entry_chat = tk.Entry(settings_frame7, font=12, width=20, fg="black")
+entry_chat.pack(side=LEFT, padx=170, anchor=CENTER)
+button_c_chat = tk.Button(settings_frame7, text="CREATE", bg='#2E8B57', width=15, command=lambda: create_chat())
+button_c_chat.pack(side=RIGHT, anchor=E)
+
+settings_frame8 = LabelFrame(settings_frame, width=600, height=25, relief=FLAT)
+settings_frame8.pack(side=TOP, pady=2, anchor=N)
+settings_frame9 = LabelFrame(settings_frame8, width=600, height=25, relief=FLAT)
+settings_frame9.pack(side=LEFT, pady=2, anchor=N)
+label_inv_id = tk.Label(settings_frame9, font=10, text="  ID to invite:", fg="black", width=18, anchor=W)
+label_inv_id.pack(side=TOP, anchor=W)
+entry_inv_id = tk.Entry(settings_frame9, font=12, width=20, fg="black")
+entry_inv_id.pack(side=TOP, anchor=CENTER)
+settings_frame10 = LabelFrame(settings_frame8, width=600, height=25, relief=FLAT)
+settings_frame10.pack(side=LEFT, pady=2, padx=158, anchor=N)
+label_gr_toinv = tk.Label(settings_frame10, font=10, text="Group id:", fg="black", width=18, anchor=W)
+label_gr_toinv.pack(side=TOP, anchor=W)
+entry_gr_toinv = tk.Entry(settings_frame10, font=12, width=20, fg="black")
+entry_gr_toinv.pack(side=TOP, anchor=CENTER)
+button_invite = tk.Button(settings_frame8, text="INVITE", bg='#2E8B57', width=15, command=lambda: invite_to_group())
+button_invite.pack(side=RIGHT, anchor=S)
+
 settings_frame3 = LabelFrame(settings_frame, width=600, height=25, relief=FLAT)
 settings_frame3.pack(side=TOP, pady=2, anchor=N)
 settings_frame5 = LabelFrame(settings_frame3, width=600, height=25, relief=FLAT)
@@ -977,31 +1040,6 @@ entry_new_pass.pack(side=TOP, anchor=CENTER)
 button_pass_font = tk.Button(settings_frame3, text="CHANGE", bg='#2E8B57', width=15, command=lambda: change_password())
 button_pass_font.pack(side=RIGHT, anchor=S)
 
-settings_frame8 = LabelFrame(settings_frame, width=600, height=25, relief=FLAT)
-settings_frame8.pack(side=TOP, pady=2, anchor=N)
-settings_frame9 = LabelFrame(settings_frame8, width=600, height=25, relief=FLAT)
-settings_frame9.pack(side=LEFT, pady=2, anchor=N)
-label_inv_id = tk.Label(settings_frame9, font=10, text="  ID to invite:", fg="black", width=18, anchor=W)
-label_inv_id.pack(side=TOP, anchor=W)
-entry_inv_id = tk.Entry(settings_frame9, font=12, width=20, fg="black")
-entry_inv_id.pack(side=TOP, anchor=CENTER)
-settings_frame10 = LabelFrame(settings_frame8, width=600, height=25, relief=FLAT)
-settings_frame10.pack(side=LEFT, pady=2, padx=158, anchor=N)
-label_gr_toinv = tk.Label(settings_frame10, font=10, text="Group id:", fg="black", width=18, anchor=W)
-label_gr_toinv.pack(side=TOP, anchor=W)
-entry_gr_toinv = tk.Entry(settings_frame10, font=12, width=20, fg="black")
-entry_gr_toinv.pack(side=TOP, anchor=CENTER)
-button_invite = tk.Button(settings_frame8, text="INVITE", bg='#2E8B57', width=15, command=lambda: invite_to_group())
-button_invite.pack(side=RIGHT, anchor=S)
-
-settings_frame7 = LabelFrame(settings_frame, width=600, height=25, relief=FLAT)
-settings_frame7.pack(side=TOP, pady=2, anchor=N)
-label_chat = tk.Label(settings_frame7, font=10, text="  Create chat:", fg="black", width=18, anchor=W)
-label_chat.pack(side=LEFT, anchor=W)
-entry_chat = tk.Entry(settings_frame7, font=12, width=20, fg="black")
-entry_chat.pack(side=LEFT, padx=170, anchor=CENTER)
-button_c_chat = tk.Button(settings_frame7, text="CREATE", bg='#2E8B57', width=15, command=lambda: create_chat())
-button_c_chat.pack(side=RIGHT, anchor=E)
 settings_frame4 = LabelFrame(settings_frame, width=600, height=25, relief=FLAT)
 settings_frame4.pack(side=TOP, pady=2, anchor=N)
 button_b_font = tk.Button(settings_frame4, text="REGENERATE ENCRYPTION KEYS", bg='#2E8B57', width=100,
