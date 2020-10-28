@@ -876,10 +876,27 @@ def logout():
     auth_frame.pack(side=TOP, anchor=CENTER)
 
 
-def set_new_pass():
-    connect, cursor = pg_connect()
+def recovery_menu():
+    global code
     try:
         pass
+    except Exception as e:
+        print(e)
+
+
+def set_new_pass():
+    global user_login
+    connect, cursor = pg_connect()
+    try:
+        if check_input(entry_new_pass.get(), entry_old_pass.get()):
+            hashed_pass = bcrypt.hashpw(entry_new_pass.get().encode('utf-8'), bcrypt.gensalt())
+            hashed_pass = str(hashed_pass)[2:-1]
+            cursor.execute("UPDATE users SET password='{0}' WHERE login='{1}'".format(hashed_pass, user_login))
+            connect.commit()
+            messagebox.showinfo("Success", "Password has been changed")
+        cursor.close()
+        connect.close()
+        fill_auto_login_file(user_login, entry_new_pass.get())
     except Exception as e:
         exception_handler(e, connect, cursor)
 
