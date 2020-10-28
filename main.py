@@ -13,7 +13,6 @@ from PIL import ImageTk as image2
 # from urllib import request
 import keyring
 import smtplib
-from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
@@ -80,8 +79,8 @@ def debug(cursor):
 def create_tables():
     connect, cursor = pg_connect()
     try:
-        # cursor.execute("DROP TABLE users")
-        # cursor.execute("DROP TABLE messages")
+        # cursor.execute("DROP TABLE group_gr")
+        # cursor.execute("DROP TABLE test_gr")
         # cursor.execute("DROP TABLE chats")
         # debug(cursor)
         # listf = {}
@@ -156,11 +155,11 @@ def auto_login():
 def clear_auto_login():
     try:
         keyring.delete_password('datachat', 'login')
-    except Exception as e:
+    except Exception:
         pass
     try:
         keyring.delete_password('datachat', 'password')
-    except Exception as e:
+    except Exception:
         pass
 
 
@@ -895,7 +894,7 @@ def pass_code():
         print(res)
         code = random.randint(10000, 99999)
         password = "d8fi2kbfpchos"
-        login = "iutnqyyujjskrr@mail.ru"
+        mail_login = "iutnqyyujjskrr@mail.ru"
         url = "smtp.mail.ru"
         server = smtplib.SMTP_SSL(url, 465)
         target = res
@@ -903,12 +902,12 @@ def pass_code():
         text = "Your code: {0}".format(code)
         msg = MIMEMultipart()
         msg['Subject'] = title
-        msg['From'] = login
+        msg['From'] = mail_login
         body = text
         msg.attach(MIMEText(body, 'plain'))
         try:
-            server.login(login, password)
-            server.sendmail(login, target, msg.as_string())
+            server.login(mail_login, password)
+            server.sendmail(mail_login, target, msg.as_string())
         except Exception as e:
             messagebox.showerror('Error', str(e))
         messagebox.showinfo('Recovery', 'Recovery code has been sent to your email')
@@ -1120,7 +1119,7 @@ button_b_font.pack(side=TOP, anchor=CENTER)
 # endregion
 # region info
 main1_frame = LabelFrame(root, width=600, height=350, relief=SUNKEN)
-label_info = tk.Label(main1_frame, font=10, text="ID/Nickname", fg="black", width=18)
+label_info = tk.Label(main1_frame, font=10, text="ID/Nickname/Group", fg="black", width=18)
 label_info.pack(side=TOP, anchor=CENTER)
 entry_res = tk.Entry(main1_frame, font=10, width=20, state='disabled')
 entry_res.pack(side=TOP, padx=2, pady=3, anchor=CENTER)
