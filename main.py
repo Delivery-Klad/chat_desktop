@@ -25,11 +25,11 @@ w = root.winfo_screenwidth() // 2 - 140
 h = root.winfo_screenheight() // 2 - 100
 user_login = ''
 user_id = ''
+email = ''
 var = IntVar()
 private_key = rsa.PrivateKey(1, 2, 3, 4, 5)
 files_dir = 'files'
 private_key_file = files_dir + '/priv_key.PEM'
-email = ''
 
 try:
     # iutnqyyujjskrr@mail.ru
