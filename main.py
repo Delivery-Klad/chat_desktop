@@ -29,6 +29,7 @@ var = IntVar()
 private_key = rsa.PrivateKey(1, 2, 3, 4, 5)
 files_dir = 'files'
 private_key_file = files_dir + '/priv_key.PEM'
+email = ''
 
 try:
     # iutnqyyujjskrr@mail.ru
@@ -889,42 +890,49 @@ def recovery_menu():
 
 
 def new_pass_menu():
-    global w
-    global h
+    global w, h
     global code
     try:
-        auth_frame.pack_forget()
-        root.geometry("200x100+{}+{}".format(w, h))
-        recovery_frame.pack(side=TOP, anchor=CENTER)
+        if not entry_code.get() == str(code):
+            messagebox.showerror('Input error', 'Incorrect code')
+            return
+        recovery_frame.pack_forget()
+        root.geometry("200x130+{}+{}".format(w, h))
+        new_pass_frame.pack(side=TOP, anchor=CENTER)
     except Exception as e:
         print(e)
 
 
 def set_new_pass():
-    global user_login
+    global user_login, email
+    user_login = entry_log.get()
     connect, cursor = pg_connect()
     try:
-        if check_input(entry_new_pass.get(), entry_old_pass.get()):
-            hashed_pass = bcrypt.hashpw(entry_new_pass.get().encode('utf-8'), bcrypt.gensalt())
+        if check_input(entry_new_p2.get(), entry_new_p.get()):
+            hashed_pass = bcrypt.hashpw(entry_new_p.get().encode('utf-8'), bcrypt.gensalt())
             hashed_pass = str(hashed_pass)[2:-1]
-            cursor.execute("UPDATE users SET password='{0}' WHERE login='{1}'".format(hashed_pass, user_login))
+            cursor.execute("UPDATE users SET password='{0}' WHERE email='{1}'".format(hashed_pass, email))
             connect.commit()
             messagebox.showinfo("Success", "Password has been changed")
+            fill_auto_login_file(user_login, entry_new_p.get())
+            entry_pass.delete(0, tk.END)
+            entry_pass.insert(0, entry_new_p.get())
+            root.geometry("200x160+{}+{}".format(w, h))
+            new_pass_frame.pack_forget()
+            auth_frame.pack(side=TOP, anchor=CENTER)
         cursor.close()
         connect.close()
-        fill_auto_login_file(user_login, entry_new_pass.get())
     except Exception as e:
         exception_handler(e, connect, cursor)
 
 
 def pass_code():
-    global code
-    global user_id
+    global code, user_id, email
     connect, cursor = pg_connect()
     try:
         cursor.execute("SELECT email FROM users WHERE id={0}".format(get_user_id(entry_log.get(), cursor)))
         res = cursor.fetchall()[0][0]
-        print(res)
+        email = res
         code = random.randint(10000, 99999)
         password = "d8fi2kbfpchos"
         mail_login = "iutnqyyujjskrr@mail.ru"
@@ -996,10 +1004,23 @@ label_code = tk.Label(recovery_frame, font=10, text="Code:                      
 label_code.pack(side=TOP, anchor=S)
 entry_code = tk.Entry(recovery_frame, font=12, width=20, fg="black")
 entry_code.pack(side=TOP)
-button_code = tk.Button(auth_frame, text="SEND", bg='#2E8B57', width=11, command=lambda: show_reg_frame())
+button_code = tk.Button(recovery_frame, text="SEND", bg='#2E8B57', width=11, command=lambda: new_pass_menu())
 button_code.pack(side=RIGHT, pady=3, anchor=CENTER)
 # endregion
-# region reg
+# region new pass
+new_pass_frame = LabelFrame(root, width=200, height=130, relief=FLAT)
+label_code = tk.Label(new_pass_frame, font=10, text="New Password:              ", fg="black", width=18)
+label_code.pack(side=TOP, anchor=S)
+entry_new_p = tk.Entry(new_pass_frame, font=12, width=20, fg="black", show='•')
+entry_new_p.pack(side=TOP)
+label_code = tk.Label(new_pass_frame, font=10, text="Repeat Password:           ", fg="black", width=18)
+label_code.pack(side=TOP, anchor=S)
+entry_new_p2 = tk.Entry(new_pass_frame, font=12, width=20, fg="black", show='•')
+entry_new_p2.pack(side=TOP)
+button_code = tk.Button(new_pass_frame, text="SET", bg='#2E8B57', width=11, command=lambda: set_new_pass())
+button_code.pack(side=RIGHT, pady=3, anchor=CENTER)
+# endregion
+# region email
 label_email = tk.Label(auth_frame, font=10, text="Email:                          ", fg="black", width=18)
 entry_email = tk.Entry(auth_frame, font=12, width=20, fg="black")
 # endregion
