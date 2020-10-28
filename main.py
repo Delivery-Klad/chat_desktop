@@ -877,9 +877,25 @@ def logout():
 
 
 def recovery_menu():
+    global w
+    global h
     global code
     try:
-        pass
+        auth_frame.pack_forget()
+        root.geometry("200x100+{}+{}".format(w, h))
+        recovery_frame.pack(side=TOP, anchor=CENTER)
+    except Exception as e:
+        print(e)
+
+
+def new_pass_menu():
+    global w
+    global h
+    global code
+    try:
+        auth_frame.pack_forget()
+        root.geometry("200x100+{}+{}".format(w, h))
+        recovery_frame.pack(side=TOP, anchor=CENTER)
     except Exception as e:
         print(e)
 
@@ -928,7 +944,7 @@ def pass_code():
         except Exception as e:
             messagebox.showerror('Error', str(e))
         messagebox.showinfo('Recovery', 'Recovery code has been sent to your email')
-        # show recovery menu
+        recovery_menu()
         cursor.close()
         connect.close()
     except Exception as e:
@@ -973,6 +989,15 @@ button_reg_m = tk.Button(auth_frame, text="REGISTER", bg='#2E8B57', width=11, co
 button_reg_m.pack(side=RIGHT, pady=3, anchor=CENTER)
 button_reg = tk.Button(auth_frame, text="REGISTER", bg='#2E8B57', width=11, command=lambda: register())
 button_login_b = tk.Button(auth_frame, text="BACK", bg='#2E8B57', width=11, command=lambda: back_to_login())
+# endregion
+# region reg
+recovery_frame = LabelFrame(root, width=200, height=130, relief=FLAT)
+label_code = tk.Label(recovery_frame, font=10, text="Code:                           ", fg="black", width=18)
+label_code.pack(side=TOP, anchor=S)
+entry_code = tk.Entry(recovery_frame, font=12, width=20, fg="black")
+entry_code.pack(side=TOP)
+button_code = tk.Button(auth_frame, text="SEND", bg='#2E8B57', width=11, command=lambda: show_reg_frame())
+button_code.pack(side=RIGHT, pady=3, anchor=CENTER)
 # endregion
 # region reg
 label_email = tk.Label(auth_frame, font=10, text="Email:                          ", fg="black", width=18)
