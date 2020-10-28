@@ -1,16 +1,23 @@
 import os
-import psycopg2
-import bcrypt
 import rsa
+import bcrypt
+import base64
+import random
+import psycopg2
 import tkinter as tk
 from tkinter import *
 from tkinter import messagebox
 from tkinter import filedialog
 from PIL import Image as image1
 from PIL import ImageTk as image2
-import base64
+# from urllib import request
+import keyring
+import smtplib
+from email.mime.application import MIMEApplication
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 
-
+code = None
 chats = {}
 current_chat = "g0"
 root = tk.Tk()
@@ -22,9 +29,11 @@ user_id = ''
 var = IntVar()
 private_key = rsa.PrivateKey(1, 2, 3, 4, 5)
 files_dir = 'files'
-auto_fill_data_file = files_dir + '/rem.rm'
 private_key_file = files_dir + '/priv_key.PEM'
+
 try:
+    # iutnqyyujjskrr@mail.ru
+    # d8fi2kbfpchos
     os.mkdir(files_dir)
 except FileExistsError:
     pass
@@ -66,14 +75,14 @@ def debug(cursor):
     cursor.execute("SELECT table_name FROM information_schema.tables WHERE table_schema NOT IN ("
                    "'information_schema', 'pg_catalog') AND table_schema IN('public', 'myschema');")
     print(cursor.fetchall())
-        
+
 
 def create_tables():
     connect, cursor = pg_connect()
     try:
         # cursor.execute("DROP TABLE users")
         # cursor.execute("DROP TABLE messages")
-        # cursor.execute("DROP TABLE msg_gr")
+        # cursor.execute("DROP TABLE chats")
         # debug(cursor)
         # listf = {}
         # listf['{0}'.format('butth')] = 1
@@ -81,12 +90,13 @@ def create_tables():
         cursor.execute('CREATE TABLE IF NOT EXISTS users(id INTEGER,'
                        'login TEXT,'
                        'password TEXT,'
-                       'pubkey TEXT)')
+                       'pubkey TEXT,'
+                       'email TEXT)')
         cursor.execute('CREATE TABLE IF NOT EXISTS chats(id TEXT,'
                        'name TEXT,'
                        'owner INTEGER)')
         cursor.execute('CREATE TABLE IF NOT EXISTS messages(from_id TEXT,'
-                       'to_id INTEGER,'
+                       'to_id TEXT,'
                        'message BYTEA)')
         connect.commit()
         cursor.close()
@@ -130,22 +140,13 @@ def check_password(cursor, log, pas):
 def auto_login():
     global user_login
     global user_id
-    psw, lgn = '', ''
     try:
-        with open(auto_fill_data_file, 'r') as file:
-            res = file.read().split('  ', 1)
-        if len(res) == 1:
-            return
-        tmp = res[0].split(' ')
-        for i in tmp:
-            lgn += chr(int(i) - 1)
-        tmp = res[1].split(' ')
-        tmp.pop(len(tmp) - 1)
-        for i in tmp:
-            psw += chr(int(i) - 2)
-        entry_log.insert(0, lgn)
-        entry_pass.insert(0, psw)
-        var.set(1)
+        lgn = keyring.get_password('datachat', 'login')
+        psw = keyring.get_password('datachat', 'password')
+        if lgn is not None and psw is not None:
+            entry_log.insert(0, lgn)
+            entry_pass.insert(0, psw)
+            var.set(1)
     except FileNotFoundError:
         pass
     except Exception as e:
@@ -153,19 +154,19 @@ def auto_login():
 
 
 def clear_auto_login():
-    with open(auto_fill_data_file, 'w') as file:
-        file.write('')
+    try:
+        keyring.delete_password('datachat', 'login')
+    except Exception as e:
+        pass
+    try:
+        keyring.delete_password('datachat', 'password')
+    except Exception as e:
+        pass
 
 
 def fill_auto_login_file(lgn, psw):
-    with open(auto_fill_data_file, 'w') as file:
-        file.write('')
-    with open(auto_fill_data_file, 'a') as file:
-        for i in lgn:
-            file.write(str(ord(i) + 1) + ' ')
-        file.write(' ')
-        for i in psw:
-            file.write(str(ord(i) + 2) + ' ')
+    keyring.set_password('datachat', 'login', lgn)
+    keyring.set_password('datachat', 'password', psw)
 
 
 def login(*args):
@@ -180,7 +181,9 @@ def login(*args):
         if res == "False":
             cursor.close()
             connect.close()
-            messagebox.showerror('Input error', 'Wrong password')
+            msg = messagebox.askquestion('Input error', 'Wrong password, recover?', icon='error')
+            if msg == 'yes':
+                pass_code()
             return
         elif res == "None":
             cursor.close()
@@ -202,10 +205,33 @@ def login(*args):
         exception_handler(e, connect, cursor)
 
 
+def show_reg_frame():
+    root.geometry("200x175+{}+{}".format(w, h))
+    entry_id.focus_set()
+    button_login.pack_forget()
+    button_reg_m.pack_forget()
+    check_remember.pack_forget()
+    label_email.pack(side=TOP, anchor=S)
+    entry_email.pack(side=TOP)
+    button_login_b.pack(side=LEFT, pady=3, anchor=CENTER)
+    button_reg.pack(side=RIGHT, pady=3, anchor=CENTER)
+
+
+def back_to_login():
+    label_email.pack_forget()
+    entry_email.pack_forget()
+    button_login_b.pack_forget()
+    button_reg.pack_forget()
+    root.geometry("200x160+{}+{}".format(w, h))
+    check_remember.pack(side=TOP, anchor=S)
+    button_login.pack(side=LEFT, pady=3, anchor=CENTER)
+    button_reg_m.pack(side=RIGHT, pady=3, anchor=CENTER)
+
+
 def register():
     connect, cursor = pg_connect()
     try:
-        if len(entry_log.get()) == 0 or len(entry_pass.get()) == 0:
+        if len(entry_log.get()) == 0 or len(entry_pass.get()) == 0 or len(entry_email.get()) == 0:
             messagebox.showerror('Input error', 'Fill all input fields')
             cursor.close()
             connect.close()
@@ -232,8 +258,10 @@ def register():
             max_id += 1
         else:
             max_id = 0
-        cursor.execute("INSERT INTO users VALUES ({0}, '{1}', '{2}', '{3}')".format(max_id, entry_log.get(),
-                                                                                    hashed_pass, keys_generation()))
+        cursor.execute("INSERT INTO users VALUES ({0}, '{1}', '{2}', '{3}', '{4}')".format(max_id, entry_log.get(),
+                                                                                           hashed_pass,
+                                                                                           keys_generation(),
+                                                                                           entry_email.get()))
         connect.commit()
         cursor.close()
         connect.close()
@@ -431,7 +459,7 @@ def send_message():
         cursor.execute("SELECT pubkey FROM users WHERE id={0}".format(to_id))
         res = cursor.fetchall()[0][0]
         encrypt_msg = encrypt(msg.encode('utf-8'), res)
-        cursor.execute("INSERT INTO messages VALUES ('{0}', {1}, {2})".format(user_id, to_id, encrypt_msg))
+        cursor.execute("INSERT INTO messages VALUES ('{0}', '{1}', {2})".format(user_id, to_id, encrypt_msg))
         entry_msg.delete(0, tk.END)
         connect.commit()
         cursor.close()
@@ -463,7 +491,8 @@ def send_image():
         original_img.close()
         with open('resized_image.png', 'rb') as file:
             b64 = base64.b64encode(file.read())
-        cursor.execute("INSERT INTO messages VALUES ('{0}', {1}, {2})".format(user_id, entry_id.get(), psycopg2.Binary(b64)))
+        cursor.execute(
+            "INSERT INTO messages VALUES ('{0}', '{1}', {2})".format(user_id, entry_id.get(), psycopg2.Binary(b64)))
         os.remove('resized_image.png')
         connect.commit()
         cursor.close()
@@ -476,9 +505,9 @@ def get_message():
     global user_id, spacing
     connect, cursor = pg_connect()
     try:
-        cursor.execute("SELECT * FROM messages WHERE to_id={0} AND NOT from_id LIKE 'g%'".format(user_id))
+        cursor.execute("SELECT * FROM messages WHERE to_id='{0}' AND NOT from_id LIKE 'g%'".format(user_id))
         res = cursor.fetchall()
-        cursor.execute("DELETE FROM messages WHERE to_id={0} AND NOT from_id LIKE 'g%'".format(user_id))
+        cursor.execute("DELETE FROM messages WHERE to_id='{0}' AND NOT from_id LIKE 'g%'".format(user_id))
         connect.commit()
         for i in res:
             decrypt_msg = decrypt(i[2])
@@ -656,10 +685,6 @@ def change_password():
             messagebox.showinfo("Success", "Password has been changed")
         cursor.close()
         connect.close()
-        with open(auto_fill_data_file, 'r') as file:
-            res = file.read().split('  ', 1)
-        if len(res) == 1:
-            return
         fill_auto_login_file(user_login, entry_new_pass.get())
     except Exception as e:
         exception_handler(e, connect, cursor)
@@ -771,8 +796,8 @@ def send_chat_message():
             cursor.execute("SELECT pubkey FROM users WHERE id={0}".format(i[0]))
             res = cursor.fetchall()[0][0]
             encrypt_msg = encrypt(message.encode('utf-8'), res)
-            cursor.execute("INSERT INTO messages VALUES ('{0}', {1}, {2})".format(current_chat + '_' + str(user_id),
-                                                                                  i[0], encrypt_msg))
+            cursor.execute("INSERT INTO messages VALUES ('{0}', '{1}', {2})".format(current_chat + '_' + str(user_id),
+                                                                                    i[0], encrypt_msg))
             entry_msg2.delete(0, tk.END)
         connect.commit()
         cursor.close()
@@ -785,14 +810,13 @@ def get_chat_message():
     global user_id, spacing, current_chat
     connect, cursor = pg_connect()
     try:
-        cursor.execute("SELECT * FROM messages WHERE to_id={0} AND from_id LIKE '{1}%'".format(user_id, current_chat))
+        cursor.execute("SELECT * FROM messages WHERE to_id='{0}' AND from_id LIKE '{1}%'".format(user_id, current_chat))
         res = cursor.fetchall()
-        cursor.execute("DELETE FROM messages WHERE to_id={0} AND from_id LIKE '{1}%'".format(user_id, current_chat))
+        cursor.execute("DELETE FROM messages WHERE to_id='{0}' AND from_id LIKE '{1}%'".format(user_id, current_chat))
         connect.commit()
         for i in res:
             decrypt_msg = decrypt(i[2])
             nickname = get_user_nickname(i[0].split('_', 1)[1], cursor)
-
             content = '{0}: {1}'.format(nickname, decrypt_msg)
             widget = Label(canvas_2, text=content, bg='white', fg='black', font=14)
             canvas_2.create_window(0, spacing, window=widget, anchor='nw')
@@ -853,6 +877,48 @@ def logout():
     auth_frame.pack(side=TOP, anchor=CENTER)
 
 
+def set_new_pass():
+    connect, cursor = pg_connect()
+    try:
+        pass
+    except Exception as e:
+        exception_handler(e, connect, cursor)
+
+
+def pass_code():
+    global code
+    global user_id
+    connect, cursor = pg_connect()
+    try:
+        cursor.execute("SELECT email FROM users WHERE id={0}".format(get_user_id(entry_log.get(), cursor)))
+        res = cursor.fetchall()[0][0]
+        print(res)
+        code = random.randint(10000, 99999)
+        password = "d8fi2kbfpchos"
+        login = "iutnqyyujjskrr@mail.ru"
+        url = "smtp.mail.ru"
+        server = smtplib.SMTP_SSL(url, 465)
+        target = res
+        title = "Recovery code"
+        text = "Your code: {0}".format(code)
+        msg = MIMEMultipart()
+        msg['Subject'] = title
+        msg['From'] = login
+        body = text
+        msg.attach(MIMEText(body, 'plain'))
+        try:
+            server.login(login, password)
+            server.sendmail(login, target, msg.as_string())
+        except Exception as e:
+            messagebox.showerror('Error', str(e))
+        messagebox.showinfo('Recovery', 'Recovery code has been sent to your email')
+        # show recovery menu
+        cursor.close()
+        connect.close()
+    except Exception as e:
+        exception_handler(e, connect, cursor)
+
+
 def loop(*args):
     while True:
         print(1)
@@ -887,8 +953,14 @@ check_remember = tk.Checkbutton(auth_frame, font=10, fg='black', text='Remember 
 check_remember.pack(side=TOP, anchor=S)
 button_login = tk.Button(auth_frame, text="LOGIN", bg='#2E8B57', width=11, command=lambda: login())
 button_login.pack(side=LEFT, pady=3, anchor=CENTER)
+button_reg_m = tk.Button(auth_frame, text="REGISTER", bg='#2E8B57', width=11, command=lambda: show_reg_frame())
+button_reg_m.pack(side=RIGHT, pady=3, anchor=CENTER)
 button_reg = tk.Button(auth_frame, text="REGISTER", bg='#2E8B57', width=11, command=lambda: register())
-button_reg.pack(side=RIGHT, pady=3, anchor=CENTER)
+button_login_b = tk.Button(auth_frame, text="BACK", bg='#2E8B57', width=11, command=lambda: back_to_login())
+# endregion
+# region reg
+label_email = tk.Label(auth_frame, font=10, text="Email:                          ", fg="black", width=18)
+entry_email = tk.Entry(auth_frame, font=12, width=20, fg="black")
 # endregion
 # region main menu
 main_frame = LabelFrame(root, width=850, height=500)
@@ -961,7 +1033,7 @@ button_refresh2.pack(side=TOP, pady=3, anchor=CENTER)
 entry_msg2 = tk.Entry(group_frame, font=10, width=85)
 # entry_msg2.bind("<Return>", send_chat_message())
 entry_msg2.pack(side=LEFT, padx=3)
-button_img2 = tk.Button(group_frame, text="➕", bg='#2E8B57', width=3) #, command=lambda: send_image())
+button_img2 = tk.Button(group_frame, text="➕", bg='#2E8B57', width=3)  # , command=lambda: send_image())
 button_img2.pack(side=LEFT, anchor=E)
 button_send2 = tk.Button(group_frame, text="SEND", bg='#2E8B57', width=8, command=lambda: send_chat_message())
 button_send2.pack(side=LEFT, anchor=E, padx=3)
