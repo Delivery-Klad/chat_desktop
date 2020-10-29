@@ -11,7 +11,6 @@ from tkinter import filedialog
 from PIL import Image as image1
 from PIL import ImageTk as image2
 # from urllib import request
-import keyring
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -29,6 +28,7 @@ email = ''
 var = IntVar()
 private_key = rsa.PrivateKey(1, 2, 3, 4, 5)
 files_dir = 'files'
+auto_fill_data_file = files_dir + '/rem.rm'
 private_key_file = files_dir + '/priv_key.PEM'
 
 try:
@@ -140,13 +140,22 @@ def check_password(cursor, log, pas):
 def auto_login():
     global user_login
     global user_id
+    psw, lgn = '', ''
     try:
-        lgn = keyring.get_password('datachat', 'login')
-        psw = keyring.get_password('datachat', 'password')
-        if lgn is not None and psw is not None:
-            entry_log.insert(0, lgn)
-            entry_pass.insert(0, psw)
-            var.set(1)
+        with open(auto_fill_data_file, 'r') as file:
+            res = file.read().split('  ', 1)
+        if len(res) == 1:
+            return
+        tmp = res[0].split(' ')
+        for i in tmp:
+            lgn += chr(int(i) - 1)
+        tmp = res[1].split(' ')
+        tmp.pop(len(tmp) - 1)
+        for i in tmp:
+            psw += chr(int(i) - 2)
+        entry_log.insert(0, lgn)
+        entry_pass.insert(0, psw)
+        var.set(1)
     except FileNotFoundError:
         pass
     except Exception as e:
@@ -154,19 +163,19 @@ def auto_login():
 
 
 def clear_auto_login():
-    try:
-        keyring.delete_password('datachat', 'login')
-    except Exception:
-        pass
-    try:
-        keyring.delete_password('datachat', 'password')
-    except Exception:
-        pass
+    with open(auto_fill_data_file, 'w') as file:
+        file.write('')
 
 
 def fill_auto_login_file(lgn, psw):
-    keyring.set_password('datachat', 'login', lgn)
-    keyring.set_password('datachat', 'password', psw)
+    with open(auto_fill_data_file, 'w') as file:
+        file.write('')
+    with open(auto_fill_data_file, 'a') as file:
+        for i in lgn:
+            file.write(str(ord(i) + 1) + ' ')
+        file.write(' ')
+        for i in psw:
+            file.write(str(ord(i) + 2) + ' ')
 
 
 def login(*args):
