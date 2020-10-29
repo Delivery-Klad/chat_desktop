@@ -80,8 +80,8 @@ def debug(cursor):
 def create_tables():
     connect, cursor = pg_connect()
     try:
-        # cursor.execute("DROP TABLE group_gr")
-        # cursor.execute("DROP TABLE test_gr")
+        # cursor.execute("DROP TABLE messages")
+        # cursor.execute("DROP TABLE users")
         # cursor.execute("DROP TABLE chats")
         # debug(cursor)
         # listf = {}
@@ -138,8 +138,7 @@ def check_password(cursor, log, pas):
 
 
 def auto_login():
-    global user_login
-    global user_id
+    global user_login, user_id
     psw, lgn = '', ''
     try:
         with open(auto_fill_data_file, 'r') as file:
@@ -164,27 +163,29 @@ def auto_login():
 
 def clear_auto_login():
     with open(auto_fill_data_file, 'w') as file:
-        file.write('')
+        file.write("")
 
 
 def fill_auto_login_file(lgn, psw):
+    to_write = ""
+    for i in lgn:
+        to_write += str(ord(i) + 1) + " "
+    to_write += " "
+    for i in psw:
+        to_write += str(ord(i) + 2) + " "
     with open(auto_fill_data_file, 'w') as file:
-        file.write('')
-    with open(auto_fill_data_file, 'a') as file:
-        for i in lgn:
-            file.write(str(ord(i) + 1) + ' ')
-        file.write(' ')
-        for i in psw:
-            file.write(str(ord(i) + 2) + ' ')
+        file.write(to_write)
 
 
 def login(*args):
-    global user_login
-    global user_id
+    label_loading.place(x=60, y=60)
+    root.update()
+    global user_login, user_id
     connect, cursor = pg_connect()
     try:
         if len(entry_log.get()) == 0 or len(entry_pass.get()) == 0:
             messagebox.showerror('Input error', 'Fill all input fields')
+            label_loading.place_forget()
             return
         res = check_password(cursor, entry_log.get(), entry_pass.get().encode('utf-8'))
         if res == "False":
@@ -193,11 +194,13 @@ def login(*args):
             msg = messagebox.askquestion('Input error', 'Wrong password, recover?', icon='error')
             if msg == 'yes':
                 pass_code()
+            label_loading.place_forget()
             return
         elif res == "None":
             cursor.close()
             connect.close()
             messagebox.showerror('Input error', 'User not found')
+            label_loading.place_forget()
             return
         if var.get() == 0:
             clear_auto_login()
@@ -210,7 +213,9 @@ def login(*args):
         hide_auth_menu()
         cursor.close()
         connect.close()
+        label_loading.place_forget()
     except Exception as e:
+        label_loading.place_forget()
         exception_handler(e, connect, cursor)
 
 
@@ -289,8 +294,7 @@ def get_id(cursor):
 
 
 def hide_auth_menu():
-    global w
-    global h
+    global w, h
     w -= 200
     auth_frame.pack_forget()
     root.geometry("1000x500+{}+{}".format(w, h))
@@ -300,6 +304,7 @@ def hide_auth_menu():
 
 
 def menu_navigation(menu: str):
+    root.update()
     global current_chat, chats
     if menu == "chat":
         for key in chats:
@@ -444,6 +449,7 @@ def get_user_id(user, cursor):
 
 
 def send_message():
+    root.update()
     global user_id
     connect, cursor = pg_connect()
     try:
@@ -511,6 +517,7 @@ def send_image():
 
 
 def get_message():
+    root.update()
     global user_id, spacing
     connect, cursor = pg_connect()
     try:
@@ -650,30 +657,6 @@ def get_private_key():
         private_key = rsa.PrivateKey.load_pkcs1(data)
     except FileNotFoundError:
         pass
-
-
-def change_text_font():
-    if len(entry_font.get()) == 0:
-        messagebox.showerror("Input error", "Input field must be filled")
-        return
-    if not entry_font.get().isdigit():
-        messagebox.showerror("Input error", "Font must be a number")
-        return
-    for i in labels:
-        i.configure(font=int(entry_font.get()))
-    messagebox.showinfo("OOPS", "Not worked yet")
-
-
-def change_but_font():
-    if len(entry_b_font.get()) == 0:
-        messagebox.showerror("Input error", "Input field must be filled")
-        return
-    if not entry_b_font.get().isdigit():
-        messagebox.showerror("Input error", "Font must be a number")
-        return
-    for i in buttons:
-        i.configure(font=int(entry_b_font.get()))
-    messagebox.showinfo("OOPS", "Not worked yet")
 
 
 def change_password():
@@ -875,8 +858,7 @@ def invite_to_group():
 
 
 def logout():
-    global w
-    global h
+    global w, h
     w += 200
     menu_navigation("chat")
     menu_frame.pack_forget()
@@ -887,9 +869,7 @@ def logout():
 
 
 def recovery_menu():
-    global w
-    global h
-    global code
+    global w, h, code
     try:
         auth_frame.pack_forget()
         root.geometry("200x100+{}+{}".format(w, h))
@@ -899,8 +879,7 @@ def recovery_menu():
 
 
 def new_pass_menu():
-    global w, h
-    global code
+    global w, h, code
     try:
         if not entry_code.get() == str(code):
             messagebox.showerror('Input error', 'Incorrect code')
@@ -1054,7 +1033,6 @@ main2_frame.pack(side=TOP, anchor=CENTER)
 main2_frame2 = LabelFrame(group_frame, width=600, height=350, relief=FLAT)
 main2_frame2.pack(side=TOP, anchor=CENTER)
 # endregion
-
 # region chat
 frame = Frame(main2_frame, width=850, height=500)
 frame.pack(expand=True, fill=BOTH)
@@ -1113,22 +1091,6 @@ entry_log.focus_set()
 # root.after(500, loop)
 # endregion
 # region settings
-settings_frame1 = LabelFrame(settings_frame, width=850, height=410, relief=FLAT)
-settings_frame1.pack(side=TOP, pady=2, anchor=N)
-label_font = tk.Label(settings_frame1, font=10, text="  Text font:", fg="black", width=18, anchor=W)
-label_font.pack(side=LEFT, anchor=W)
-entry_font = tk.Entry(settings_frame1, font=12, width=20, fg="black")
-entry_font.pack(side=LEFT, padx=170, anchor=CENTER)
-button_font = tk.Button(settings_frame1, text="SET", bg='#2E8B57', width=15, command=lambda: change_text_font())
-button_font.pack(side=RIGHT, anchor=E)
-settings_frame2 = LabelFrame(settings_frame, width=600, height=25, relief=FLAT)
-settings_frame2.pack(side=TOP, pady=2, anchor=N)
-label_b_font = tk.Label(settings_frame2, font=10, text="  Buttons font:", fg="black", width=18, anchor=W)
-label_b_font.pack(side=LEFT, anchor=W)
-entry_b_font = tk.Entry(settings_frame2, font=12, width=20, fg="black")
-entry_b_font.pack(side=LEFT, padx=170, anchor=CENTER)
-button_b_font = tk.Button(settings_frame2, text="SET", bg='#2E8B57', width=15, command=lambda: change_but_font())
-button_b_font.pack(side=RIGHT, anchor=E)
 settings_frame_2 = LabelFrame(settings_frame, width=600, height=25, relief=FLAT)
 settings_frame_2.pack(side=TOP, pady=2, anchor=N)
 label_check = tk.Label(settings_frame_2, font=10, text="  Update frequency:", fg="black", width=18, anchor=W)
@@ -1199,11 +1161,9 @@ entry_id_or_nick = tk.Entry(main1_frame, font=10, width=20)
 entry_id_or_nick.pack(side=TOP, padx=2, anchor=CENTER)
 button_check = tk.Button(main1_frame, text="CHECK", bg='#2E8B57', width=25, command=lambda: get_user_info())
 button_check.pack(side=TOP, anchor=CENTER)
-# endregion
 
-labels = [label_user, label_password, entry_id, entry_msg, label_old_pass, entry_old_pass, entry_id_or_nick,
-          label_info, entry_res, entry_new_pass, label_new_pass, entry_font, entry_b_font, label_font, label_b_font]
-buttons = []
+label_loading = Label(root, font=10, text="LOADING", fg="black", bg="white")
+# endregion
 auto_login()
 
 if __name__ == "__main__":
