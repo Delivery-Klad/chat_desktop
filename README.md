@@ -1,4 +1,4 @@
-# Database Chat
+# Database Chat (edit)
 Auth window
 
 # ![alt text](https://github.com/Kladmen228/database_chat/blob/master/Images/auth.png)
