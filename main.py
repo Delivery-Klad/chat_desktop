@@ -163,16 +163,16 @@ def auto_login():
 
 def clear_auto_login():
     with open(auto_fill_data_file, 'w') as file:
-        file.write("")
+        file.write(' ')
 
 
 def fill_auto_login_file(lgn, psw):
-    to_write = ""
+    to_write = ''
     for i in lgn:
-        to_write += str(ord(i) + 1) + " "
-    to_write += " "
+        to_write += str(ord(i) + 1) + ' '
+    to_write += ' '
     for i in psw:
-        to_write += str(ord(i) + 2) + " "
+        to_write += str(ord(i) + 2) + ' '
     with open(auto_fill_data_file, 'w') as file:
         file.write(to_write)
 
