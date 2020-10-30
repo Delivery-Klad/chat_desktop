@@ -1,7 +1,7 @@
 # Database Chat (edit)
 Auth window
 
-# ![alt text](./auth.png)
+# ![alt text](Images/auth.png)
 
 Registration window
 
