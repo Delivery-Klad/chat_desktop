@@ -1,7 +1,7 @@
 # Database Chat (edit)
 Auth window
 
-# ![alt text](https://github.com/Kladmen228/database_chat/blob/master/Images/auth.png)
+# ![alt text](./auth.png)
 
 Registration window
 
