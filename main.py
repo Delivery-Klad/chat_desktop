@@ -11,9 +11,14 @@ from tkinter import filedialog
 from PIL import Image as image1
 from PIL import ImageTk as image2
 # from urllib import request
+import keyring
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+
+
+from keyring.backends.Windows import WinVaultKeyring
+keyring.set_keyring(WinVaultKeyring())
 
 code = None
 chats = {}
@@ -138,23 +143,15 @@ def check_password(cursor, log, pas):
 
 
 def auto_login():
-    global user_login, user_id
-    psw, lgn = '', ''
+    global user_login
+    global user_id
     try:
-        with open(auto_fill_data_file, 'r') as file:
-            res = file.read().split('  ', 1)
-        if len(res) == 1:
-            return
-        tmp = res[0].split(' ')
-        for i in tmp:
-            lgn += chr(int(i) - 1)
-        tmp = res[1].split(' ')
-        tmp.pop(len(tmp) - 1)
-        for i in tmp:
-            psw += chr(int(i) - 2)
-        entry_log.insert(0, lgn)
-        entry_pass.insert(0, psw)
-        var.set(1)
+        lgn = keyring.get_password('datachat', 'login')
+        psw = keyring.get_password('datachat', 'password')
+        if lgn is not None and psw is not None:
+            entry_log.insert(0, lgn)
+            entry_pass.insert(0, psw)
+            var.set(1)
     except FileNotFoundError:
         pass
     except Exception as e:
@@ -162,19 +159,19 @@ def auto_login():
 
 
 def clear_auto_login():
-    with open(auto_fill_data_file, 'w') as file:
-        file.write(' ')
+    try:
+        keyring.delete_password('datachat', 'login')
+    except Exception:
+        pass
+    try:
+        keyring.delete_password('datachat', 'password')
+    except Exception:
+        pass
 
 
 def fill_auto_login_file(lgn, psw):
-    to_write = ''
-    for i in lgn:
-        to_write += str(ord(i) + 1) + ' '
-    to_write += ' '
-    for i in psw:
-        to_write += str(ord(i) + 2) + ' '
-    with open(auto_fill_data_file, 'w') as file:
-        file.write(to_write)
+    keyring.set_password('datachat', 'login', lgn)
+    keyring.set_password('datachat', 'password', psw)
 
 
 def login(*args):

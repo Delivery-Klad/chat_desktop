@@ -22,3 +22,7 @@ Info window
 Settings window
 
 # ![alt text](https://github.com/Kladmen228/database_chat/blob/master/Images/settings.png)
+
+pyinstaller -F -c --hidden-import win32timezone main.py
+https://github.com/jaraco/keyring/issues/324
+https://github.com/jaraco/keyring/issues/468
