@@ -5,23 +5,23 @@ Auth window
 
 Registration window
 
-# ![alt text](https://github.com/Kladmen228/database_chat/blob/master/Images/register.png)
+# ![alt text](Images/register.png)
 
 Chat window
 
-# ![alt text](https://github.com/Kladmen228/database_chat/blob/master/Images/chat.png)
+# ![alt text](Images/chat.png)
 
 Group chats
 
-# ![alt text](https://github.com/Kladmen228/database_chat/blob/master/Images/groups.png)
+# ![alt text](Images/groups.png)
 
 Info window
 
-# ![alt text](https://github.com/Kladmen228/database_chat/blob/master/Images/info.png)
+# ![alt text](Images/info.png)
 
 Settings window
 
-# ![alt text](https://github.com/Kladmen228/database_chat/blob/master/Images/settings.png)
+# ![alt text](Images/settings.png)
 
 pyinstaller -F -c --hidden-import win32timezone main.py
 https://github.com/jaraco/keyring/issues/324
