@@ -23,6 +23,9 @@ Settings window
 
 # ![alt text](Images/settings.png)
 
+Password's recovery
+
+# ![alt text](Images/recovery.png)
 pyinstaller -F -c --hidden-import win32timezone main.py
 https://github.com/jaraco/keyring/issues/324
 https://github.com/jaraco/keyring/issues/468
