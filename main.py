@@ -10,7 +10,7 @@ from tkinter import messagebox
 from tkinter import filedialog
 from PIL import Image as image1
 from PIL import ImageTk as image2
-# from urllib import request
+import requests
 import keyring
 import smtplib
 from email.mime.multipart import MIMEMultipart
@@ -55,6 +55,11 @@ def exception_handler(e, connect, cursor):
 
 def pg_connect():
     try:
+        try:
+            print(requests.get('https://solitary-glitter-9901.dakfadeev.workers.dev/').text)
+            # print(requests.post('https://localhost:9090/post/get_pass').text)
+        except Exception as e:
+            print(e)
         con = psycopg2.connect(
             host="ec2-54-75-244-161.eu-west-1.compute.amazonaws.com",
             database="d8fi2kbfpchos",
