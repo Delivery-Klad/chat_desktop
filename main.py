@@ -96,7 +96,7 @@ def create_tables():
         # listf = {}
         # listf['{0}'.format('butth')] = 1
         # print(listf[1])
-        cursor.execute('CREATE TABLE IF NOT EXISTS users(id INTEGER,'
+        cursor.execute('CREATE TABLE IF NOT EXISTS users(id TEXT,'
                        'login TEXT,'
                        'password TEXT,'
                        'pubkey TEXT,'
@@ -268,6 +268,7 @@ def register():
         except Exception as e:
             print(e)
         cursor.execute("CREATE USER {0} WITH PASSWORD '{1}'".format(entry_log.get(), entry_pass.get()))
+        cursor.execute("GRANT user_access TO {0}".format(entry_log.get()))
         connect.commit()
         db_log, db_pass = entry_log.get(), entry_log.get()
         hashed_pass = bcrypt.hashpw(entry_pass.get().encode('utf-8'), bcrypt.gensalt())
