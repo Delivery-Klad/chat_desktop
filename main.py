@@ -36,6 +36,9 @@ files_dir = 'files'
 auto_fill_data_file = files_dir + '/rem.rm'
 private_key_file = files_dir + '/priv_key.PEM'
 
+db_log = "register"
+db_pass = "reg"
+
 try:
     # iutnqyyujjskrr@mail.ru
     # d8fi2kbfpchos
@@ -54,18 +57,14 @@ def exception_handler(e, connect, cursor):
 
 
 def pg_connect():
+    global db_log, db_pass
     try:
-        try:
-            print(requests.get('https://solitary-glitter-9901.dakfadeev.workers.dev/').text)
-            # print(requests.post('https://localhost:9090/post/get_pass').text)
-        except Exception as e:
-            print(e)
         con = psycopg2.connect(
-            host="ec2-54-75-244-161.eu-west-1.compute.amazonaws.com",
-            database="d8fi2kbfpchos",
-            user="iutnqyyujjskrr",
+            host="localhost",
+            database="postgres",
+            user=db_log,
             port="5432",
-            password="45be3b8ccf0ce93d0e142ec546edaa8a067370f5c050b92b4c181730fb2c9814")
+            password=db_pass)
         cur = con.cursor()
         return con, cur
     except Exception as e:
@@ -148,12 +147,13 @@ def check_password(cursor, log, pas):
 
 
 def auto_login():
-    global user_login
-    global user_id
+    global user_login, user_id, db_log, db_pass
     try:
         lgn = keyring.get_password('datachat', 'login')
         psw = keyring.get_password('datachat', 'password')
         if lgn is not None and psw is not None:
+            db_log = lgn
+            db_pass = psw
             entry_log.insert(0, lgn)
             entry_pass.insert(0, psw)
             var.set(1)
@@ -182,13 +182,15 @@ def fill_auto_login_file(lgn, psw):
 def login(*args):
     label_loading.place(x=60, y=60)
     root.update()
-    global user_login, user_id
-    connect, cursor = pg_connect()
+    global user_login, user_id, db_log, db_pass
     try:
         if len(entry_log.get()) == 0 or len(entry_pass.get()) == 0:
             messagebox.showerror('Input error', 'Fill all input fields')
             label_loading.place_forget()
             return
+        db_log = entry_log.get()
+        db_pass = entry_pass.get()
+        connect, cursor = pg_connect()
         res = check_password(cursor, entry_log.get(), entry_pass.get().encode('utf-8'))
         if res == "False":
             cursor.close()
@@ -218,7 +220,7 @@ def login(*args):
         label_loading.place_forget()
     except Exception as e:
         label_loading.place_forget()
-        exception_handler(e, connect, cursor)
+        print(e)
 
 
 def show_reg_frame():
@@ -245,17 +247,16 @@ def back_to_login():
 
 
 def register():
-    connect, cursor = pg_connect()
+    global db_log, db_pass
     try:
         if len(entry_log.get()) == 0 or len(entry_pass.get()) == 0 or len(entry_email.get()) == 0:
             messagebox.showerror('Input error', 'Fill all input fields')
-            cursor.close()
-            connect.close()
             return
         if not check_input(entry_pass.get(), entry_log.get()):
-            cursor.close()
-            connect.close()
             return
+        db_log = "register"
+        db_pass = "reg"
+        connect, cursor = pg_connect()
         try:
             cursor.execute("SELECT COUNT(*) FROM users WHERE login = '{0}'".format(str(entry_log.get())))
             res = cursor.fetchall()[0][0]
@@ -266,6 +267,9 @@ def register():
                 return
         except Exception as e:
             print(e)
+        cursor.execute("CREATE USER {0} WITH PASSWORD '{1}'".format(entry_log.get(), entry_pass.get()))
+        connect.commit()
+        db_log, db_pass = entry_log.get(), entry_log.get()
         hashed_pass = bcrypt.hashpw(entry_pass.get().encode('utf-8'), bcrypt.gensalt())
         hashed_pass = str(hashed_pass)[2:-1]
         cursor.execute("SELECT MAX(id) FROM users")
@@ -282,7 +286,7 @@ def register():
         cursor.close()
         connect.close()
     except Exception as e:
-        exception_handler(e, connect, cursor)
+        print(e)
 
 
 def get_id(cursor):
