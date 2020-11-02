@@ -37,8 +37,6 @@ auto_fill_data_file = files_dir + '/rem.rm'
 private_key_file = files_dir + '/priv_key.PEM'
 
 try:
-    # iutnqyyujjskrr@mail.ru
-    # d8fi2kbfpchos
     os.mkdir(files_dir)
 except FileExistsError:
     pass
@@ -55,11 +53,6 @@ def exception_handler(e, connect, cursor):
 
 def pg_connect():
     try:
-        try:
-            print(requests.get('https://solitary-glitter-9901.dakfadeev.workers.dev/').text)
-            # print(requests.post('https://localhost:9090/post/get_pass').text)
-        except Exception as e:
-            print(e)
         con = psycopg2.connect(
             host="ec2-54-75-244-161.eu-west-1.compute.amazonaws.com",
             database="d8fi2kbfpchos",
@@ -94,9 +87,6 @@ def create_tables():
         # cursor.execute("DROP TABLE users")
         # cursor.execute("DROP TABLE chats")
         # debug(cursor)
-        # listf = {}
-        # listf['{0}'.format('butth')] = 1
-        # print(listf[1])
         cursor.execute('CREATE TABLE IF NOT EXISTS users(id INTEGER,'
                        'login TEXT,'
                        'password TEXT,'
