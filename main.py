@@ -10,14 +10,14 @@ from tkinter import messagebox
 from tkinter import filedialog
 from PIL import Image as image1
 from PIL import ImageTk as image2
-import requests
 import keyring
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-
+from datetime import datetime, timezone
 
 from keyring.backends.Windows import WinVaultKeyring
+
 keyring.set_keyring(WinVaultKeyring())
 
 code = None
@@ -35,6 +35,7 @@ private_key = rsa.PrivateKey(1, 2, 3, 4, 5)
 files_dir = 'files'
 auto_fill_data_file = files_dir + '/rem.rm'
 private_key_file = files_dir + '/priv_key.PEM'
+current_chat = -1
 
 try:
     os.mkdir(files_dir)
@@ -95,7 +96,8 @@ def create_tables():
         cursor.execute('CREATE TABLE IF NOT EXISTS chats(id TEXT,'
                        'name TEXT,'
                        'owner INTEGER)')
-        cursor.execute('CREATE TABLE IF NOT EXISTS messages(from_id TEXT,'
+        cursor.execute('CREATE TABLE IF NOT EXISTS messages(date TIMESTAMP,'
+                       'from_id TEXT,'
                        'to_id TEXT,'
                        'message BYTEA)')
         connect.commit()
@@ -200,7 +202,6 @@ def login(*args):
             fill_auto_login_file(entry_log.get(), entry_pass.get())
         user_login = entry_log.get()
         user_id = get_id(cursor)
-        get_message()
         get_private_key()
         hide_auth_menu()
         cursor.close()
@@ -213,7 +214,6 @@ def login(*args):
 
 def show_reg_frame():
     root.geometry("200x175+{}+{}".format(w, h))
-    entry_id.focus_set()
     button_login.pack_forget()
     button_reg_m.pack_forget()
     check_remember.pack_forget()
@@ -290,7 +290,7 @@ def hide_auth_menu():
     w -= 200
     auth_frame.pack_forget()
     root.geometry("1000x500+{}+{}".format(w, h))
-    entry_id.focus_set()
+    entry_msg.focus_set()
     menu_frame.pack(side=LEFT, pady=5, anchor=N)
     main_frame.pack(side=LEFT, anchor=CENTER)
 
@@ -442,16 +442,11 @@ def get_user_id(user, cursor):
 
 def send_message():
     root.update()
-    global user_id
+    global user_id, current_chat
     connect, cursor = pg_connect()
     try:
-        if len(entry_id.get()) == 0 or len(entry_msg.get()) == 0:
+        if len(entry_msg.get()) == 0:
             messagebox.showerror('Input error', 'Fill all input fields')
-            cursor.close()
-            connect.close()
-            return
-        if not entry_id.get().isdigit():
-            messagebox.showerror('Input error', 'Id must be a number')
             cursor.close()
             connect.close()
             return
@@ -461,12 +456,17 @@ def send_message():
                 cursor.close()
                 connect.close()
                 return
-        to_id = int(entry_id.get())
+        to_id = current_chat
         msg = entry_msg.get()
         cursor.execute("SELECT pubkey FROM users WHERE id={0}".format(to_id))
         res = cursor.fetchall()[0][0]
         encrypt_msg = encrypt(msg.encode('utf-8'), res)
-        cursor.execute("INSERT INTO messages VALUES ('{0}', '{1}', {2})".format(user_id, to_id, encrypt_msg))
+        date = datetime.utcnow().strftime('%y-%m-%d %H:%M:%S')
+        cursor.execute(
+            "INSERT INTO messages VALUES (to_timestamp('{0}', 'dd-mm-yy hh24:mi:ss'), '{1}', '{2}', {3})".format(date,
+                                                                                                                 user_id,
+                                                                                                                 to_id,
+                                                                                                                 encrypt_msg))
         entry_msg.delete(0, tk.END)
         connect.commit()
         cursor.close()
@@ -476,12 +476,10 @@ def send_message():
 
 
 def send_image():
-    global user_id
+    root.update()
+    global user_id, current_chat
     connect, cursor = pg_connect()
     try:
-        if len(entry_id.get()) == 0:
-            messagebox.showerror('Input error', 'Fill "id" input field')
-            return
         path = filedialog.askopenfilename(filetypes=(("image", "*.png"), ("image", "*.jpg")))
         if len(path) == 0:
             return
@@ -498,8 +496,9 @@ def send_image():
         original_img.close()
         with open('resized_image.png', 'rb') as file:
             b64 = base64.b64encode(file.read())
-        cursor.execute(
-            "INSERT INTO messages VALUES ('{0}', '{1}', {2})".format(user_id, entry_id.get(), psycopg2.Binary(b64)))
+        date = datetime.utcnow().strftime('%d/%m/%y %H:%M:%S')
+        cursor.execute("INSERT INTO messages VALUES ('{0}', '{1}', '{2}', "
+                       "{3})".format(date, user_id, current_chat, psycopg2.Binary(b64)))
         os.remove('resized_image.png')
         connect.commit()
         cursor.close()
@@ -510,24 +509,28 @@ def send_image():
 
 def get_message():
     root.update()
-    global user_id, spacing
+    global user_id, spacing, current_chat
     connect, cursor = pg_connect()
     try:
-        cursor.execute("SELECT * FROM messages WHERE to_id='{0}' AND NOT from_id LIKE 'g%'".format(user_id))
+        cursor.execute("SELECT * FROM messages WHERE to_id='{0}' AND from_id='{1}' AND NOT from_id LIKE 'g%' "
+                       "ORDER BY date".format(user_id, current_chat))
         res = cursor.fetchall()
-        cursor.execute("DELETE FROM messages WHERE to_id='{0}' AND NOT from_id LIKE 'g%'".format(user_id))
-        connect.commit()
+        cursor.execute("SELECT * FROM messages WHERE to_id='{1}' AND from_id='{0}' AND NOT from_id LIKE 'g%' "
+                       "ORDER BY date".format(user_id, current_chat))
+        res += cursor.fetchall()
+        res.sort()
+        canvas.delete("all")
         for i in res:
-            decrypt_msg = decrypt(i[2])
-            nickname = get_user_nickname(i[0], cursor)
+            decrypt_msg = decrypt(i[3])
+            nick = get_user_nickname(i[2], cursor)
             if decrypt_msg is None:
-                content = '{0}: attachment'.format(nickname)
+                content = '{0} {1}:'.format(i[0], nick)
                 widget = Label(canvas, text=content, bg='white', fg='black', font=14)
                 canvas.create_window(0, spacing, window=widget, anchor='nw')
                 spacing += 25
                 canvas.config(scrollregion=canvas.bbox("all"))
                 with open('tmp_img.png', 'wb') as file:
-                    file.write(base64.b64decode(i[2]))
+                    file.write(base64.b64decode(i[3]))
                 im = image1.open('tmp_img.png')
                 photo = image2.PhotoImage(im)
                 im.close()
@@ -537,7 +540,7 @@ def get_message():
                 canvas.create_window(0, spacing, window=widget, anchor='nw')
                 spacing += photo.height() + 2
             else:
-                content = '{0}: {1}'.format(nickname, decrypt_msg)
+                content = '{0} {2}: {1}'.format(str(i[0])[2:], decrypt_msg, nick)
                 widget = Label(canvas, text=content, bg='white', fg='black', font=14)
                 canvas.create_window(0, spacing, window=widget, anchor='nw')
                 spacing += 25
@@ -581,19 +584,15 @@ def login_handler(*args):
 
 def send_message_handler(*args):
     if str(root.focus_get()) == ".!labelframe2.!entry":
-        if len(entry_id.get()) != 0 and len(entry_msg.get()) != 0:
+        if len(entry_msg.get()) != 0:
             send_message()
-        elif len(entry_id.get()) == 0:
-            pass
         elif len(entry_msg.get()) == 0:
             entry_msg.focus_set()
     elif str(root.focus_get()) == ".!labelframe2.!entry2":
-        if len(entry_id.get()) != 0 and len(entry_msg.get()) != 0:
+        if len(entry_msg.get()) != 0:
             send_message()
         elif len(entry_msg.get()) == 0:
             pass
-        elif len(entry_id.get()) == 0:
-            entry_id.focus_set()
 
 
 def change_pass_handler(*args):
@@ -780,8 +779,10 @@ def send_chat_message():
             cursor.execute("SELECT pubkey FROM users WHERE id={0}".format(i[0]))
             res = cursor.fetchall()[0][0]
             encrypt_msg = encrypt(message.encode('utf-8'), res)
-            cursor.execute("INSERT INTO messages VALUES ('{0}', '{1}', {2})".format(current_chat + '_' + str(user_id),
-                                                                                    i[0], encrypt_msg))
+            date = datetime.utcnow().strftime('%d/%m/%y %H:%M:%S')
+            cursor.execute(
+                "INSERT INTO messages VALUES ('{0}', '{0}', '{1}', {2})".format(date, current_chat + '_' + str(user_id),
+                                                                                i[0], encrypt_msg))
             entry_msg2.delete(0, tk.END)
         connect.commit()
         cursor.close()
@@ -794,10 +795,9 @@ def get_chat_message():
     global user_id, spacing, current_chat
     connect, cursor = pg_connect()
     try:
-        cursor.execute("SELECT * FROM messages WHERE to_id='{0}' AND from_id LIKE '{1}%'".format(user_id, current_chat))
+        cursor.execute("SELECT * FROM messages WHERE to_id='{0}' AND from_id LIKE '{1}%' ORDER BY date".format(user_id,
+                                                                                                               current_chat))
         res = cursor.fetchall()
-        cursor.execute("DELETE FROM messages WHERE to_id='{0}' AND from_id LIKE '{1}%'".format(user_id, current_chat))
-        connect.commit()
         for i in res:
             decrypt_msg = decrypt(i[2])
             nickname = get_user_nickname(i[0].split('_', 1)[1], cursor)
@@ -939,6 +939,32 @@ def pass_code():
         exception_handler(e, connect, cursor)
 
 
+def open_chat():
+    global current_chat
+    chat = entry_chat_id.get()
+    connect, cursor = pg_connect()
+    if len(chat) == 0 or not chat.isnumeric():
+        messagebox.showerror('Input error', 'Chat id must be a number')
+        cursor.close()
+        connect.close()
+        return
+    nick = get_user_nickname(int(chat), cursor)
+    if nick is not None:
+        label_chat_id.configure(text='Current chat with: ' + nick)
+    else:
+        messagebox.showerror('Input error', 'User not found')
+        cursor.close()
+        connect.close()
+        return
+    current_chat = int(chat)
+    button_send.configure(state='normal')
+    button_img.configure(state='normal')
+    canvas.delete("all")
+    get_message()
+    cursor.close()
+    connect.close()
+
+
 def loop(*args):
     while True:
         print(1)
@@ -1026,16 +1052,25 @@ main2_frame2 = LabelFrame(group_frame, width=600, height=350, relief=FLAT)
 main2_frame2.pack(side=TOP, anchor=CENTER)
 # endregion
 # region chat
-frame = Frame(main2_frame, width=850, height=500)
+chat_frame = LabelFrame(main2_frame, width=600, height=25, relief=FLAT)
+chat_frame.pack(side=TOP, pady=2, anchor=N)
+label_chat_id = tk.Label(chat_frame, font=10, text="Current chat with: ", fg="black", width=25, anchor=W)
+label_chat_id.pack(side=LEFT, anchor=W)
+entry_chat_id = tk.Entry(chat_frame, font=12, width=20, fg="black")
+entry_chat_id.pack(side=LEFT, padx=165, anchor=CENTER)
+button_chat_id = tk.Button(chat_frame, text="OPEN", bg='#2E8B57', width=15, command=lambda: open_chat())
+button_chat_id.pack(side=RIGHT, anchor=E)
+
+frame = Frame(main2_frame, width=850, height=450)
 frame.pack(expand=True, fill=BOTH)
-canvas = Canvas(frame, bg='#FFFFFF', width=850, height=410, scrollregion=(0, 0, 500, 500))
+canvas = Canvas(frame, bg='#FFFFFF', width=850, height=370, scrollregion=(0, 0, 500, 450))
 vbar = Scrollbar(frame, orient=VERTICAL)
 vbar.pack(side=RIGHT, fill=Y)
 vbar.config(command=canvas.yview)
 hbar = Scrollbar(frame, orient=HORIZONTAL)
 hbar.pack(side=BOTTOM, fill=X)
 hbar.config(command=canvas.xview)
-canvas.config(width=850, height=410)
+canvas.config(width=850, height=370)
 canvas.config(xscrollcommand=hbar.set, yscrollcommand=vbar.set)
 canvas.pack(side=TOP, expand=True, fill=BOTH)
 canvas.bind("<MouseWheel>", OnMouseWheel)
@@ -1058,15 +1093,13 @@ canvas_2.config(scrollregion=canvas_2.bbox("all"))
 
 button_refresh = tk.Button(main_frame, text="REFRESH", bg='#2E8B57', width=128, command=lambda: get_message())
 button_refresh.pack(side=TOP, pady=3, anchor=CENTER)
-entry_id = tk.Entry(main_frame, font=10, width=8)
-entry_id.bind("<Return>", send_message_handler)
-entry_id.pack(side=LEFT, padx=5)
-entry_msg = tk.Entry(main_frame, font=10, width=75)
+entry_msg = tk.Entry(main_frame, font=10, width=85)
 entry_msg.bind("<Return>", send_message_handler)
 entry_msg.pack(side=LEFT, padx=3)
-button_img = tk.Button(main_frame, text="➕", bg='#2E8B57', width=3, command=lambda: send_image())
+button_img = tk.Button(main_frame, text="➕", bg='#2E8B57', width=3, command=lambda: send_image(), state='disabled')
 button_img.pack(side=LEFT, anchor=E)
-button_send = tk.Button(main_frame, text="SEND", bg='#2E8B57', width=8, command=lambda: send_message())
+button_send = tk.Button(main_frame, text="SEND", bg='#2E8B57', width=8, command=lambda: send_message(),
+                        state='disabled')
 button_send.pack(side=LEFT, anchor=E, padx=3)
 
 button_refresh2 = tk.Button(group_frame, text="REFRESH", bg='#2E8B57', width=128, command=lambda: get_chat_message())
