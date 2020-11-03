@@ -14,8 +14,7 @@ import keyring
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from datetime import datetime, timezone
-
+from datetime import datetime
 from keyring.backends.Windows import WinVaultKeyring
 
 keyring.set_keyring(WinVaultKeyring())
@@ -35,7 +34,6 @@ private_key = rsa.PrivateKey(1, 2, 3, 4, 5)
 files_dir = 'files'
 auto_fill_data_file = files_dir + '/rem.rm'
 private_key_file = files_dir + '/priv_key.PEM'
-current_chat = -1
 
 try:
     os.mkdir(files_dir)
@@ -767,6 +765,7 @@ def send_chat_message():
     global user_id, current_chat
     connect, cursor = pg_connect()
     message = entry_msg2.get()
+    print(message)
     try:
         if len(message) == 0:
             messagebox.showerror('Input error', 'Fill all input fields')
@@ -781,7 +780,7 @@ def send_chat_message():
             encrypt_msg = encrypt(message.encode('utf-8'), res)
             date = datetime.utcnow().strftime('%d/%m/%y %H:%M:%S')
             cursor.execute(
-                "INSERT INTO messages VALUES ('{0}', '{0}', '{1}', {2})".format(date, current_chat + '_' + str(user_id),
+                "INSERT INTO messages VALUES ('{0}', '{1}', '{2}', {3})".format(date, current_chat + '_' + str(user_id),
                                                                                 i[0], encrypt_msg))
             entry_msg2.delete(0, tk.END)
         connect.commit()
@@ -791,17 +790,22 @@ def send_chat_message():
         exception_handler(e, connect, cursor)
 
 
+def send_chat_image():
+    pass
+
+
 def get_chat_message():
     global user_id, spacing, current_chat
     connect, cursor = pg_connect()
+    canvas_2.delete("all")
     try:
-        cursor.execute("SELECT * FROM messages WHERE to_id='{0}' AND from_id LIKE '{1}%' ORDER BY date".format(user_id,
-                                                                                                               current_chat))
+        cursor.execute("SELECT * FROM messages WHERE to_id='{0}' AND from_id LIKE '{1}%' ORDER BY "
+                       "date".format(user_id, current_chat))
         res = cursor.fetchall()
         for i in res:
-            decrypt_msg = decrypt(i[2])
-            nickname = get_user_nickname(i[0].split('_', 1)[1], cursor)
-            content = '{0}: {1}'.format(nickname, decrypt_msg)
+            decrypt_msg = decrypt(i[3])
+            nickname = get_user_nickname(i[1].split('_', 1)[1], cursor)
+            content = '{0} {1}: {2}'.format(i[0], nickname, decrypt_msg)
             widget = Label(canvas_2, text=content, bg='white', fg='black', font=14)
             canvas_2.create_window(0, spacing, window=widget, anchor='nw')
             spacing += 25
@@ -1107,7 +1111,7 @@ button_refresh2.pack(side=TOP, pady=3, anchor=CENTER)
 entry_msg2 = tk.Entry(group_frame, font=10, width=85)
 # entry_msg2.bind("<Return>", send_chat_message())
 entry_msg2.pack(side=LEFT, padx=3)
-button_img2 = tk.Button(group_frame, text="➕", bg='#2E8B57', width=3)  # , command=lambda: send_image())
+button_img2 = tk.Button(group_frame, text="➕", bg='#2E8B57', width=3, command=lambda: send_chat_image())
 button_img2.pack(side=LEFT, anchor=E)
 button_send2 = tk.Button(group_frame, text="SEND", bg='#2E8B57', width=8, command=lambda: send_chat_message())
 button_send2.pack(side=LEFT, anchor=E, padx=3)
