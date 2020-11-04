@@ -1,29 +1,28 @@
 import os
 import rsa
 import bcrypt
-import base64
 import random
+import yadisk
+import keyring
+import smtplib
 import psycopg2
 import tkinter as tk
 from tkinter import *
+from datetime import datetime
 from tkinter import messagebox
 from tkinter import filedialog
-from PIL import Image as image1
-from PIL import ImageTk as image2
-import keyring
-import smtplib
-from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from datetime import datetime
+from email.mime.multipart import MIMEMultipart
 from keyring.backends.Windows import WinVaultKeyring
 
 keyring.set_keyring(WinVaultKeyring())
+y = yadisk.YaDisk(token="AgAAAABITC7sAAav1g3D_G43akSwv85Xg-yPrCY")
 
 code = None
 chats = {}
 current_chat = "g0"
 root = tk.Tk()
-spacing = 0
+spacing, spacing_2 = 0, 0
 w = root.winfo_screenwidth() // 2 - 140
 h = root.winfo_screenheight() // 2 - 100
 user_login = ''
@@ -97,7 +96,8 @@ def create_tables():
         cursor.execute('CREATE TABLE IF NOT EXISTS messages(date TIMESTAMP,'
                        'from_id TEXT,'
                        'to_id TEXT,'
-                       'message BYTEA)')
+                       'message BYTEA,'
+                       'file TEXT)')
         connect.commit()
         cursor.close()
         connect.close()
@@ -295,7 +295,7 @@ def hide_auth_menu():
 
 def menu_navigation(menu: str):
     root.update()
-    global current_chat, chats
+    global current_chat, chats, spacing, spacing_2
     if menu == "chat":
         for key in chats:
             chats[key].pack_forget()
@@ -313,7 +313,13 @@ def menu_navigation(menu: str):
         settings_frame.pack_forget()
         group_frame.pack_forget()
         main_frame.pack(side=LEFT, anchor=CENTER)
-        current_chat = "g0"
+        canvas.delete("all")
+        current_chat = "-1"
+        label_chat_id.configure(text='Current chat with: ')
+        entry_chat_id.delete(0, tk.END)
+        spacing, spacing_2 = 0, 0
+        button_send2.configure(state='disabled')
+        button_img2.configure(state='disabled')
     elif menu == "set":
         button_chat.configure(bg="#A9A9A9")
         button_info.configure(bg="#A9A9A9")
@@ -384,6 +390,8 @@ def config(groups):
 
 
 def change_group(gr_id: str, button):
+    button_send2.configure(state='normal')
+    button_img2.configure(state='normal')
     global current_chat, chats
     current_chat = gr_id
     print(current_chat)
@@ -461,10 +469,8 @@ def send_message():
         encrypt_msg = encrypt(msg.encode('utf-8'), res)
         date = datetime.utcnow().strftime('%y-%m-%d %H:%M:%S')
         cursor.execute(
-            "INSERT INTO messages VALUES (to_timestamp('{0}', 'dd-mm-yy hh24:mi:ss'), '{1}', '{2}', {3})".format(date,
-                                                                                                                 user_id,
-                                                                                                                 to_id,
-                                                                                                                 encrypt_msg))
+            "INSERT INTO messages VALUES (to_timestamp('{0}', 'dd-mm-yy hh24:mi:ss'), '{1}', '{2}', {3}, "
+            "'-')".format(date, user_id, to_id, encrypt_msg))
         entry_msg.delete(0, tk.END)
         connect.commit()
         cursor.close()
@@ -473,31 +479,27 @@ def send_message():
         exception_handler(e, connect, cursor)
 
 
-def send_image():
+def send_doc():
     root.update()
-    global user_id, current_chat
+    global user_id, current_chat, y
     connect, cursor = pg_connect()
     try:
-        path = filedialog.askopenfilename(filetypes=(("image", "*.png"), ("image", "*.jpg")))
+        path = filedialog.askopenfilename(filetypes=[("All files", "*.*")])
         if len(path) == 0:
             return
-        original_img = image1.open(path)
-        width, height = original_img.size
-        while width > 840:
-            width = round(width * 0.8)
-            height = round(height * 0.8)
-        while height > 400:
-            width = round(width * 0.8)
-            height = round(height * 0.8)
-        original_img.thumbnail((width, height), image1.ANTIALIAS)
-        original_img.save('resized_image.png')
-        original_img.close()
-        with open('resized_image.png', 'rb') as file:
-            b64 = base64.b64encode(file.read())
+        path = path.split('/')
+        path = path[len(path) - 1]
+        try:
+            y.upload(path, '/' + path)
+        except Exception:
+            pass
+        link = y.get_download_link('/' + path)
+        cursor.execute("SELECT pubkey FROM users WHERE id={0}".format(current_chat))
+        res = cursor.fetchall()[0][0]
+        encrypt_msg = encrypt('՗'.encode('utf-8'), res)
         date = datetime.utcnow().strftime('%d/%m/%y %H:%M:%S')
-        cursor.execute("INSERT INTO messages VALUES ('{0}', '{1}', '{2}', "
-                       "{3})".format(date, user_id, current_chat, psycopg2.Binary(b64)))
-        os.remove('resized_image.png')
+        cursor.execute("INSERT INTO messages VALUES (to_timestamp('{0}', 'yy-mm-dd hh24:mi:ss'), '{1}', '{2}', "
+                       "{3}, '{4}')".format(date, user_id, current_chat, encrypt_msg, link))
         connect.commit()
         cursor.close()
         connect.close()
@@ -509,6 +511,7 @@ def get_message():
     root.update()
     global user_id, spacing, current_chat
     connect, cursor = pg_connect()
+    spacing = 0
     try:
         cursor.execute("SELECT * FROM messages WHERE to_id='{0}' AND from_id='{1}' AND NOT from_id LIKE 'g%' "
                        "ORDER BY date".format(user_id, current_chat))
@@ -521,22 +524,12 @@ def get_message():
         for i in res:
             decrypt_msg = decrypt(i[3])
             nick = get_user_nickname(i[2], cursor)
-            if decrypt_msg is None:
-                content = '{0} {1}:'.format(i[0], nick)
-                widget = Label(canvas, text=content, bg='white', fg='black', font=14)
+            if decrypt_msg is None or ord(decrypt_msg[0]) == 1367:
+                content = '{0} {2}: {1}'.format(str(i[0])[2:], i[4], nick)
+                widget = tk.Listbox(canvas, bg='white', fg='black', font=14, width=95, height=1)
+                widget.insert(0, content)
                 canvas.create_window(0, spacing, window=widget, anchor='nw')
                 spacing += 25
-                canvas.config(scrollregion=canvas.bbox("all"))
-                with open('tmp_img.png', 'wb') as file:
-                    file.write(base64.b64decode(i[3]))
-                im = image1.open('tmp_img.png')
-                photo = image2.PhotoImage(im)
-                im.close()
-                os.remove('tmp_img.png')
-                widget = Label(canvas, image=photo, fg='black')
-                widget.image = photo
-                canvas.create_window(0, spacing, window=widget, anchor='nw')
-                spacing += photo.height() + 2
             else:
                 content = '{0} {2}: {1}'.format(str(i[0])[2:], decrypt_msg, nick)
                 widget = Label(canvas, text=content, bg='white', fg='black', font=14)
@@ -765,7 +758,6 @@ def send_chat_message():
     global user_id, current_chat
     connect, cursor = pg_connect()
     message = entry_msg2.get()
-    print(message)
     try:
         if len(message) == 0:
             messagebox.showerror('Input error', 'Fill all input fields')
@@ -780,8 +772,8 @@ def send_chat_message():
             encrypt_msg = encrypt(message.encode('utf-8'), res)
             date = datetime.utcnow().strftime('%d/%m/%y %H:%M:%S')
             cursor.execute(
-                "INSERT INTO messages VALUES ('{0}', '{1}', '{2}', {3})".format(date, current_chat + '_' + str(user_id),
-                                                                                i[0], encrypt_msg))
+                "INSERT INTO messages VALUES (to_timestamp('{0}', 'yy-mm-dd hh24:mi:ss'), '{1}', '{2}', {3}, "
+                "'-')".format(date, current_chat + '_' + str(user_id),  i[0], encrypt_msg))
             entry_msg2.delete(0, tk.END)
         connect.commit()
         cursor.close()
@@ -790,14 +782,45 @@ def send_chat_message():
         exception_handler(e, connect, cursor)
 
 
-def send_chat_image():
-    pass
+def send_chat_doc():
+    root.update()
+    global user_id, current_chat, y
+    connect, cursor = pg_connect()
+    try:
+        path = filedialog.askopenfilename(filetypes=[("All files", "*.*")])
+        if len(path) == 0:
+            cursor.close()
+            connect.close()
+            return
+        path = path.split('/')
+        path = path[len(path) - 1]
+        try:
+            y.upload(path, '/' + path)
+        except Exception as e:
+            pass
+        link = y.get_download_link('/' + path)
+        name = get_chat_name(current_chat)
+        users = get_chat_users(name)
+        for i in users:
+            cursor.execute("SELECT pubkey FROM users WHERE id={0}".format(i[0]))
+            res = cursor.fetchall()[0][0]
+            encrypt_msg = encrypt('՗'.encode('utf-8'), res)
+            date = datetime.utcnow().strftime('%d/%m/%y %H:%M:%S')
+            cursor.execute(
+                "INSERT INTO messages VALUES (to_timestamp('{0}', 'yy-mm-dd hh24:mi:ss'), '{1}', '{2}', {3}, "
+                "'{4}')".format(date, current_chat + '_' + str(user_id), i[0], encrypt_msg, link))
+        connect.commit()
+        cursor.close()
+        connect.close()
+    except Exception as e:
+        exception_handler(e, connect, cursor)
 
 
 def get_chat_message():
-    global user_id, spacing, current_chat
+    global user_id, spacing_2, current_chat
     connect, cursor = pg_connect()
     canvas_2.delete("all")
+    spacing_2 = 0
     try:
         cursor.execute("SELECT * FROM messages WHERE to_id='{0}' AND from_id LIKE '{1}%' ORDER BY "
                        "date".format(user_id, current_chat))
@@ -805,10 +828,17 @@ def get_chat_message():
         for i in res:
             decrypt_msg = decrypt(i[3])
             nickname = get_user_nickname(i[1].split('_', 1)[1], cursor)
-            content = '{0} {1}: {2}'.format(i[0], nickname, decrypt_msg)
-            widget = Label(canvas_2, text=content, bg='white', fg='black', font=14)
-            canvas_2.create_window(0, spacing, window=widget, anchor='nw')
-            spacing += 25
+            if decrypt_msg is None or ord(decrypt_msg[0]) == 1367:
+                content = '{0} {2}: {1}'.format(str(i[0])[2:], i[4], nickname)
+                widget = tk.Listbox(canvas_2, bg='white', fg='black', font=14, width=95, height=1)
+                widget.insert(0, content)
+                canvas_2.create_window(0, spacing_2, window=widget, anchor='nw')
+                spacing_2 += 25
+            else:
+                content = '{0} {1}: {2}'.format(str(i[0])[2:], nickname, decrypt_msg)
+                widget = Label(canvas_2, text=content, bg='white', fg='black', font=14)
+                canvas_2.create_window(0, spacing_2, window=widget, anchor='nw')
+                spacing_2 += 25
         canvas_2.config(scrollregion=canvas_2.bbox("all"))
         cursor.close()
         connect.close()
@@ -888,6 +918,7 @@ def new_pass_menu():
 
 
 def set_new_pass():
+    root.update()
     global user_login, email
     user_login = entry_log.get()
     connect, cursor = pg_connect()
@@ -911,6 +942,7 @@ def set_new_pass():
 
 
 def pass_code():
+    root.update()
     global code, user_id, email
     connect, cursor = pg_connect()
     try:
@@ -944,6 +976,7 @@ def pass_code():
 
 
 def open_chat():
+    root.update()
     global current_chat
     chat = entry_chat_id.get()
     connect, cursor = pg_connect()
@@ -1100,7 +1133,7 @@ button_refresh.pack(side=TOP, pady=3, anchor=CENTER)
 entry_msg = tk.Entry(main_frame, font=10, width=85)
 entry_msg.bind("<Return>", send_message_handler)
 entry_msg.pack(side=LEFT, padx=3)
-button_img = tk.Button(main_frame, text="➕", bg='#2E8B57', width=3, command=lambda: send_image(), state='disabled')
+button_img = tk.Button(main_frame, text="➕", bg='#2E8B57', width=3, command=lambda: send_doc(), state='disabled')
 button_img.pack(side=LEFT, anchor=E)
 button_send = tk.Button(main_frame, text="SEND", bg='#2E8B57', width=8, command=lambda: send_message(),
                         state='disabled')
@@ -1111,11 +1144,11 @@ button_refresh2.pack(side=TOP, pady=3, anchor=CENTER)
 entry_msg2 = tk.Entry(group_frame, font=10, width=85)
 # entry_msg2.bind("<Return>", send_chat_message())
 entry_msg2.pack(side=LEFT, padx=3)
-button_img2 = tk.Button(group_frame, text="➕", bg='#2E8B57', width=3, command=lambda: send_chat_image())
+button_img2 = tk.Button(group_frame, text="➕", bg='#2E8B57', width=3, state='disabled', command=lambda: send_chat_doc())
 button_img2.pack(side=LEFT, anchor=E)
-button_send2 = tk.Button(group_frame, text="SEND", bg='#2E8B57', width=8, command=lambda: send_chat_message())
+button_send2 = tk.Button(group_frame, text="SEND", bg='#2E8B57', width=8, state='disabled',
+                         command=lambda: send_chat_message())
 button_send2.pack(side=LEFT, anchor=E, padx=3)
-
 entry_log.focus_set()
 # root.after(500, loop)
 # endregion
