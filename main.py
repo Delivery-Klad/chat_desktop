@@ -268,17 +268,20 @@ def register():
         except Exception as e:
             print(e)
         cursor.execute("CREATE USER {0} WITH PASSWORD '{1}'".format(entry_log.get(), entry_pass.get()))
+        connect.commit()
         cursor.execute("GRANT user_access TO {0}".format(entry_log.get()))
         connect.commit()
         db_log, db_pass = entry_log.get(), entry_log.get()
         hashed_pass = bcrypt.hashpw(entry_pass.get().encode('utf-8'), bcrypt.gensalt())
         hashed_pass = str(hashed_pass)[2:-1]
         cursor.execute("SELECT MAX(id) FROM users")
-        max_id = cursor.fetchall()[0][0]
+        max_id = int(cursor.fetchall()[0][0])
+        print(1)
         if max_id is not None:
             max_id += 1
         else:
             max_id = 0
+        print(2)
         cursor.execute("INSERT INTO users VALUES ({0}, '{1}', '{2}', '{3}', '{4}')".format(max_id, entry_log.get(),
                                                                                            hashed_pass,
                                                                                            keys_generation(),
@@ -435,7 +438,7 @@ def get_user_info():
 
 def get_user_nickname(user, cursor):
     try:
-        cursor.execute("SELECT login FROM users WHERE id={0}".format(user))
+        cursor.execute("SELECT login FROM users WHERE id='{0}'".format(user))
         res = cursor.fetchall()
         return res[0][0]
     except IndexError:
@@ -478,7 +481,7 @@ def send_message():
                 return
         to_id = int(entry_id.get())
         msg = entry_msg.get()
-        cursor.execute("SELECT pubkey FROM users WHERE id={0}".format(to_id))
+        cursor.execute("SELECT pubkey FROM users WHERE id='{0}'".format(to_id))
         res = cursor.fetchall()[0][0]
         encrypt_msg = encrypt(msg.encode('utf-8'), res)
         cursor.execute("INSERT INTO messages VALUES ('{0}', '{1}', {2})".format(user_id, to_id, encrypt_msg))
@@ -528,10 +531,10 @@ def get_message():
     global user_id, spacing
     connect, cursor = pg_connect()
     try:
+        cursor.execute("SELECT * FROM messages")
+        print(cursor.fetchall())
         cursor.execute("SELECT * FROM messages WHERE to_id='{0}' AND NOT from_id LIKE 'g%'".format(user_id))
         res = cursor.fetchall()
-        cursor.execute("DELETE FROM messages WHERE to_id='{0}' AND NOT from_id LIKE 'g%'".format(user_id))
-        connect.commit()
         for i in res:
             decrypt_msg = decrypt(i[2])
             nickname = get_user_nickname(i[0], cursor)
@@ -723,6 +726,7 @@ def create_chat():
         cursor.execute("INSERT INTO chats VALUES ('g{0}', '{1}', {2})".format(max_id, name, user_id))
         cursor.execute('CREATE TABLE IF NOT EXISTS {0}(id INTEGER)'.format(name))
         connect.commit()
+        cursor.execute('GRANT SELECT, INSERT ON {0} TO user_access'.format(name))
         cursor.execute("INSERT INTO {0} VALUES({1})".format(name, user_id))
         connect.commit()
         cursor.close()
@@ -792,7 +796,7 @@ def send_chat_message():
         name = get_chat_name(current_chat)
         users = get_chat_users(name)
         for i in users:
-            cursor.execute("SELECT pubkey FROM users WHERE id={0}".format(i[0]))
+            cursor.execute("SELECT pubkey FROM users WHERE id='{0}'".format(i[0]))
             res = cursor.fetchall()[0][0]
             encrypt_msg = encrypt(message.encode('utf-8'), res)
             cursor.execute("INSERT INTO messages VALUES ('{0}', '{1}', {2})".format(current_chat + '_' + str(user_id),
@@ -811,8 +815,6 @@ def get_chat_message():
     try:
         cursor.execute("SELECT * FROM messages WHERE to_id='{0}' AND from_id LIKE '{1}%'".format(user_id, current_chat))
         res = cursor.fetchall()
-        cursor.execute("DELETE FROM messages WHERE to_id='{0}' AND from_id LIKE '{1}%'".format(user_id, current_chat))
-        connect.commit()
         for i in res:
             decrypt_msg = decrypt(i[2])
             nickname = get_user_nickname(i[0].split('_', 1)[1], cursor)
@@ -850,8 +852,9 @@ def invite_to_group():
         messagebox.showerror('Input error', 'Entries lenght must be more than 0 characters')
         return
     connect, cursor = pg_connect()
+    own = get_chat_owner(inv_group)
     try:
-        if user_id != int(get_chat_owner(inv_group)):
+        if int(user_id) != int(own):
             messagebox.showerror('Access error', "You are not chat's owner")
             return
         name = get_chat_name(inv_group)
