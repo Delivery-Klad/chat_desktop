@@ -1,11 +1,13 @@
 import os
 import rsa
+import time
 import bcrypt
 import random
 import yadisk
 import keyring
 import smtplib
 import psycopg2
+import threading
 import tkinter as tk
 from tkinter import *
 from datetime import datetime
@@ -20,7 +22,7 @@ y = yadisk.YaDisk(token="AgAAAABITC7sAAav1g3D_G43akSwv85Xg-yPrCY")
 
 code = None
 chats = {}
-current_chat = "g0"
+current_chat = "-1"
 root = tk.Tk()
 spacing, spacing_2 = 0, 0
 w = root.winfo_screenwidth() // 2 - 140
@@ -33,6 +35,7 @@ private_key = rsa.PrivateKey(1, 2, 3, 4, 5)
 files_dir = 'files'
 auto_fill_data_file = files_dir + '/rem.rm'
 private_key_file = files_dir + '/priv_key.PEM'
+time_to_check = 300.0
 
 try:
     os.mkdir(files_dir)
@@ -170,9 +173,9 @@ def fill_auto_login_file(lgn, psw):
 
 
 def login(*args):
+    global user_login, user_id, time_to_check
     label_loading.place(x=60, y=60)
     root.update()
-    global user_login, user_id
     connect, cursor = pg_connect()
     try:
         if len(entry_log.get()) == 0 or len(entry_pass.get()) == 0:
@@ -205,6 +208,11 @@ def login(*args):
         cursor.close()
         connect.close()
         label_loading.place_forget()
+        checker.start()
+        upd = keyring.get_password('datachat', 'update')
+        if upd is not None:
+            time_to_check = upd
+            print(upd)
     except Exception as e:
         label_loading.place_forget()
         exception_handler(e, connect, cursor)
@@ -233,6 +241,7 @@ def back_to_login():
 
 
 def register():
+    root.update()
     connect, cursor = pg_connect()
     try:
         if len(entry_log.get()) == 0 or len(entry_pass.get()) == 0 or len(entry_email.get()) == 0:
@@ -285,6 +294,7 @@ def get_id(cursor):
 
 def hide_auth_menu():
     global w, h
+    root.update()
     w -= 200
     auth_frame.pack_forget()
     root.geometry("1000x500+{}+{}".format(w, h))
@@ -294,8 +304,7 @@ def hide_auth_menu():
 
 
 def menu_navigation(menu: str):
-    root.update()
-    global current_chat, chats, spacing, spacing_2
+    global current_chat, chats, spacing, spacing_2, checker
     if menu == "chat":
         for key in chats:
             chats[key].pack_forget()
@@ -367,6 +376,7 @@ def menu_navigation(menu: str):
 
 def config(groups):
     global chats
+    root.update()
     try:
         chats[groups[0]].configure(command=lambda: change_group(get_chat_id(groups[0]), chats[groups[0]]))
     except IndexError:
@@ -394,7 +404,6 @@ def change_group(gr_id: str, button):
     button_img2.configure(state='normal')
     global current_chat, chats
     current_chat = gr_id
-    print(current_chat)
     for key in chats:
         chats[key].configure(bg='#A9A9A9')
     button.configure(bg="#2E8B57")
@@ -402,6 +411,7 @@ def change_group(gr_id: str, button):
 
 
 def get_user_info():
+    root.update()
     connect, cursor = pg_connect()
     try:
         _input = entry_id_or_nick.get()
@@ -447,8 +457,8 @@ def get_user_id(user, cursor):
 
 
 def send_message():
-    root.update()
     global user_id, current_chat
+    root.update()
     connect, cursor = pg_connect()
     try:
         if len(entry_msg.get()) == 0:
@@ -607,6 +617,7 @@ def change_pass_handler(*args):
 
 
 def regenerate_keys():
+    root.update()
     global user_id
     connect, cursor = pg_connect()
     try:
@@ -643,6 +654,7 @@ def get_private_key():
 
 def change_password():
     global user_login
+    root.update()
     connect, cursor = pg_connect()
     try:
         res = check_password(cursor, user_login, entry_old_pass.get().encode('utf-8'))
@@ -666,6 +678,7 @@ def change_password():
 
 def create_chat():
     global user_id
+    root.update()
     connect, cursor = pg_connect()
     try:
         name = entry_chat.get()
@@ -756,6 +769,7 @@ def get_chat_owner(group_id: str):
 
 def send_chat_message():
     global user_id, current_chat
+    root.update()
     connect, cursor = pg_connect()
     message = entry_msg2.get()
     try:
@@ -783,8 +797,8 @@ def send_chat_message():
 
 
 def send_chat_doc():
-    root.update()
     global user_id, current_chat, y
+    root.update()
     connect, cursor = pg_connect()
     try:
         path = filedialog.askopenfilename(filetypes=[("All files", "*.*")])
@@ -863,6 +877,7 @@ def get_users_groups(cursor):
 
 def invite_to_group():
     global user_id
+    root.update()
     inv_user = entry_inv_id.get()
     inv_group = entry_gr_toinv.get()
     if len(inv_user) == 0 and len(inv_group) == 0:
@@ -918,8 +933,8 @@ def new_pass_menu():
 
 
 def set_new_pass():
-    root.update()
     global user_login, email
+    root.update()
     user_login = entry_log.get()
     connect, cursor = pg_connect()
     try:
@@ -942,8 +957,8 @@ def set_new_pass():
 
 
 def pass_code():
-    root.update()
     global code, user_id, email
+    root.update()
     connect, cursor = pg_connect()
     try:
         cursor.execute("SELECT email FROM users WHERE id={0}".format(get_user_id(entry_log.get(), cursor)))
@@ -976,8 +991,8 @@ def pass_code():
 
 
 def open_chat():
-    root.update()
     global current_chat
+    root.update()
     chat = entry_chat_id.get()
     connect, cursor = pg_connect()
     if len(chat) == 0 or not chat.isnumeric():
@@ -993,7 +1008,7 @@ def open_chat():
         cursor.close()
         connect.close()
         return
-    current_chat = int(chat)
+    current_chat = chat
     button_send.configure(state='normal')
     button_img.configure(state='normal')
     canvas.delete("all")
@@ -1002,20 +1017,37 @@ def open_chat():
     connect.close()
 
 
-def loop(*args):
-    while True:
-        print(1)
-        root.update()
-
-
 def OnMouseWheel(event):
     canvas.yview("scroll", event.delta, "units")
     return "break"
 
 
 def auto_check():
-    button_check.configure(text='11 Min')
-    print(1)
+    global time_to_check
+    if time_to_check == 300:
+        time_to_check = 600
+        label_check2.configure(text='10 Min')
+    elif time_to_check == 600:
+        time_to_check = 900
+        label_check2.configure(text='15 Min')
+    elif time_to_check == 900:
+        time_to_check = 300
+        label_check2.configure(text='5 Min')
+    keyring.set_password('datachat', 'update', time_to_check)
+
+
+def loop_get_msg():
+    global time_to_check
+    timing = time.time()
+    while True:
+        if time.time() - timing > time_to_check:
+            timing = time.time()
+            print('check')
+            if current_chat != '-1':
+                if current_chat[0] != 'g':
+                    get_message()
+                elif current_chat[0] == 'g':
+                    get_chat_message()
 
 
 create_tables()
@@ -1157,10 +1189,10 @@ settings_frame_2 = LabelFrame(settings_frame, width=600, height=25, relief=FLAT)
 settings_frame_2.pack(side=TOP, pady=2, anchor=N)
 label_check = tk.Label(settings_frame_2, font=10, text="  Update frequency:", fg="black", width=18, anchor=W)
 label_check.pack(side=LEFT, anchor=W)
-label_check2 = tk.Label(settings_frame_2, font=12, width=20, fg="black")
+label_check2 = tk.Label(settings_frame_2, font=12, text='5 min', width=20, fg="black")
 label_check2.pack(side=LEFT, padx=170, anchor=CENTER)
-button_check = tk.Button(settings_frame_2, text="10 Min", bg='#2E8B57', width=15, command=lambda: auto_check())
-button_check.pack(side=RIGHT, anchor=E)
+button_check_msg = tk.Button(settings_frame_2, text="UPDATE", bg='#2E8B57', width=15, command=lambda: auto_check())
+button_check_msg.pack(side=RIGHT, anchor=E)
 
 settings_frame7 = LabelFrame(settings_frame, width=600, height=25, relief=FLAT)
 settings_frame7.pack(side=TOP, pady=2, anchor=N)
@@ -1223,10 +1255,10 @@ entry_id_or_nick = tk.Entry(main1_frame, font=10, width=20)
 entry_id_or_nick.pack(side=TOP, padx=2, anchor=CENTER)
 button_check = tk.Button(main1_frame, text="CHECK", bg='#2E8B57', width=25, command=lambda: get_user_info())
 button_check.pack(side=TOP, anchor=CENTER)
-
 label_loading = Label(root, font=10, text="LOADING", fg="black", bg="white")
 # endregion
 auto_login()
+checker = threading.Thread(target=loop_get_msg, daemon=True)
 
 if __name__ == "__main__":
     root.title("Chat")
