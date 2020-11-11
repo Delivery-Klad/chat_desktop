@@ -211,8 +211,7 @@ def login(*args):
         checker.start()
         upd = keyring.get_password('datachat', 'update')
         if upd is not None:
-            time_to_check = upd
-            print(upd)
+            time_to_check = int(upd)
     except Exception as e:
         label_loading.place_forget()
         exception_handler(e, connect, cursor)
