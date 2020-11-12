@@ -1,6 +1,7 @@
 import os
 import rsa
 import time
+import qrcode
 import bcrypt
 import random
 import yadisk
@@ -10,6 +11,7 @@ import psycopg2
 import threading
 import tkinter as tk
 from tkinter import *
+from PIL import Image
 from datetime import datetime
 from tkinter import messagebox
 from tkinter import filedialog
@@ -301,7 +303,7 @@ def hide_auth_menu():
 
 
 def menu_navigation(menu: str):
-    global current_chat, chats, spacing, spacing_2, checker
+    global current_chat, chats, spacing, spacing_2, checker, private_key
     if menu == "chat":
         for key in chats:
             chats[key].pack_forget()
@@ -336,6 +338,19 @@ def menu_navigation(menu: str):
         group_frame.pack_forget()
         settings_frame.pack(side=LEFT, anchor=N)
     elif menu == "info":
+        root.update()
+        qr = qrcode.make(private_key)
+        qr.save('QR.png')
+        qr = Image.open('QR.png')
+        w = int(qr.size[0] / 2)
+        h = int(qr.size[1] / 2)
+        img = qr.resize((w, h), Image.ANTIALIAS)
+        img.save('QR.png')
+        _qr = PhotoImage(file="QR.png")
+        label_qr = Label(main1_frame, image=_qr)
+        label_qr.pack_forget()
+        label_qr.image = _qr
+        label_qr.pack(side=RIGHT, anchor=SE)
         button_chat.configure(bg="#A9A9A9")
         button_info.configure(bg="#2E8B57")
         button_settings.configure(bg="#A9A9A9")
@@ -344,6 +359,7 @@ def menu_navigation(menu: str):
         settings_frame.pack_forget()
         group_frame.pack_forget()
         main1_frame.pack(side=LEFT, anchor=NW)
+        # os.remove('QR.png')
     elif menu == "group":
         button_chat.pack_forget()
         button_settings.pack_forget()
@@ -1244,14 +1260,16 @@ button_b_font.pack(side=TOP, anchor=CENTER)
 # endregion
 # region info
 main1_frame = LabelFrame(root, width=600, height=350, relief=SUNKEN)
-label_info = tk.Label(main1_frame, font=10, text="ID/Nickname/Group", fg="black", width=18)
-label_info.pack(side=TOP, anchor=CENTER)
-entry_res = tk.Entry(main1_frame, font=10, width=20, state='disabled')
-entry_res.pack(side=TOP, padx=2, pady=3, anchor=CENTER)
-entry_id_or_nick = tk.Entry(main1_frame, font=10, width=20)
-entry_id_or_nick.pack(side=TOP, padx=2, anchor=CENTER)
-button_check = tk.Button(main1_frame, text="CHECK", bg='#2E8B57', width=25, command=lambda: get_user_info())
-button_check.pack(side=TOP, anchor=CENTER)
+info_frame = LabelFrame(main1_frame, relief=SUNKEN)
+info_frame.pack(side=LEFT, anchor=NW)
+label_info = tk.Label(info_frame, font=10, text="ID/Nickname/Group", fg="black", width=18)
+label_info.pack(side=TOP, anchor=SW)
+entry_res = tk.Entry(info_frame, font=10, width=20, state='disabled')
+entry_res.pack(side=TOP, padx=2, pady=3, anchor=SW)
+entry_id_or_nick = tk.Entry(info_frame, font=10, width=20)
+entry_id_or_nick.pack(side=TOP, padx=2, anchor=SW)
+button_check = tk.Button(info_frame, text="CHECK", bg='#2E8B57', width=25, command=lambda: get_user_info())
+button_check.pack(side=TOP, anchor=SW)
 label_loading = Label(root, font=10, text="LOADING", fg="black", bg="white")
 # endregion
 auto_login()
