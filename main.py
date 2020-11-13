@@ -212,6 +212,18 @@ def login(*args):
         upd = keyring.get_password('datachat', 'update')
         if upd is not None:
             time_to_check = int(upd)
+        qr = qrcode.make(private_key)
+        qr.save(files_dir + '/QR.png')
+        qr = Image.open(files_dir + '/QR.png')
+        width = int(qr.size[0] / 2)
+        height = int(qr.size[1] / 2)
+        img = qr.resize((width, height), Image.ANTIALIAS)
+        img.save(files_dir + '/QR.png')
+        _qr = PhotoImage(file=files_dir + "/QR.png")
+        label_qr = Label(main1_frame, image=_qr)
+        label_qr.image = _qr
+        label_qr.pack(side=RIGHT, anchor=SE)
+        os.remove(files_dir + '/QR.png')
     except Exception as e:
         label_loading.place_forget()
         exception_handler(e, connect, cursor)
@@ -339,18 +351,6 @@ def menu_navigation(menu: str):
         settings_frame.pack(side=LEFT, anchor=N)
     elif menu == "info":
         root.update()
-        qr = qrcode.make(private_key)
-        qr.save('QR.png')
-        qr = Image.open('QR.png')
-        w = int(qr.size[0] / 2)
-        h = int(qr.size[1] / 2)
-        img = qr.resize((w, h), Image.ANTIALIAS)
-        img.save('QR.png')
-        _qr = PhotoImage(file="QR.png")
-        label_qr = Label(main1_frame, image=_qr)
-        label_qr.pack_forget()
-        label_qr.image = _qr
-        label_qr.pack(side=RIGHT, anchor=SE)
         button_chat.configure(bg="#A9A9A9")
         button_info.configure(bg="#2E8B57")
         button_settings.configure(bg="#A9A9A9")
@@ -359,7 +359,6 @@ def menu_navigation(menu: str):
         settings_frame.pack_forget()
         group_frame.pack_forget()
         main1_frame.pack(side=LEFT, anchor=NW)
-        # os.remove('QR.png')
     elif menu == "group":
         button_chat.pack_forget()
         button_settings.pack_forget()
