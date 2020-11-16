@@ -1,18 +1,12 @@
-import psycopg2
+import dropbox
 
-con = psycopg2.connect(
-            host="localhost",
-            database="postgres",
-            user="postgres",
-            port="5432",
-            password="0258")
-cur = con.cursor()
+dbx = dropbox.Dropbox('eCp2HTOUrNUAAAAAAAAAASLGV_nwg-uK-KcCXkZTWnT66l2rg9-W6CAGKZnMTiLI')
 
-cur.execute("GRANT SELECT, INSERT ON test_gr TO user_access")
-#print(cur.fetchall())
-cur.execute("SELECT table_catalog, table_schema, table_name, privilege_type "
-            "FROM information_schema.table_privileges WHERE grantee = 'register'")
-print(cur.fetchall())
-# cur.execute("DROP TABLE users CASCADE")
-#cur.execute("DELETE FROM users WHERE login='dakak'")
-con.commit()
+result = dbx.sharing_create_shared_link_with_settings('/test.txt')
+
+print(result.url)
+# import yadisk
+# y = yadisk.YaDisk(token="AgAAAABITC7sAAav1g3D_G43akSwv85Xg-yPrCY")
+# y.upload("test.txt", "/destination.txt")
+# print(y.get_download_link('/destination.txt'))
+# print(y.get_disk_info())
