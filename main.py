@@ -36,8 +36,6 @@ files_dir = 'files'
 auto_fill_data_file = files_dir + '/rem.rm'
 private_key_file = files_dir + '/priv_key.PEM'
 time_to_check = 300.0
-db_log = "register"
-db_pass = "reg"
 
 try:
     os.mkdir(files_dir)
@@ -55,14 +53,13 @@ def exception_handler(e, connect, cursor):
 
 
 def pg_connect():
-    global db_log, db_pass
     try:
         con = psycopg2.connect(
-            host="localhost",
-            database="postgres",
-            user=db_log,
+            host="ec2-54-75-244-161.eu-west-1.compute.amazonaws.com",
+            database="d8fi2kbfpchos",
+            user="iutnqyyujjskrr",
             port="5432",
-            password=db_pass)
+            password="45be3b8ccf0ce93d0e142ec546edaa8a067370f5c050b92b4c181730fb2c9814")
         cur = con.cursor()
         return con, cur
     except Exception as e:
@@ -87,7 +84,7 @@ def debug(cursor):
 def create_tables():
     connect, cursor = pg_connect()
     try:
-        cursor.execute("DROP TABLE messages")
+        # cursor.execute("DROP TABLE messages")
         # cursor.execute("DROP TABLE users")
         # cursor.execute("DROP TABLE chats")
         # debug(cursor)
@@ -144,13 +141,12 @@ def check_password(cursor, log, pas):
 
 
 def auto_login():
-    global user_login, user_id, db_log, db_pass
+    global user_login
+    global user_id
     try:
         lgn = keyring.get_password('datachat', 'login')
         psw = keyring.get_password('datachat', 'password')
         if lgn is not None and psw is not None:
-            db_log = lgn
-            db_pass = psw
             entry_log.insert(0, lgn)
             entry_pass.insert(0, psw)
             var.set(1)
@@ -177,17 +173,15 @@ def fill_auto_login_file(lgn, psw):
 
 
 def login(*args):
-    global user_login, user_id, time_to_check, db_log, db_pass
+    global user_login, user_id, time_to_check
     label_loading.place(x=60, y=60)
     root.update()
+    connect, cursor = pg_connect()
     try:
         if len(entry_log.get()) == 0 or len(entry_pass.get()) == 0:
             messagebox.showerror('Input error', 'Fill all input fields')
             label_loading.place_forget()
             return
-        db_log = entry_log.get()
-        db_pass = entry_pass.get()
-        connect, cursor = pg_connect()
         res = check_password(cursor, entry_log.get(), entry_pass.get().encode('utf-8'))
         if res == "False":
             cursor.close()
@@ -232,7 +226,7 @@ def login(*args):
         os.remove(files_dir + '/QR.png')
     except Exception as e:
         label_loading.place_forget()
-        print(e)
+        exception_handler(e, connect, cursor)
 
 
 def show_reg_frame():
@@ -258,16 +252,18 @@ def back_to_login():
 
 
 def register():
-    global db_log, db_pass
+    root.update()
+    connect, cursor = pg_connect()
     try:
         if len(entry_log.get()) == 0 or len(entry_pass.get()) == 0 or len(entry_email.get()) == 0:
             messagebox.showerror('Input error', 'Fill all input fields')
+            cursor.close()
+            connect.close()
             return
         if not check_input(entry_pass.get(), entry_log.get()):
+            cursor.close()
+            connect.close()
             return
-        db_log = "register"
-        db_pass = "reg"
-        connect, cursor = pg_connect()
         try:
             cursor.execute("SELECT COUNT(*) FROM users WHERE login = '{0}'".format(str(entry_log.get())))
             res = cursor.fetchall()[0][0]
@@ -278,15 +274,10 @@ def register():
                 return
         except Exception as e:
             print(e)
-        cursor.execute("CREATE USER {0} WITH PASSWORD '{1}'".format(entry_log.get(), entry_pass.get()))
-        connect.commit()
-        cursor.execute("GRANT user_access TO {0}".format(entry_log.get()))
-        connect.commit()
-        db_log, db_pass = entry_log.get(), entry_log.get()
         hashed_pass = bcrypt.hashpw(entry_pass.get().encode('utf-8'), bcrypt.gensalt())
         hashed_pass = str(hashed_pass)[2:-1]
         cursor.execute("SELECT MAX(id) FROM users")
-        max_id = int(cursor.fetchall()[0][0])
+        max_id = cursor.fetchall()[0][0]
         if max_id is not None:
             max_id += 1
         else:
@@ -299,7 +290,7 @@ def register():
         cursor.close()
         connect.close()
     except Exception as e:
-        print(e)
+        exception_handler(e, connect, cursor)
 
 
 def get_id(cursor):
@@ -732,7 +723,6 @@ def create_chat():
         cursor.execute("INSERT INTO chats VALUES ('g{0}', '{1}', {2})".format(max_id, name, user_id))
         cursor.execute('CREATE TABLE IF NOT EXISTS {0}(id INTEGER)'.format(name))
         connect.commit()
-        cursor.execute('GRANT SELECT, INSERT ON {0} TO user_access'.format(name))
         cursor.execute("INSERT INTO {0} VALUES({1})".format(name, user_id))
         connect.commit()
         cursor.close()
