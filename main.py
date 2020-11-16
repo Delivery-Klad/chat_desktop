@@ -1,47 +1,45 @@
 import os
 import rsa
+import time
+import qrcode
 import bcrypt
-import base64
 import random
-import psycopg2
-import tkinter as tk
-from tkinter import *
-from tkinter import messagebox
-from tkinter import filedialog
-from PIL import Image as image1
-from PIL import ImageTk as image2
-import requests
+import yadisk
 import keyring
 import smtplib
-from email.mime.multipart import MIMEMultipart
+import psycopg2
+import threading
+import tkinter as tk
+from tkinter import *
+from PIL import Image
+from datetime import datetime
+from tkinter import messagebox
+from tkinter import filedialog
 from email.mime.text import MIMEText
-
-
+from email.mime.multipart import MIMEMultipart
 from keyring.backends.Windows import WinVaultKeyring
+
 keyring.set_keyring(WinVaultKeyring())
+y = yadisk.YaDisk(token="AgAAAABITC7sAAav1g3D_G43akSwv85Xg-yPrCY")
 
 code = None
 chats = {}
-current_chat = "g0"
+current_chat = "-1"
 root = tk.Tk()
-spacing = 0
+spacing, spacing_2 = 0, 0
 w = root.winfo_screenwidth() // 2 - 140
 h = root.winfo_screenheight() // 2 - 100
-user_login = ''
-user_id = ''
-email = ''
+user_id, email, user_login = '', '', ''
 var = IntVar()
 private_key = rsa.PrivateKey(1, 2, 3, 4, 5)
 files_dir = 'files'
 auto_fill_data_file = files_dir + '/rem.rm'
 private_key_file = files_dir + '/priv_key.PEM'
-
+time_to_check = 300.0
 db_log = "register"
 db_pass = "reg"
 
 try:
-    # iutnqyyujjskrr@mail.ru
-    # d8fi2kbfpchos
     os.mkdir(files_dir)
 except FileExistsError:
     pass
@@ -89,14 +87,11 @@ def debug(cursor):
 def create_tables():
     connect, cursor = pg_connect()
     try:
-        # cursor.execute("DROP TABLE messages")
+        cursor.execute("DROP TABLE messages")
         # cursor.execute("DROP TABLE users")
         # cursor.execute("DROP TABLE chats")
         # debug(cursor)
-        # listf = {}
-        # listf['{0}'.format('butth')] = 1
-        # print(listf[1])
-        cursor.execute('CREATE TABLE IF NOT EXISTS users(id TEXT,'
+        cursor.execute('CREATE TABLE IF NOT EXISTS users(id INTEGER,'
                        'login TEXT,'
                        'password TEXT,'
                        'pubkey TEXT,'
@@ -104,9 +99,11 @@ def create_tables():
         cursor.execute('CREATE TABLE IF NOT EXISTS chats(id TEXT,'
                        'name TEXT,'
                        'owner INTEGER)')
-        cursor.execute('CREATE TABLE IF NOT EXISTS messages(from_id TEXT,'
+        cursor.execute('CREATE TABLE IF NOT EXISTS messages(date TIMESTAMP,'
+                       'from_id TEXT,'
                        'to_id TEXT,'
-                       'message BYTEA)')
+                       'message BYTEA,'
+                       'file TEXT)')
         connect.commit()
         cursor.close()
         connect.close()
@@ -180,9 +177,9 @@ def fill_auto_login_file(lgn, psw):
 
 
 def login(*args):
+    global user_login, user_id, time_to_check, db_log, db_pass
     label_loading.place(x=60, y=60)
     root.update()
-    global user_login, user_id, db_log, db_pass
     try:
         if len(entry_log.get()) == 0 or len(entry_pass.get()) == 0:
             messagebox.showerror('Input error', 'Fill all input fields')
@@ -212,12 +209,27 @@ def login(*args):
             fill_auto_login_file(entry_log.get(), entry_pass.get())
         user_login = entry_log.get()
         user_id = get_id(cursor)
-        get_message()
         get_private_key()
         hide_auth_menu()
         cursor.close()
         connect.close()
         label_loading.place_forget()
+        checker.start()
+        upd = keyring.get_password('datachat', 'update')
+        if upd is not None:
+            time_to_check = int(upd)
+        qr = qrcode.make(private_key)
+        qr.save(files_dir + '/QR.png')
+        qr = Image.open(files_dir + '/QR.png')
+        width = int(qr.size[0] / 2)
+        height = int(qr.size[1] / 2)
+        img = qr.resize((width, height), Image.ANTIALIAS)
+        img.save(files_dir + '/QR.png')
+        _qr = PhotoImage(file=files_dir + "/QR.png")
+        label_qr = Label(main1_frame, image=_qr)
+        label_qr.image = _qr
+        label_qr.pack(side=RIGHT, anchor=SE)
+        os.remove(files_dir + '/QR.png')
     except Exception as e:
         label_loading.place_forget()
         print(e)
@@ -225,7 +237,6 @@ def login(*args):
 
 def show_reg_frame():
     root.geometry("200x175+{}+{}".format(w, h))
-    entry_id.focus_set()
     button_login.pack_forget()
     button_reg_m.pack_forget()
     check_remember.pack_forget()
@@ -276,12 +287,10 @@ def register():
         hashed_pass = str(hashed_pass)[2:-1]
         cursor.execute("SELECT MAX(id) FROM users")
         max_id = int(cursor.fetchall()[0][0])
-        print(1)
         if max_id is not None:
             max_id += 1
         else:
             max_id = 0
-        print(2)
         cursor.execute("INSERT INTO users VALUES ({0}, '{1}', '{2}', '{3}', '{4}')".format(max_id, entry_log.get(),
                                                                                            hashed_pass,
                                                                                            keys_generation(),
@@ -305,17 +314,17 @@ def get_id(cursor):
 
 def hide_auth_menu():
     global w, h
+    root.update()
     w -= 200
     auth_frame.pack_forget()
     root.geometry("1000x500+{}+{}".format(w, h))
-    entry_id.focus_set()
+    entry_msg.focus_set()
     menu_frame.pack(side=LEFT, pady=5, anchor=N)
     main_frame.pack(side=LEFT, anchor=CENTER)
 
 
 def menu_navigation(menu: str):
-    root.update()
-    global current_chat, chats
+    global current_chat, chats, spacing, spacing_2, checker, private_key
     if menu == "chat":
         for key in chats:
             chats[key].pack_forget()
@@ -333,7 +342,13 @@ def menu_navigation(menu: str):
         settings_frame.pack_forget()
         group_frame.pack_forget()
         main_frame.pack(side=LEFT, anchor=CENTER)
-        current_chat = "g0"
+        canvas.delete("all")
+        current_chat = "-1"
+        label_chat_id.configure(text='Current chat with: ')
+        entry_chat_id.delete(0, tk.END)
+        spacing, spacing_2 = 0, 0
+        button_send2.configure(state='disabled')
+        button_img2.configure(state='disabled')
     elif menu == "set":
         button_chat.configure(bg="#A9A9A9")
         button_info.configure(bg="#A9A9A9")
@@ -344,6 +359,7 @@ def menu_navigation(menu: str):
         group_frame.pack_forget()
         settings_frame.pack(side=LEFT, anchor=N)
     elif menu == "info":
+        root.update()
         button_chat.configure(bg="#A9A9A9")
         button_info.configure(bg="#2E8B57")
         button_settings.configure(bg="#A9A9A9")
@@ -381,6 +397,7 @@ def menu_navigation(menu: str):
 
 def config(groups):
     global chats
+    root.update()
     try:
         chats[groups[0]].configure(command=lambda: change_group(get_chat_id(groups[0]), chats[groups[0]]))
     except IndexError:
@@ -404,9 +421,10 @@ def config(groups):
 
 
 def change_group(gr_id: str, button):
+    button_send2.configure(state='normal')
+    button_img2.configure(state='normal')
     global current_chat, chats
     current_chat = gr_id
-    print(current_chat)
     for key in chats:
         chats[key].configure(bg='#A9A9A9')
     button.configure(bg="#2E8B57")
@@ -414,6 +432,7 @@ def change_group(gr_id: str, button):
 
 
 def get_user_info():
+    root.update()
     connect, cursor = pg_connect()
     try:
         _input = entry_id_or_nick.get()
@@ -438,7 +457,7 @@ def get_user_info():
 
 def get_user_nickname(user, cursor):
     try:
-        cursor.execute("SELECT login FROM users WHERE id='{0}'".format(user))
+        cursor.execute("SELECT login FROM users WHERE id={0}".format(user))
         res = cursor.fetchall()
         return res[0][0]
     except IndexError:
@@ -459,17 +478,12 @@ def get_user_id(user, cursor):
 
 
 def send_message():
+    global user_id, current_chat
     root.update()
-    global user_id
     connect, cursor = pg_connect()
     try:
-        if len(entry_id.get()) == 0 or len(entry_msg.get()) == 0:
+        if len(entry_msg.get()) == 0:
             messagebox.showerror('Input error', 'Fill all input fields')
-            cursor.close()
-            connect.close()
-            return
-        if not entry_id.get().isdigit():
-            messagebox.showerror('Input error', 'Id must be a number')
             cursor.close()
             connect.close()
             return
@@ -479,12 +493,15 @@ def send_message():
                 cursor.close()
                 connect.close()
                 return
-        to_id = int(entry_id.get())
+        to_id = current_chat
         msg = entry_msg.get()
-        cursor.execute("SELECT pubkey FROM users WHERE id='{0}'".format(to_id))
+        cursor.execute("SELECT pubkey FROM users WHERE id={0}".format(to_id))
         res = cursor.fetchall()[0][0]
         encrypt_msg = encrypt(msg.encode('utf-8'), res)
-        cursor.execute("INSERT INTO messages VALUES ('{0}', '{1}', {2})".format(user_id, to_id, encrypt_msg))
+        date = datetime.utcnow().strftime('%y-%m-%d %H:%M:%S')
+        cursor.execute(
+            "INSERT INTO messages VALUES (to_timestamp('{0}', 'dd-mm-yy hh24:mi:ss'), '{1}', '{2}', {3}, "
+            "'-')".format(date, user_id, to_id, encrypt_msg))
         entry_msg.delete(0, tk.END)
         connect.commit()
         cursor.close()
@@ -493,32 +510,27 @@ def send_message():
         exception_handler(e, connect, cursor)
 
 
-def send_image():
-    global user_id
+def send_doc():
+    root.update()
+    global user_id, current_chat, y
     connect, cursor = pg_connect()
     try:
-        if len(entry_id.get()) == 0:
-            messagebox.showerror('Input error', 'Fill "id" input field')
-            return
-        path = filedialog.askopenfilename(filetypes=(("image", "*.png"), ("image", "*.jpg")))
+        path = filedialog.askopenfilename(filetypes=[("All files", "*.*")])
         if len(path) == 0:
             return
-        original_img = image1.open(path)
-        width, height = original_img.size
-        while width > 840:
-            width = round(width * 0.8)
-            height = round(height * 0.8)
-        while height > 400:
-            width = round(width * 0.8)
-            height = round(height * 0.8)
-        original_img.thumbnail((width, height), image1.ANTIALIAS)
-        original_img.save('resized_image.png')
-        original_img.close()
-        with open('resized_image.png', 'rb') as file:
-            b64 = base64.b64encode(file.read())
-        cursor.execute(
-            "INSERT INTO messages VALUES ('{0}', '{1}', {2})".format(user_id, entry_id.get(), psycopg2.Binary(b64)))
-        os.remove('resized_image.png')
+        path = path.split('/')
+        path = path[len(path) - 1]
+        try:
+            y.upload(path, '/' + path)
+        except Exception:
+            pass
+        link = y.get_download_link('/' + path)
+        cursor.execute("SELECT pubkey FROM users WHERE id={0}".format(current_chat))
+        res = cursor.fetchall()[0][0]
+        encrypt_msg = encrypt('՗'.encode('utf-8'), res)
+        date = datetime.utcnow().strftime('%d/%m/%y %H:%M:%S')
+        cursor.execute("INSERT INTO messages VALUES (to_timestamp('{0}', 'yy-mm-dd hh24:mi:ss'), '{1}', '{2}', "
+                       "{3}, '{4}')".format(date, user_id, current_chat, encrypt_msg, link))
         connect.commit()
         cursor.close()
         connect.close()
@@ -528,34 +540,29 @@ def send_image():
 
 def get_message():
     root.update()
-    global user_id, spacing
+    global user_id, spacing, current_chat
     connect, cursor = pg_connect()
+    spacing = 0
     try:
-        cursor.execute("SELECT * FROM messages")
-        print(cursor.fetchall())
-        cursor.execute("SELECT * FROM messages WHERE to_id='{0}' AND NOT from_id LIKE 'g%'".format(user_id))
+        cursor.execute("SELECT * FROM messages WHERE to_id='{0}' AND from_id='{1}' AND NOT from_id LIKE 'g%' "
+                       "ORDER BY date".format(user_id, current_chat))
         res = cursor.fetchall()
+        cursor.execute("SELECT * FROM messages WHERE to_id='{1}' AND from_id='{0}' AND NOT from_id LIKE 'g%' "
+                       "ORDER BY date".format(user_id, current_chat))
+        res += cursor.fetchall()
+        res.sort()
+        canvas.delete("all")
         for i in res:
-            decrypt_msg = decrypt(i[2])
-            nickname = get_user_nickname(i[0], cursor)
-            if decrypt_msg is None:
-                content = '{0}: attachment'.format(nickname)
-                widget = Label(canvas, text=content, bg='white', fg='black', font=14)
+            decrypt_msg = decrypt(i[3])
+            nick = get_user_nickname(i[2], cursor)
+            if decrypt_msg is None or ord(decrypt_msg[0]) == 1367:
+                content = '{0} {2}: {1}'.format(str(i[0])[2:], i[4], nick)
+                widget = tk.Listbox(canvas, bg='white', fg='black', font=14, width=95, height=1)
+                widget.insert(0, content)
                 canvas.create_window(0, spacing, window=widget, anchor='nw')
                 spacing += 25
-                canvas.config(scrollregion=canvas.bbox("all"))
-                with open('tmp_img.png', 'wb') as file:
-                    file.write(base64.b64decode(i[2]))
-                im = image1.open('tmp_img.png')
-                photo = image2.PhotoImage(im)
-                im.close()
-                os.remove('tmp_img.png')
-                widget = Label(canvas, image=photo, fg='black')
-                widget.image = photo
-                canvas.create_window(0, spacing, window=widget, anchor='nw')
-                spacing += photo.height() + 2
             else:
-                content = '{0}: {1}'.format(nickname, decrypt_msg)
+                content = '{0} {2}: {1}'.format(str(i[0])[2:], decrypt_msg, nick)
                 widget = Label(canvas, text=content, bg='white', fg='black', font=14)
                 canvas.create_window(0, spacing, window=widget, anchor='nw')
                 spacing += 25
@@ -599,19 +606,15 @@ def login_handler(*args):
 
 def send_message_handler(*args):
     if str(root.focus_get()) == ".!labelframe2.!entry":
-        if len(entry_id.get()) != 0 and len(entry_msg.get()) != 0:
+        if len(entry_msg.get()) != 0:
             send_message()
-        elif len(entry_id.get()) == 0:
-            pass
         elif len(entry_msg.get()) == 0:
             entry_msg.focus_set()
     elif str(root.focus_get()) == ".!labelframe2.!entry2":
-        if len(entry_id.get()) != 0 and len(entry_msg.get()) != 0:
+        if len(entry_msg.get()) != 0:
             send_message()
         elif len(entry_msg.get()) == 0:
             pass
-        elif len(entry_id.get()) == 0:
-            entry_id.focus_set()
 
 
 def change_pass_handler(*args):
@@ -635,6 +638,7 @@ def change_pass_handler(*args):
 
 
 def regenerate_keys():
+    root.update()
     global user_id
     connect, cursor = pg_connect()
     try:
@@ -671,6 +675,7 @@ def get_private_key():
 
 def change_password():
     global user_login
+    root.update()
     connect, cursor = pg_connect()
     try:
         res = check_password(cursor, user_login, entry_old_pass.get().encode('utf-8'))
@@ -694,6 +699,7 @@ def change_password():
 
 def create_chat():
     global user_id
+    root.update()
     connect, cursor = pg_connect()
     try:
         name = entry_chat.get()
@@ -785,6 +791,7 @@ def get_chat_owner(group_id: str):
 
 def send_chat_message():
     global user_id, current_chat
+    root.update()
     connect, cursor = pg_connect()
     message = entry_msg2.get()
     try:
@@ -796,11 +803,13 @@ def send_chat_message():
         name = get_chat_name(current_chat)
         users = get_chat_users(name)
         for i in users:
-            cursor.execute("SELECT pubkey FROM users WHERE id='{0}'".format(i[0]))
+            cursor.execute("SELECT pubkey FROM users WHERE id={0}".format(i[0]))
             res = cursor.fetchall()[0][0]
             encrypt_msg = encrypt(message.encode('utf-8'), res)
-            cursor.execute("INSERT INTO messages VALUES ('{0}', '{1}', {2})".format(current_chat + '_' + str(user_id),
-                                                                                    i[0], encrypt_msg))
+            date = datetime.utcnow().strftime('%d/%m/%y %H:%M:%S')
+            cursor.execute(
+                "INSERT INTO messages VALUES (to_timestamp('{0}', 'yy-mm-dd hh24:mi:ss'), '{1}', '{2}', {3}, "
+                "'-')".format(date, current_chat + '_' + str(user_id),  i[0], encrypt_msg))
             entry_msg2.delete(0, tk.END)
         connect.commit()
         cursor.close()
@@ -809,19 +818,63 @@ def send_chat_message():
         exception_handler(e, connect, cursor)
 
 
-def get_chat_message():
-    global user_id, spacing, current_chat
+def send_chat_doc():
+    global user_id, current_chat, y
+    root.update()
     connect, cursor = pg_connect()
     try:
-        cursor.execute("SELECT * FROM messages WHERE to_id='{0}' AND from_id LIKE '{1}%'".format(user_id, current_chat))
+        path = filedialog.askopenfilename(filetypes=[("All files", "*.*")])
+        if len(path) == 0:
+            cursor.close()
+            connect.close()
+            return
+        path = path.split('/')
+        path = path[len(path) - 1]
+        try:
+            y.upload(path, '/' + path)
+        except Exception as e:
+            pass
+        link = y.get_download_link('/' + path)
+        name = get_chat_name(current_chat)
+        users = get_chat_users(name)
+        for i in users:
+            cursor.execute("SELECT pubkey FROM users WHERE id={0}".format(i[0]))
+            res = cursor.fetchall()[0][0]
+            encrypt_msg = encrypt('՗'.encode('utf-8'), res)
+            date = datetime.utcnow().strftime('%d/%m/%y %H:%M:%S')
+            cursor.execute(
+                "INSERT INTO messages VALUES (to_timestamp('{0}', 'yy-mm-dd hh24:mi:ss'), '{1}', '{2}', {3}, "
+                "'{4}')".format(date, current_chat + '_' + str(user_id), i[0], encrypt_msg, link))
+        connect.commit()
+        cursor.close()
+        connect.close()
+    except Exception as e:
+        exception_handler(e, connect, cursor)
+
+
+def get_chat_message():
+    global user_id, spacing_2, current_chat
+    connect, cursor = pg_connect()
+    canvas_2.delete("all")
+    spacing_2 = 0
+    try:
+        cursor.execute("SELECT * FROM messages WHERE to_id='{0}' AND from_id LIKE '{1}%' ORDER BY "
+                       "date".format(user_id, current_chat))
         res = cursor.fetchall()
         for i in res:
-            decrypt_msg = decrypt(i[2])
-            nickname = get_user_nickname(i[0].split('_', 1)[1], cursor)
-            content = '{0}: {1}'.format(nickname, decrypt_msg)
-            widget = Label(canvas_2, text=content, bg='white', fg='black', font=14)
-            canvas_2.create_window(0, spacing, window=widget, anchor='nw')
-            spacing += 25
+            decrypt_msg = decrypt(i[3])
+            nickname = get_user_nickname(i[1].split('_', 1)[1], cursor)
+            if decrypt_msg is None or ord(decrypt_msg[0]) == 1367:
+                content = '{0} {2}: {1}'.format(str(i[0])[2:], i[4], nickname)
+                widget = tk.Listbox(canvas_2, bg='white', fg='black', font=14, width=95, height=1)
+                widget.insert(0, content)
+                canvas_2.create_window(0, spacing_2, window=widget, anchor='nw')
+                spacing_2 += 25
+            else:
+                content = '{0} {1}: {2}'.format(str(i[0])[2:], nickname, decrypt_msg)
+                widget = Label(canvas_2, text=content, bg='white', fg='black', font=14)
+                canvas_2.create_window(0, spacing_2, window=widget, anchor='nw')
+                spacing_2 += 25
         canvas_2.config(scrollregion=canvas_2.bbox("all"))
         cursor.close()
         connect.close()
@@ -846,15 +899,15 @@ def get_users_groups(cursor):
 
 def invite_to_group():
     global user_id
+    root.update()
     inv_user = entry_inv_id.get()
     inv_group = entry_gr_toinv.get()
     if len(inv_user) == 0 and len(inv_group) == 0:
         messagebox.showerror('Input error', 'Entries lenght must be more than 0 characters')
         return
     connect, cursor = pg_connect()
-    own = get_chat_owner(inv_group)
     try:
-        if int(user_id) != int(own):
+        if user_id != int(get_chat_owner(inv_group)):
             messagebox.showerror('Access error', "You are not chat's owner")
             return
         name = get_chat_name(inv_group)
@@ -903,6 +956,7 @@ def new_pass_menu():
 
 def set_new_pass():
     global user_login, email
+    root.update()
     user_login = entry_log.get()
     connect, cursor = pg_connect()
     try:
@@ -926,6 +980,7 @@ def set_new_pass():
 
 def pass_code():
     global code, user_id, email
+    root.update()
     connect, cursor = pg_connect()
     try:
         cursor.execute("SELECT email FROM users WHERE id={0}".format(get_user_id(entry_log.get(), cursor)))
@@ -957,10 +1012,31 @@ def pass_code():
         exception_handler(e, connect, cursor)
 
 
-def loop(*args):
-    while True:
-        print(1)
-        root.update()
+def open_chat():
+    global current_chat
+    root.update()
+    chat = entry_chat_id.get()
+    connect, cursor = pg_connect()
+    if len(chat) == 0 or not chat.isnumeric():
+        messagebox.showerror('Input error', 'Chat id must be a number')
+        cursor.close()
+        connect.close()
+        return
+    nick = get_user_nickname(int(chat), cursor)
+    if nick is not None:
+        label_chat_id.configure(text='Current chat with: ' + nick)
+    else:
+        messagebox.showerror('Input error', 'User not found')
+        cursor.close()
+        connect.close()
+        return
+    current_chat = chat
+    button_send.configure(state='normal')
+    button_img.configure(state='normal')
+    canvas.delete("all")
+    get_message()
+    cursor.close()
+    connect.close()
 
 
 def OnMouseWheel(event):
@@ -969,8 +1045,31 @@ def OnMouseWheel(event):
 
 
 def auto_check():
-    button_check.configure(text='11 Min')
-    print(1)
+    global time_to_check
+    if time_to_check == 300:
+        time_to_check = 600
+        label_check2.configure(text='10 Min')
+    elif time_to_check == 600:
+        time_to_check = 900
+        label_check2.configure(text='15 Min')
+    elif time_to_check == 900:
+        time_to_check = 300
+        label_check2.configure(text='5 Min')
+    keyring.set_password('datachat', 'update', time_to_check)
+
+
+def loop_get_msg():
+    global time_to_check
+    timing = time.time()
+    while True:
+        if time.time() - timing > time_to_check:
+            timing = time.time()
+            print('check')
+            if current_chat != '-1':
+                if current_chat[0] != 'g':
+                    get_message()
+                elif current_chat[0] == 'g':
+                    get_chat_message()
 
 
 create_tables()
@@ -1044,16 +1143,25 @@ main2_frame2 = LabelFrame(group_frame, width=600, height=350, relief=FLAT)
 main2_frame2.pack(side=TOP, anchor=CENTER)
 # endregion
 # region chat
-frame = Frame(main2_frame, width=850, height=500)
+chat_frame = LabelFrame(main2_frame, width=600, height=25, relief=FLAT)
+chat_frame.pack(side=TOP, pady=2, anchor=N)
+label_chat_id = tk.Label(chat_frame, font=10, text="Current chat with: ", fg="black", width=25, anchor=W)
+label_chat_id.pack(side=LEFT, anchor=W)
+entry_chat_id = tk.Entry(chat_frame, font=12, width=20, fg="black")
+entry_chat_id.pack(side=LEFT, padx=165, anchor=CENTER)
+button_chat_id = tk.Button(chat_frame, text="OPEN", bg='#2E8B57', width=15, command=lambda: open_chat())
+button_chat_id.pack(side=RIGHT, anchor=E)
+
+frame = Frame(main2_frame, width=850, height=450)
 frame.pack(expand=True, fill=BOTH)
-canvas = Canvas(frame, bg='#FFFFFF', width=850, height=410, scrollregion=(0, 0, 500, 500))
+canvas = Canvas(frame, bg='#FFFFFF', width=850, height=370, scrollregion=(0, 0, 500, 450))
 vbar = Scrollbar(frame, orient=VERTICAL)
 vbar.pack(side=RIGHT, fill=Y)
 vbar.config(command=canvas.yview)
 hbar = Scrollbar(frame, orient=HORIZONTAL)
 hbar.pack(side=BOTTOM, fill=X)
 hbar.config(command=canvas.xview)
-canvas.config(width=850, height=410)
+canvas.config(width=850, height=370)
 canvas.config(xscrollcommand=hbar.set, yscrollcommand=vbar.set)
 canvas.pack(side=TOP, expand=True, fill=BOTH)
 canvas.bind("<MouseWheel>", OnMouseWheel)
@@ -1076,15 +1184,13 @@ canvas_2.config(scrollregion=canvas_2.bbox("all"))
 
 button_refresh = tk.Button(main_frame, text="REFRESH", bg='#2E8B57', width=128, command=lambda: get_message())
 button_refresh.pack(side=TOP, pady=3, anchor=CENTER)
-entry_id = tk.Entry(main_frame, font=10, width=8)
-entry_id.bind("<Return>", send_message_handler)
-entry_id.pack(side=LEFT, padx=5)
-entry_msg = tk.Entry(main_frame, font=10, width=75)
+entry_msg = tk.Entry(main_frame, font=10, width=85)
 entry_msg.bind("<Return>", send_message_handler)
 entry_msg.pack(side=LEFT, padx=3)
-button_img = tk.Button(main_frame, text="➕", bg='#2E8B57', width=3, command=lambda: send_image())
+button_img = tk.Button(main_frame, text="➕", bg='#2E8B57', width=3, command=lambda: send_doc(), state='disabled')
 button_img.pack(side=LEFT, anchor=E)
-button_send = tk.Button(main_frame, text="SEND", bg='#2E8B57', width=8, command=lambda: send_message())
+button_send = tk.Button(main_frame, text="SEND", bg='#2E8B57', width=8, command=lambda: send_message(),
+                        state='disabled')
 button_send.pack(side=LEFT, anchor=E, padx=3)
 
 button_refresh2 = tk.Button(group_frame, text="REFRESH", bg='#2E8B57', width=128, command=lambda: get_chat_message())
@@ -1092,11 +1198,11 @@ button_refresh2.pack(side=TOP, pady=3, anchor=CENTER)
 entry_msg2 = tk.Entry(group_frame, font=10, width=85)
 # entry_msg2.bind("<Return>", send_chat_message())
 entry_msg2.pack(side=LEFT, padx=3)
-button_img2 = tk.Button(group_frame, text="➕", bg='#2E8B57', width=3)  # , command=lambda: send_image())
+button_img2 = tk.Button(group_frame, text="➕", bg='#2E8B57', width=3, state='disabled', command=lambda: send_chat_doc())
 button_img2.pack(side=LEFT, anchor=E)
-button_send2 = tk.Button(group_frame, text="SEND", bg='#2E8B57', width=8, command=lambda: send_chat_message())
+button_send2 = tk.Button(group_frame, text="SEND", bg='#2E8B57', width=8, state='disabled',
+                         command=lambda: send_chat_message())
 button_send2.pack(side=LEFT, anchor=E, padx=3)
-
 entry_log.focus_set()
 # root.after(500, loop)
 # endregion
@@ -1105,10 +1211,10 @@ settings_frame_2 = LabelFrame(settings_frame, width=600, height=25, relief=FLAT)
 settings_frame_2.pack(side=TOP, pady=2, anchor=N)
 label_check = tk.Label(settings_frame_2, font=10, text="  Update frequency:", fg="black", width=18, anchor=W)
 label_check.pack(side=LEFT, anchor=W)
-label_check2 = tk.Label(settings_frame_2, font=12, width=20, fg="black")
+label_check2 = tk.Label(settings_frame_2, font=12, text='5 min', width=20, fg="black")
 label_check2.pack(side=LEFT, padx=170, anchor=CENTER)
-button_check = tk.Button(settings_frame_2, text="10 Min", bg='#2E8B57', width=15, command=lambda: auto_check())
-button_check.pack(side=RIGHT, anchor=E)
+button_check_msg = tk.Button(settings_frame_2, text="UPDATE", bg='#2E8B57', width=15, command=lambda: auto_check())
+button_check_msg.pack(side=RIGHT, anchor=E)
 
 settings_frame7 = LabelFrame(settings_frame, width=600, height=25, relief=FLAT)
 settings_frame7.pack(side=TOP, pady=2, anchor=N)
@@ -1163,18 +1269,20 @@ button_b_font.pack(side=TOP, anchor=CENTER)
 # endregion
 # region info
 main1_frame = LabelFrame(root, width=600, height=350, relief=SUNKEN)
-label_info = tk.Label(main1_frame, font=10, text="ID/Nickname/Group", fg="black", width=18)
-label_info.pack(side=TOP, anchor=CENTER)
-entry_res = tk.Entry(main1_frame, font=10, width=20, state='disabled')
-entry_res.pack(side=TOP, padx=2, pady=3, anchor=CENTER)
-entry_id_or_nick = tk.Entry(main1_frame, font=10, width=20)
-entry_id_or_nick.pack(side=TOP, padx=2, anchor=CENTER)
-button_check = tk.Button(main1_frame, text="CHECK", bg='#2E8B57', width=25, command=lambda: get_user_info())
-button_check.pack(side=TOP, anchor=CENTER)
-
+info_frame = LabelFrame(main1_frame, relief=SUNKEN)
+info_frame.pack(side=LEFT, anchor=NW)
+label_info = tk.Label(info_frame, font=10, text="ID/Nickname/Group", fg="black", width=18)
+label_info.pack(side=TOP, anchor=SW)
+entry_res = tk.Entry(info_frame, font=10, width=20, state='disabled')
+entry_res.pack(side=TOP, padx=2, pady=3, anchor=SW)
+entry_id_or_nick = tk.Entry(info_frame, font=10, width=20)
+entry_id_or_nick.pack(side=TOP, padx=2, anchor=SW)
+button_check = tk.Button(info_frame, text="CHECK", bg='#2E8B57', width=25, command=lambda: get_user_info())
+button_check.pack(side=TOP, anchor=SW)
 label_loading = Label(root, font=10, text="LOADING", fg="black", bg="white")
 # endregion
 auto_login()
+checker = threading.Thread(target=loop_get_msg, daemon=True)
 
 if __name__ == "__main__":
     root.title("Chat")
