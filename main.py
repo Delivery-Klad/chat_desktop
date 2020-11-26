@@ -33,7 +33,6 @@ user_id, email, user_login = '', '', ''
 var = IntVar()
 private_key = rsa.PrivateKey(1, 2, 3, 4, 5)
 files_dir = 'files'
-auto_fill_data_file = files_dir + '/rem.rm'
 private_key_file = files_dir + '/priv_key.PEM'
 time_to_check = 300.0
 db_log = "register"
