@@ -102,6 +102,7 @@ def create_tables():
                        'from_id TEXT,'
                        'to_id TEXT,'
                        'message BYTEA,'
+                       'message1 BYTEA,'
                        'file TEXT)')
         connect.commit()
         cursor.close()
@@ -227,7 +228,7 @@ def login(*args):
         _qr = PhotoImage(file=files_dir + "/QR.png")
         label_qr = Label(main1_frame, image=_qr)
         label_qr.image = _qr
-        label_qr.pack(side=RIGHT, anchor=SE)
+        # label_qr.pack(side=RIGHT, anchor=SE)
         os.remove(files_dir + '/QR.png')
     except Exception as e:
         label_loading.place_forget()
@@ -497,10 +498,13 @@ def send_message():
         cursor.execute("SELECT pubkey FROM users WHERE id={0}".format(to_id))
         res = cursor.fetchall()[0][0]
         encrypt_msg = encrypt(msg.encode('utf-8'), res)
+        cursor.execute("SELECT pubkey FROM users WHERE id={0}".format(user_id))
+        res = cursor.fetchall()[0][0]
+        encrypt_msg1 = encrypt(msg.encode('utf-8'), res)
         date = datetime.utcnow().strftime('%y-%m-%d %H:%M:%S')
         cursor.execute(
-            "INSERT INTO messages VALUES (to_timestamp('{0}', 'dd-mm-yy hh24:mi:ss'), '{1}', '{2}', {3}, "
-            "'-')".format(date, user_id, to_id, encrypt_msg))
+            "INSERT INTO messages VALUES (to_timestamp('{0}', 'dd-mm-yy hh24:mi:ss'), '{1}', '{2}', {3}, {4},"
+            "'-')".format(date, user_id, to_id, encrypt_msg, encrypt_msg1))
         entry_msg.delete(0, tk.END)
         connect.commit()
         cursor.close()
@@ -529,7 +533,7 @@ def send_doc():
         encrypt_msg = encrypt('՗'.encode('utf-8'), res)
         date = datetime.utcnow().strftime('%d/%m/%y %H:%M:%S')
         cursor.execute("INSERT INTO messages VALUES (to_timestamp('{0}', 'yy-mm-dd hh24:mi:ss'), '{1}', '{2}', "
-                       "{3}, '{4}')".format(date, user_id, current_chat, encrypt_msg, link))
+                       "{3}, {3}, '{4}')".format(date, user_id, current_chat, encrypt_msg, link))
         connect.commit()
         cursor.close()
         connect.close()
@@ -552,10 +556,10 @@ def get_message():
         res.sort()
         canvas.delete("all")
         for i in res:
-            decrypt_msg = decrypt(i[3])
-            nick = get_user_nickname(i[2], cursor)
+            decrypt_msg = decrypt(i[3], i[4])
+            nick = get_user_nickname(i[1], cursor)
             if decrypt_msg is None or ord(decrypt_msg[0]) == 1367:
-                content = '{0} {2}: {1}'.format(str(i[0])[2:], i[4], nick)
+                content = '{0} {2}: {1}'.format(str(i[0])[2:], i[5], nick)
                 widget = tk.Listbox(canvas, bg='white', fg='black', font=14, width=95, height=1)
                 widget.insert(0, content)
                 canvas.create_window(0, spacing, window=widget, anchor='nw')
@@ -583,14 +587,14 @@ def encrypt(msg: bytes, pubkey):
         print(e)
 
 
-def decrypt(msg: bytes):
+def decrypt(msg: bytes, msg1: bytes):
     global private_key
     try:
         decrypted_message = rsa.decrypt(msg, private_key)
         return decrypted_message.decode('utf-8')
     except Exception as e:
-        print(e)
-        return None
+        decrypted_message = rsa.decrypt(msg1, private_key)
+        return decrypted_message.decode('utf-8')
 
 
 def login_handler(*args):
@@ -807,7 +811,7 @@ def send_chat_message():
             encrypt_msg = encrypt(message.encode('utf-8'), res)
             date = datetime.utcnow().strftime('%d/%m/%y %H:%M:%S')
             cursor.execute(
-                "INSERT INTO messages VALUES (to_timestamp('{0}', 'yy-mm-dd hh24:mi:ss'), '{1}', '{2}', {3}, "
+                "INSERT INTO messages VALUES (to_timestamp('{0}', 'yy-mm-dd hh24:mi:ss'), '{1}', '{2}', {3}, {3},"
                 "'-')".format(date, current_chat + '_' + str(user_id),  i[0], encrypt_msg))
             entry_msg2.delete(0, tk.END)
         connect.commit()
@@ -842,7 +846,7 @@ def send_chat_doc():
             encrypt_msg = encrypt('՗'.encode('utf-8'), res)
             date = datetime.utcnow().strftime('%d/%m/%y %H:%M:%S')
             cursor.execute(
-                "INSERT INTO messages VALUES (to_timestamp('{0}', 'yy-mm-dd hh24:mi:ss'), '{1}', '{2}', {3}, "
+                "INSERT INTO messages VALUES (to_timestamp('{0}', 'yy-mm-dd hh24:mi:ss'), '{1}', '{2}', {3}, {3},"
                 "'{4}')".format(date, current_chat + '_' + str(user_id), i[0], encrypt_msg, link))
         connect.commit()
         cursor.close()
@@ -861,10 +865,10 @@ def get_chat_message():
                        "date".format(user_id, current_chat))
         res = cursor.fetchall()
         for i in res:
-            decrypt_msg = decrypt(i[3])
+            decrypt_msg = decrypt(i[3], i[4])
             nickname = get_user_nickname(i[1].split('_', 1)[1], cursor)
             if decrypt_msg is None or ord(decrypt_msg[0]) == 1367:
-                content = '{0} {2}: {1}'.format(str(i[0])[2:], i[4], nickname)
+                content = '{0} {2}: {1}'.format(str(i[0])[2:], i[5], nickname)
                 widget = tk.Listbox(canvas_2, bg='white', fg='black', font=14, width=95, height=1)
                 widget.insert(0, content)
                 canvas_2.create_window(0, spacing_2, window=widget, anchor='nw')
@@ -909,7 +913,11 @@ def invite_to_group():
         if user_id != int(get_chat_owner(inv_group)):
             messagebox.showerror('Access error', "You are not chat's owner")
             return
+        groups = get_users_groups(cursor)
         name = get_chat_name(inv_group)
+        if name in groups:
+            messagebox.showerror('Input error', "Пользователь уже состоит в группе")
+            return
         cursor.execute("INSERT INTO {0} VALUES({1})".format(name, int(inv_user)))
         connect.commit()
         messagebox.showinfo('Success', "Success")
