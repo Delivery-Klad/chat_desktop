@@ -724,8 +724,8 @@ def create_chat():
                 return
         cursor.execute("SELECT table_name FROM information_schema.tables WHERE table_schema NOT IN ("
                        "'information_schema', 'pg_catalog') AND table_schema IN('public', 'myschema');")
-        print(cursor.fetchall())
-        if ('{0}'.format(name),) in cursor.fetchall():
+        res = cursor.fetchall()
+        if ('{0}'.format(name),) in res:
             messagebox.showerror('Name error', 'Name exists')
             cursor.close()
             connect.close()
