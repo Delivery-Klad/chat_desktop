@@ -20,7 +20,7 @@ from email.mime.multipart import MIMEMultipart
 from keyring.backends.Windows import WinVaultKeyring
 
 keyring.set_keyring(WinVaultKeyring())
-y = yadisk.YaDisk(token="AgAAAABITC7sAAav1g3D_G43akSwv85Xg-yPrCY")
+y = yadisk.YaDisk(token="AgAAAABITC7sAAbGEG8sF3E00UCxjTQXUS5Vu28")
 
 code = None
 chats = {}
