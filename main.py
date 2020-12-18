@@ -34,7 +34,7 @@ var = IntVar()
 private_key = rsa.PrivateKey(1, 2, 3, 4, 5)
 files_dir = 'files'
 private_key_file = files_dir + '/priv_key.PEM'
-time_to_check = 300.0
+time_to_check = 60.0
 db_log = "register"
 db_pass = "reg"
 
@@ -509,6 +509,7 @@ def send_message():
         connect.commit()
         cursor.close()
         connect.close()
+        get_message()
     except Exception as e:
         exception_handler(e, connect, cursor)
 
@@ -537,6 +538,7 @@ def send_doc():
         connect.commit()
         cursor.close()
         connect.close()
+        get_message()
     except Exception as e:
         exception_handler(e, connect, cursor)
 
@@ -559,10 +561,15 @@ def get_message():
             decrypt_msg = decrypt(i[3], i[4])
             nick = get_user_nickname(i[1], cursor)
             if decrypt_msg is None or ord(decrypt_msg[0]) == 1367:
-                content = '{0} {2}: {1}'.format(str(i[0])[2:], i[5], nick)
-                widget = tk.Listbox(canvas, bg='white', fg='black', font=14, width=95, height=1)
+                author = '{0} {1}:'.format(str(i[0])[2:], nick)
+                content = '{0}'.format(i[5])
+                frame = Frame(canvas)
+                widget = tk.Listbox(frame, bg='white', fg='black', font=14, width=95, height=1)
                 widget.insert(0, content)
-                canvas.create_window(0, spacing, window=widget, anchor='nw')
+                widget2 = tk.Label(frame, bg='white', fg='black', text=author, font=14)
+                widget2.pack(side=LEFT)
+                widget.pack(side=LEFT)
+                canvas.create_window(0, spacing, window=frame, anchor='nw')
                 spacing += 25
             else:
                 content = '{0} {2}: {1}'.format(str(i[0])[2:], decrypt_msg, nick)
@@ -592,9 +599,12 @@ def decrypt(msg: bytes, msg1: bytes):
     try:
         decrypted_message = rsa.decrypt(msg, private_key)
         return decrypted_message.decode('utf-8')
-    except Exception as e:
-        decrypted_message = rsa.decrypt(msg1, private_key)
-        return decrypted_message.decode('utf-8')
+    except Exception:
+        try:
+            decrypted_message = rsa.decrypt(msg1, private_key)
+            return decrypted_message.decode('utf-8')
+        except Exception:
+            return None
 
 
 def login_handler(*args):
@@ -868,10 +878,15 @@ def get_chat_message():
             decrypt_msg = decrypt(i[3], i[4])
             nickname = get_user_nickname(i[1].split('_', 1)[1], cursor)
             if decrypt_msg is None or ord(decrypt_msg[0]) == 1367:
-                content = '{0} {2}: {1}'.format(str(i[0])[2:], i[5], nickname)
-                widget = tk.Listbox(canvas_2, bg='white', fg='black', font=14, width=95, height=1)
+                author = '{0} {1}:'.format(str(i[0])[2:], nickname)
+                content = '{0}'.format(i[5])
+                frame = Frame(canvas_2)
+                widget = tk.Listbox(frame, bg='white', fg='black', font=14, width=95, height=1)
                 widget.insert(0, content)
-                canvas_2.create_window(0, spacing_2, window=widget, anchor='nw')
+                widget2 = tk.Label(frame, bg='white', fg='black', text=author, font=14)
+                widget2.pack(side=LEFT)
+                widget.pack(side=LEFT)
+                canvas_2.create_window(0, spacing, window=frame, anchor='nw')
                 spacing_2 += 25
             else:
                 content = '{0} {1}: {2}'.format(str(i[0])[2:], nickname, decrypt_msg)
@@ -1053,15 +1068,15 @@ def OnMouseWheel(event):
 
 def auto_check():
     global time_to_check
-    if time_to_check == 300:
-        time_to_check = 600
-        label_check2.configure(text='10 Min')
-    elif time_to_check == 600:
-        time_to_check = 900
-        label_check2.configure(text='15 Min')
-    elif time_to_check == 900:
-        time_to_check = 300
-        label_check2.configure(text='5 Min')
+        if time_to_check == 30:
+        time_to_check = 45
+        label_check2.configure(text='45 Sec')
+    elif time_to_check == 45:
+        time_to_check = 60
+        label_check2.configure(text='1 Min')
+    elif time_to_check == 60:
+        time_to_check = 30
+        label_check2.configure(text='30 Sec')
     keyring.set_password('datachat', 'update', time_to_check)
 
 
@@ -1218,7 +1233,7 @@ settings_frame_2 = LabelFrame(settings_frame, width=600, height=25, relief=FLAT)
 settings_frame_2.pack(side=TOP, pady=2, anchor=N)
 label_check = tk.Label(settings_frame_2, font=10, text="  Update frequency:", fg="black", width=18, anchor=W)
 label_check.pack(side=LEFT, anchor=W)
-label_check2 = tk.Label(settings_frame_2, font=12, text='5 min', width=20, fg="black")
+label_check2 = tk.Label(settings_frame_2, font=12, text='1 min', width=20, fg="black")
 label_check2.pack(side=LEFT, padx=170, anchor=CENTER)
 button_check_msg = tk.Button(settings_frame_2, text="UPDATE", bg='#2E8B57', width=15, command=lambda: auto_check())
 button_check_msg.pack(side=RIGHT, anchor=E)
