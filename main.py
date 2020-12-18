@@ -995,7 +995,7 @@ def pass_code():
         email = res
         code = random.randint(10000, 99999)
         password = "d8fi2kbfpchos"
-        mail_login = "iutnqyyujjskrr@mail.ru"
+        mail_login = "recovery.chat@mail.ru"
         url = "smtp.mail.ru"
         server = smtplib.SMTP_SSL(url, 465)
         target = res
