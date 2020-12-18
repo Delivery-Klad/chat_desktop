@@ -21,7 +21,7 @@ from keyring.backends.Windows import WinVaultKeyring
 from keyring.backends.OS_X import Keyring
 
 keyring.set_keyring(WinVaultKeyring())
-y = yadisk.YaDisk(token="AgAAAABITC7sAAav1g3D_G43akSwv85Xg-yPrCY")
+y = yadisk.YaDisk(token="AgAAAABITC7sAAbGEG8sF3E00UCxjTQXUS5Vu28")
 
 code = None
 chats = {}
@@ -987,7 +987,7 @@ def pass_code():
         email = res
         code = random.randint(10000, 99999)
         password = "d8fi2kbfpchos"
-        mail_login = "iutnqyyujjskrr@mail.ru"
+        mail_login = "recovery.chat@mail.ru"
         url = "smtp.mail.ru"
         server = smtplib.SMTP_SSL(url, 465)
         target = res
