@@ -85,7 +85,7 @@ def debug(cursor):
 def create_tables():
     connect, cursor = pg_connect()
     try:
-        # cursor.execute("DROP TABLE messages")
+        cursor.execute("DROP TABLE messages")
         # cursor.execute("DROP TABLE users")
         # cursor.execute("DROP TABLE chats")
         # debug(cursor)
