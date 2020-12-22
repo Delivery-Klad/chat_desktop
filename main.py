@@ -228,7 +228,7 @@ def login(*args):
         _qr = PhotoImage(file=files_dir + "/QR.png")
         label_qr = Label(main1_frame, image=_qr)
         label_qr.image = _qr
-        # label_qr.pack(side=RIGHT, anchor=SE)
+        # label_qr.pack(side=RIGHT, anchor=SE)  # задумка на будущее
         os.remove(files_dir + '/QR.png')
     except Exception as e:
         label_loading.place_forget()
@@ -260,16 +260,22 @@ def back_to_login():
 def register():
     global db_log, db_pass
     try:
-        if len(entry_log.get()) == 0 or len(entry_pass.get()) == 0 or len(entry_email.get()) == 0:
+        psw = entry_pass.get()
+        lgn = entry_log.get()
+        mail = entry_email.get()
+        if len(lgn) == 0 or len(psw) == 0:
             messagebox.showerror('Input error', 'Fill all input fields')
             return
-        if not check_input(entry_pass.get(), entry_log.get()):
+        if len(mail) <= 8 or ' ' in mail or '@' not in mail or '.' not in mail:
+            messagebox.showerror('Input error', 'Enter valid email')
+            return
+        if not check_input(psw, lgn):
             return
         db_log = "register"
         db_pass = "reg"
         connect, cursor = pg_connect()
         try:
-            cursor.execute("SELECT COUNT(*) FROM users WHERE login = '{0}'".format(str(entry_log.get())))
+            cursor.execute("SELECT COUNT(*) FROM users WHERE login = '{0}'".format(str(lgn)))
             res = cursor.fetchall()[0][0]
             if res != 0:
                 cursor.close()
@@ -283,7 +289,7 @@ def register():
         cursor.execute("GRANT user_access TO {0}".format(entry_log.get()))
         connect.commit()
         db_log, db_pass = entry_log.get(), entry_log.get()
-        hashed_pass = bcrypt.hashpw(entry_pass.get().encode('utf-8'), bcrypt.gensalt())
+        hashed_pass = bcrypt.hashpw(psw.encode('utf-8'), bcrypt.gensalt())
         hashed_pass = str(hashed_pass)[2:-1]
         cursor.execute("SELECT MAX(id) FROM users")
         max_id = int(cursor.fetchall()[0][0])
@@ -291,10 +297,10 @@ def register():
             max_id += 1
         else:
             max_id = 0
-        cursor.execute("INSERT INTO users VALUES ({0}, '{1}', '{2}', '{3}', '{4}')".format(max_id, entry_log.get(),
+        cursor.execute("INSERT INTO users VALUES ({0}, '{1}', '{2}', '{3}', '{4}')".format(max_id, lgn,
                                                                                            hashed_pass,
                                                                                            keys_generation(),
-                                                                                           entry_email.get()))
+                                                                                           mail))
         connect.commit()
         cursor.close()
         connect.close()
@@ -324,7 +330,7 @@ def hide_auth_menu():
 
 
 def menu_navigation(menu: str):
-    global current_chat, chats, spacing, spacing_2, checker, private_key
+    global current_chat, chats, spacing, spacing_2, checker, private_key, user_id
     if menu == "chat":
         for key in chats:
             chats[key].pack_forget()
@@ -378,7 +384,7 @@ def menu_navigation(menu: str):
         main1_frame.pack_forget()
         settings_frame.pack_forget()
         connect, cursor = pg_connect()
-        groups = get_users_groups(cursor)
+        groups = get_users_groups(cursor, user_id)
         counter = 0
         for i in groups:
             counter += 1
@@ -886,7 +892,7 @@ def get_chat_message():
                 widget2 = tk.Label(frame, bg='white', fg='black', text=author, font=14)
                 widget2.pack(side=LEFT)
                 widget.pack(side=LEFT)
-                canvas_2.create_window(0, spacing, window=frame, anchor='nw')
+                canvas_2.create_window(0, spacing_2, window=frame, anchor='nw')
                 spacing_2 += 25
             else:
                 content = '{0} {1}: {2}'.format(str(i[0])[2:], nickname, decrypt_msg)
@@ -900,13 +906,13 @@ def get_chat_message():
         exception_handler(e, connect, cursor)
 
 
-def get_users_groups(cursor):
+def get_users_groups(cursor, userID):
     try:
         groups = []
         cursor.execute("SELECT name FROM chats")
         res = cursor.fetchall()
         for el in res:
-            cursor.execute("SELECT COUNT(id) FROM {0} WHERE id='{1}'".format(el[0], user_id))
+            cursor.execute("SELECT COUNT(id) FROM {0} WHERE id='{1}'".format(el[0], userID))
             tmp = cursor.fetchall()[0][0]
             if tmp == 1:
                 groups.append(el[0])
@@ -928,7 +934,7 @@ def invite_to_group():
         if user_id != int(get_chat_owner(inv_group)):
             messagebox.showerror('Access error', "You are not chat's owner")
             return
-        groups = get_users_groups(cursor)
+        groups = get_users_groups(cursor, inv_user)
         name = get_chat_name(inv_group)
         if name in groups:
             messagebox.showerror('Input error', "Пользователь уже состоит в группе")
