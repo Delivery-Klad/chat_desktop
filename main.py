@@ -564,13 +564,13 @@ def get_message():
             if decrypt_msg is None or ord(decrypt_msg[0]) == 1367:
                 author = '{0} {1}:'.format(str(i[0])[2:], nick)
                 content = '{0}'.format(i[5])
-                frame = Frame(canvas)
-                widget = tk.Listbox(frame, bg='white', fg='black', font=14, width=95, height=1)
+                msg_frame = Frame(canvas)
+                widget = tk.Listbox(msg_frame, bg='white', fg='black', font=14, width=95, height=1)
                 widget.insert(0, content)
-                widget2 = tk.Label(frame, bg='white', fg='black', text=author, font=14)
+                widget2 = tk.Label(msg_frame, bg='white', fg='black', text=author, font=14)
                 widget2.pack(side=LEFT)
                 widget.pack(side=LEFT)
-                canvas.create_window(0, spacing, window=frame, anchor='nw')
+                canvas.create_window(0, spacing, window=msg_frame, anchor='nw')
                 spacing += 25
             else:
                 content = '{0} {2}: {1}'.format(str(i[0])[2:], decrypt_msg, nick)
@@ -845,7 +845,7 @@ def send_chat_doc():
         path = path[len(path) - 1]
         try:
             y.upload(path, '/' + path)
-        except Exception as e:
+        except Exception:
             pass
         link = y.get_download_link('/' + path)
         name = get_chat_name(current_chat)
@@ -880,13 +880,13 @@ def get_chat_message():
             if decrypt_msg is None or ord(decrypt_msg[0]) == 1367:
                 author = '{0} {1}:'.format(str(i[0])[2:], nickname)
                 content = '{0}'.format(i[5])
-                frame = Frame(canvas_2)
-                widget = tk.Listbox(frame, bg='white', fg='black', font=14, width=95, height=1)
+                msg_frame = Frame(canvas_2)
+                widget = tk.Listbox(msg_frame, bg='white', fg='black', font=14, width=95, height=1)
                 widget.insert(0, content)
-                widget2 = tk.Label(frame, bg='white', fg='black', text=author, font=14)
+                widget2 = tk.Label(msg_frame, bg='white', fg='black', text=author, font=14)
                 widget2.pack(side=LEFT)
                 widget.pack(side=LEFT)
-                canvas_2.create_window(0, spacing_2, window=frame, anchor='nw')
+                canvas_2.create_window(0, spacing_2, window=msg_frame, anchor='nw')
                 spacing_2 += 25
             else:
                 content = '{0} {1}: {2}'.format(str(i[0])[2:], nickname, decrypt_msg)
@@ -900,13 +900,13 @@ def get_chat_message():
         exception_handler(e, connect, cursor)
 
 
-def get_users_groups(cursor, userID):
+def get_users_groups(cursor, user):
     try:
         groups = []
         cursor.execute("SELECT name FROM chats")
         res = cursor.fetchall()
         for el in res:
-            cursor.execute("SELECT COUNT(id) FROM {0} WHERE id='{1}'".format(el[0], userID))
+            cursor.execute("SELECT COUNT(id) FROM {0} WHERE id='{1}'".format(el[0], user))
             tmp = cursor.fetchall()[0][0]
             if tmp == 1:
                 groups.append(el[0])
