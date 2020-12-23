@@ -9,7 +9,7 @@ elif sys.platform == "win64":
 
 executables = [Executable("main.py", base=base)]
 packages = ["idna", "_cffi_backend", "bcrypt", "rsa", "psycopg2", "os", "keyring", "keyring.backends",
-            "smtplib", 'win32ctypes', 'yadisk']
+            "smtplib", 'win32ctypes', "yadisk", "shutil"]
 options = {'build_exe': {'packages': packages, }, }
 
 setup(name="main", options=options, version="1.0",

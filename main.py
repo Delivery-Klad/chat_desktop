@@ -526,7 +526,7 @@ def send_doc():
         path = filedialog.askopenfilename(filetypes=[("All files", "*.*")])
         if len(path) == 0:
             return
-        shutil.copy(r'{0}'.format(path), r'{0}'.format(os.path.dirname(__file__)))
+        shutil.copy(r'{0}'.format(path), r'{0}'.format(os.path.abspath("")))
         path = path.split('/')
         path = path[len(path) - 1]
         try:
@@ -847,7 +847,7 @@ def send_chat_doc():
             cursor.close()
             connect.close()
             return
-        shutil.copy(r'{0}'.format(path), r'{0}'.format(os.path.dirname(__file__)))
+        shutil.copy(r'{0}'.format(path), r'{0}'.format(os.path.abspath("")))
         path = path.split('/')
         path = path[len(path) - 1]
         try:
