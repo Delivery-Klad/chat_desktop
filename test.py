@@ -33,5 +33,9 @@ def pg_connect():
         print(e)
 
 
-pg_connect()
+# pg_connect()
+from datetime import datetime, timezone
 
+d = datetime.now(timezone.utc).astimezone()
+utc_offset = d.utcoffset()
+print(utc_offset)
