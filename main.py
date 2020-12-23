@@ -12,7 +12,7 @@ import threading
 import tkinter as tk
 from tkinter import *
 from PIL import Image
-from datetime import datetime
+from datetime import datetime, timezone
 from tkinter import messagebox
 from tkinter import filedialog
 from email.mime.text import MIMEText
@@ -37,6 +37,8 @@ private_key_file = files_dir + '/priv_key.PEM'
 time_to_check = 60.0
 db_log = "register"
 db_pass = "reg"
+dt = datetime.now(timezone.utc).astimezone()
+utc_diff = dt.utcoffset()
 
 try:
     os.mkdir(files_dir)
@@ -567,7 +569,7 @@ def get_message():
             decrypt_msg = decrypt(i[3], i[4])
             nick = get_user_nickname(i[1], cursor)
             if decrypt_msg is None or ord(decrypt_msg[0]) == 1367:
-                author = '{0} {1}:'.format(str(i[0])[2:], nick)
+                author = '{0} {1}:'.format(str(i[0] + utc_diff)[2:], nick)
                 content = '{0}'.format(i[5])
                 frame = Frame(canvas)
                 widget = tk.Listbox(frame, bg='white', fg='black', font=14, width=95, height=1)
@@ -578,7 +580,7 @@ def get_message():
                 canvas.create_window(0, spacing, window=frame, anchor='nw')
                 spacing += 25
             else:
-                content = '{0} {2}: {1}'.format(str(i[0])[2:], decrypt_msg, nick)
+                content = '{0} {2}: {1}'.format(str(i[0] + utc_diff)[2:], decrypt_msg, nick)
                 widget = Label(canvas, text=content, bg='white', fg='black', font=14)
                 canvas.create_window(0, spacing, window=widget, anchor='nw')
                 spacing += 25
@@ -884,7 +886,7 @@ def get_chat_message():
             decrypt_msg = decrypt(i[3], i[4])
             nickname = get_user_nickname(i[1].split('_', 1)[1], cursor)
             if decrypt_msg is None or ord(decrypt_msg[0]) == 1367:
-                author = '{0} {1}:'.format(str(i[0])[2:], nickname)
+                author = '{0} {1}:'.format(str(i[0] + utc_diff)[2:], nickname)
                 content = '{0}'.format(i[5])
                 frame = Frame(canvas_2)
                 widget = tk.Listbox(frame, bg='white', fg='black', font=14, width=95, height=1)
@@ -895,7 +897,7 @@ def get_chat_message():
                 canvas_2.create_window(0, spacing_2, window=frame, anchor='nw')
                 spacing_2 += 25
             else:
-                content = '{0} {1}: {2}'.format(str(i[0])[2:], nickname, decrypt_msg)
+                content = '{0} {1}: {2}'.format(str(i[0] + utc_diff)[2:], nickname, decrypt_msg)
                 widget = Label(canvas_2, text=content, bg='white', fg='black', font=14)
                 canvas_2.create_window(0, spacing_2, window=widget, anchor='nw')
                 spacing_2 += 25
