@@ -1,6 +1,7 @@
 import os
 import rsa
 import time
+import shutil
 import qrcode
 import bcrypt
 import random
@@ -18,7 +19,7 @@ from tkinter import filedialog
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from keyring.backends.Windows import WinVaultKeyring
-from keyring.backends.OS_X import Keyring
+# from keyring.backends.OS_X import Keyring
 
 keyring.set_keyring(WinVaultKeyring())
 y = yadisk.YaDisk(token="AgAAAABITC7sAAbGEG8sF3E00UCxjTQXUS5Vu28")
@@ -90,7 +91,7 @@ def create_tables():
         # cursor.execute("DROP TABLE messages")
         # cursor.execute("DROP TABLE users")
         # cursor.execute("DROP TABLE chats")
-        # debug(cursor)
+        debug(cursor)
         cursor.execute('CREATE TABLE IF NOT EXISTS users(id INTEGER,'
                        'login TEXT,'
                        'password TEXT,'
@@ -525,6 +526,7 @@ def send_doc():
         path = filedialog.askopenfilename(filetypes=[("All files", "*.*")])
         if len(path) == 0:
             return
+        shutil.copy(r'{0}'.format(path), r'{0}'.format(os.path.dirname(__file__)))
         path = path.split('/')
         path = path[len(path) - 1]
         try:
@@ -541,6 +543,7 @@ def send_doc():
         connect.commit()
         cursor.close()
         connect.close()
+        os.remove(path)
         get_message()
     except Exception as e:
         exception_handler(e, connect, cursor)
@@ -744,12 +747,12 @@ def create_chat():
             connect.close()
             return
         max_id = get_max_chat_id(cursor) + 1
-        print(max_id)
         cursor.execute("INSERT INTO chats VALUES ('g{0}', '{1}', {2})".format(max_id, name, user_id))
         cursor.execute('CREATE TABLE IF NOT EXISTS {0}(id INTEGER)'.format(name))
         connect.commit()
         cursor.execute("INSERT INTO {0} VALUES({1})".format(name, user_id))
         connect.commit()
+        messagebox.showinfo('Success', 'Chat created')
         cursor.close()
         connect.close()
     except Exception as e:
@@ -829,6 +832,7 @@ def send_chat_message():
         connect.commit()
         cursor.close()
         connect.close()
+        get_chat_message()
     except Exception as e:
         exception_handler(e, connect, cursor)
 
@@ -843,6 +847,7 @@ def send_chat_doc():
             cursor.close()
             connect.close()
             return
+        shutil.copy(r'{0}'.format(path), r'{0}'.format(os.path.dirname(__file__)))
         path = path.split('/')
         path = path[len(path) - 1]
         try:
@@ -862,7 +867,9 @@ def send_chat_doc():
                 "'{4}')".format(date, current_chat + '_' + str(user_id), i[0], encrypt_msg, link))
         connect.commit()
         cursor.close()
+        os.remove(path)
         connect.close()
+        get_chat_message()
     except Exception as e:
         exception_handler(e, connect, cursor)
 
