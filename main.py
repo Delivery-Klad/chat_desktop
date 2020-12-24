@@ -59,11 +59,11 @@ def exception_handler(e, connect, cursor):
 def pg_connect():
     try:
         con = psycopg2.connect(
-            host="ec2-54-75-244-161.eu-west-1.compute.amazonaws.com",
-            database="d8fi2kbfpchos",
-            user="iutnqyyujjskrr",
+            host="ec2-54-247-107-109.eu-west-1.compute.amazonaws.com",
+            database="de81d5uf5eagcd",
+            user="guoucmhwdhynrf",
             port="5432",
-            password="45be3b8ccf0ce93d0e142ec546edaa8a067370f5c050b92b4c181730fb2c9814")
+            password="7720bda9eb76c990aee593f9064fa653136e3a047f989f53856b37549549ebe6")
         cur = con.cursor()
         return con, cur
     except Exception as e:
@@ -91,7 +91,7 @@ def create_tables():
         # cursor.execute("DROP TABLE messages")
         # cursor.execute("DROP TABLE users")
         # cursor.execute("DROP TABLE chats")
-        debug(cursor)
+        # debug(cursor)
         cursor.execute('CREATE TABLE IF NOT EXISTS users(id INTEGER,'
                        'login TEXT,'
                        'password TEXT,'
@@ -105,7 +105,8 @@ def create_tables():
                        'to_id TEXT,'
                        'message BYTEA,'
                        'message1 BYTEA,'
-                       'file TEXT)')
+                       'file TEXT,'
+                       'read INTEGER)')
         connect.commit()
         cursor.close()
         connect.close()
@@ -508,7 +509,7 @@ def send_message():
         date = datetime.utcnow().strftime('%y-%m-%d %H:%M:%S')
         cursor.execute(
             "INSERT INTO messages VALUES (to_timestamp('{0}', 'dd-mm-yy hh24:mi:ss'), '{1}', '{2}', {3}, {4},"
-            "'-')".format(date, user_id, to_id, encrypt_msg, encrypt_msg1))
+            "'-', 0)".format(date, user_id, to_id, encrypt_msg, encrypt_msg1))
         entry_msg.delete(0, tk.END)
         connect.commit()
         cursor.close()
@@ -539,7 +540,7 @@ def send_doc():
         encrypt_msg = encrypt('՗'.encode('utf-8'), res)
         date = datetime.utcnow().strftime('%d/%m/%y %H:%M:%S')
         cursor.execute("INSERT INTO messages VALUES (to_timestamp('{0}', 'yy-mm-dd hh24:mi:ss'), '{1}', '{2}', "
-                       "{3}, {3}, '{4}')".format(date, user_id, current_chat, encrypt_msg, link))
+                       "{3}, {3}, '{4}', 0)".format(date, user_id, current_chat, encrypt_msg, link))
         connect.commit()
         cursor.close()
         connect.close()
@@ -561,6 +562,9 @@ def get_message():
         cursor.execute("SELECT * FROM messages WHERE to_id='{1}' AND from_id='{0}' AND NOT from_id LIKE 'g%' "
                        "ORDER BY date".format(user_id, current_chat))
         res += cursor.fetchall()
+        cursor.execute("UPDATE messages SET read=1 WHERE to_id='{0}' AND from_id LIKE '{1}' AND read=0".
+                       format(user_id, current_chat))
+        connect.commit()
         res.sort()
         canvas.delete("all")
         for i in res:
@@ -827,7 +831,7 @@ def send_chat_message():
             date = datetime.utcnow().strftime('%d/%m/%y %H:%M:%S')
             cursor.execute(
                 "INSERT INTO messages VALUES (to_timestamp('{0}', 'yy-mm-dd hh24:mi:ss'), '{1}', '{2}', {3}, {3},"
-                "'-')".format(date, current_chat + '_' + str(user_id),  i[0], encrypt_msg))
+                "'-', 0)".format(date, current_chat + '_' + str(user_id),  i[0], encrypt_msg))
             entry_msg2.delete(0, tk.END)
         connect.commit()
         cursor.close()
@@ -864,7 +868,7 @@ def send_chat_doc():
             date = datetime.utcnow().strftime('%d/%m/%y %H:%M:%S')
             cursor.execute(
                 "INSERT INTO messages VALUES (to_timestamp('{0}', 'yy-mm-dd hh24:mi:ss'), '{1}', '{2}', {3}, {3},"
-                "'{4}')".format(date, current_chat + '_' + str(user_id), i[0], encrypt_msg, link))
+                "'{4}', 0)".format(date, current_chat + '_' + str(user_id), i[0], encrypt_msg, link))
         connect.commit()
         cursor.close()
         os.remove(path)
@@ -883,6 +887,9 @@ def get_chat_message():
         cursor.execute("SELECT * FROM messages WHERE to_id='{0}' AND from_id LIKE '{1}%' ORDER BY "
                        "date".format(user_id, current_chat))
         res = cursor.fetchall()
+        cursor.execute("UPDATE messages SET read=1 WHERE to_id='{0}' AND from_id LIKE '{1}%' AND read=0".
+                       format(user_id, current_chat))
+        connect.commit()
         for i in res:
             decrypt_msg = decrypt(i[3], i[4])
             nickname = get_user_nickname(i[1].split('_', 1)[1], cursor)
@@ -1095,7 +1102,19 @@ def loop_get_msg():
     while True:
         if time.time() - timing > time_to_check:
             timing = time.time()
-            print('check')
+            connect, cursor = pg_connect()
+            cursor.execute("SELECT from_id FROM messages WHERE to_id='{0}' AND read=0".format(user_id))
+            res = cursor.fetchall()
+            print(res)
+            new_msgs = []
+            temp = ''
+            for i in res:
+                if i[0] not in new_msgs:
+                    new_msgs.append(i[0])
+            for i in new_msgs:
+                temp += i + ', '
+            if temp != '':
+                messagebox.showinfo('New messages!', 'You have new messages in chats: ' + temp[:-2])
             if current_chat != '-1':
                 if current_chat[0] != 'g':
                     get_message()
