@@ -963,6 +963,33 @@ def invite_to_group():
         connect.close()
     except Exception as e:
         exception_handler(e, connect, cursor)
+        
+        
+def kick_from_group():
+    global user_id
+    root.update()
+    kick_user = entry_kick_id.get()
+    kick_group = entry_gr_tokick.get()
+    if len(kick_user) == 0 and len(kick_group) == 0:
+        messagebox.showerror('Input error', 'Entries lenght must be more than 0 characters')
+        return
+    connect, cursor = pg_connect()
+    try:
+        if user_id != int(get_chat_owner(kick_group)):
+            messagebox.showerror('Access error', "You are not chat's owner")
+            return
+        groups = get_users_groups(cursor, kick_user)
+        name = get_chat_name(kick_group)
+        if name not in groups:
+            messagebox.showerror('Input error', "User is not in group")
+            return
+        cursor.execute("DELETE FROM {0} WHERE id={1}".format(name, int(kick_user)))
+        connect.commit()
+        messagebox.showinfo('Success', "Success")
+        cursor.close()
+        connect.close()
+    except Exception as e:
+        exception_handler(e, connect, cursor)
 
 
 def logout():
@@ -1298,6 +1325,23 @@ entry_gr_toinv = tk.Entry(settings_frame10, font=12, width=20, fg="black")
 entry_gr_toinv.pack(side=TOP, anchor=CENTER)
 button_invite = tk.Button(settings_frame8, text="INVITE", bg='#2E8B57', width=15, command=lambda: invite_to_group())
 button_invite.pack(side=RIGHT, anchor=S)
+
+settings_frame20 = LabelFrame(settings_frame, width=600, height=25, relief=FLAT)
+settings_frame20.pack(side=TOP, pady=2, anchor=N)
+settings_frame21 = LabelFrame(settings_frame20, width=600, height=25, relief=FLAT)
+settings_frame21.pack(side=LEFT, pady=2, anchor=N)
+label_kick_id = tk.Label(settings_frame21, font=10, text="  ID to kick:", fg="black", width=18, anchor=W)
+label_kick_id.pack(side=TOP, anchor=W)
+entry_kick_id = tk.Entry(settings_frame21, font=12, width=20, fg="black")
+entry_kick_id.pack(side=TOP, anchor=CENTER)
+settings_frame10 = LabelFrame(settings_frame20, width=600, height=25, relief=FLAT)
+settings_frame10.pack(side=LEFT, pady=2, padx=158, anchor=N)
+label_gr_tokick = tk.Label(settings_frame10, font=10, text="Group id:", fg="black", width=18, anchor=W)
+label_gr_tokick.pack(side=TOP, anchor=W)
+entry_gr_tokick = tk.Entry(settings_frame10, font=12, width=20, fg="black")
+entry_gr_tokick.pack(side=TOP, anchor=CENTER)
+button_kick = tk.Button(settings_frame20, text="KICK", bg='#2E8B57', width=15, command=lambda: kick_from_group())
+button_kick.pack(side=RIGHT, anchor=S)
 
 settings_frame3 = LabelFrame(settings_frame, width=600, height=25, relief=FLAT)
 settings_frame3.pack(side=TOP, pady=2, anchor=N)
