@@ -90,7 +90,7 @@ def debug(cursor):
 def create_tables():
     connect, cursor = pg_connect()
     try:
-        cursor.execute("DROP TABLE messages")
+        # cursor.execute("DROP TABLE messages")
         # cursor.execute("DROP TABLE users")
         # cursor.execute("DROP TABLE chats")
         # debug(cursor)
@@ -107,7 +107,8 @@ def create_tables():
                        'to_id TEXT,'
                        'message BYTEA,'
                        'message1 BYTEA,'
-                       'file TEXT)')
+                       'file TEXT,'
+                       'read INTEGER)')
         connect.commit()
         cursor.close()
         connect.close()
@@ -514,7 +515,7 @@ def send_message():
         date = datetime.utcnow().strftime('%y-%m-%d %H:%M:%S')
         cursor.execute(
             "INSERT INTO messages VALUES (to_timestamp('{0}', 'dd-mm-yy hh24:mi:ss'), '{1}', '{2}', {3}, {4},"
-            "'-')".format(date, user_id, to_id, encrypt_msg, encrypt_msg1))
+            "'-', 0)".format(date, user_id, to_id, encrypt_msg, encrypt_msg1))
         entry_msg.delete(0, tk.END)
         connect.commit()
         cursor.close()
@@ -545,7 +546,7 @@ def send_doc():
         encrypt_msg = encrypt('՗'.encode('utf-8'), res)
         date = datetime.utcnow().strftime('%d/%m/%y %H:%M:%S')
         cursor.execute("INSERT INTO messages VALUES (to_timestamp('{0}', 'yy-mm-dd hh24:mi:ss'), '{1}', '{2}', "
-                       "{3}, {3}, '{4}')".format(date, user_id, current_chat, encrypt_msg, link))
+                       "{3}, {3}, '{4}', 0)".format(date, user_id, current_chat, encrypt_msg, link))
         connect.commit()
         cursor.close()
         connect.close()
@@ -567,6 +568,9 @@ def get_message():
         cursor.execute("SELECT * FROM messages WHERE to_id='{1}' AND from_id='{0}' AND NOT from_id LIKE 'g%' "
                        "ORDER BY date".format(user_id, current_chat))
         res += cursor.fetchall()
+        cursor.execute("UPDATE messages SET read=1 WHERE to_id='{0}' AND from_id LIKE '{1}' AND read=0".
+                       format(user_id, current_chat))
+        connect.commit()
         res.sort()
         canvas.delete("all")
         for i in res:
@@ -834,7 +838,7 @@ def send_chat_message():
             date = datetime.utcnow().strftime('%d/%m/%y %H:%M:%S')
             cursor.execute(
                 "INSERT INTO messages VALUES (to_timestamp('{0}', 'yy-mm-dd hh24:mi:ss'), '{1}', '{2}', {3}, {3},"
-                "'-')".format(date, current_chat + '_' + str(user_id),  i[0], encrypt_msg))
+                "'-', 0)".format(date, current_chat + '_' + str(user_id),  i[0], encrypt_msg))
             entry_msg2.delete(0, tk.END)
         connect.commit()
         cursor.close()
@@ -871,7 +875,7 @@ def send_chat_doc():
             date = datetime.utcnow().strftime('%d/%m/%y %H:%M:%S')
             cursor.execute(
                 "INSERT INTO messages VALUES (to_timestamp('{0}', 'yy-mm-dd hh24:mi:ss'), '{1}', '{2}', {3}, {3},"
-                "'{4}')".format(date, current_chat + '_' + str(user_id), i[0], encrypt_msg, link))
+                "'{4}', 0)".format(date, current_chat + '_' + str(user_id), i[0], encrypt_msg, link))
         connect.commit()
         cursor.close()
         os.remove(path)
@@ -890,6 +894,9 @@ def get_chat_message():
         cursor.execute("SELECT * FROM messages WHERE to_id='{0}' AND from_id LIKE '{1}%' ORDER BY "
                        "date".format(user_id, current_chat))
         res = cursor.fetchall()
+        cursor.execute("UPDATE messages SET read=1 WHERE to_id='{0}' AND from_id LIKE '{1}%' AND read=0".
+                       format(user_id, current_chat))
+        connect.commit()
         for i in res:
             decrypt_msg = decrypt(i[3], i[4])
             nickname = get_user_nickname(i[1].split('_', 1)[1], cursor)
@@ -1102,7 +1109,19 @@ def loop_get_msg():
     while True:
         if time.time() - timing > time_to_check:
             timing = time.time()
-            print('check')
+            connect, cursor = pg_connect()
+            cursor.execute("SELECT from_id FROM messages WHERE to_id='{0}' AND read=0".format(user_id))
+            res = cursor.fetchall()
+            print(res)
+            new_msgs = []
+            temp = ''
+            for i in res:
+                if i[0] not in new_msgs:
+                    new_msgs.append(i[0])
+            for i in new_msgs:
+                temp += i + ', '
+            if temp != '':
+                messagebox.showinfo('New messages!', 'You have new messages in chats: ' + temp[:-2])
             if current_chat != '-1':
                 if current_chat[0] != 'g':
                     get_message()
