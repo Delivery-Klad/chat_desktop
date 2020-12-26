@@ -78,7 +78,11 @@ def auto_check_message():
 
 
 def debug(cursor):
+    cursor.execute("SELECT * FROM users")
+    print(cursor.fetchall())
     cursor.execute("SELECT * FROM chats")
+    print(cursor.fetchall())
+    cursor.execute("SELECT * FROM messages")
     print(cursor.fetchall())
     cursor.execute("SELECT table_name FROM information_schema.tables WHERE table_schema NOT IN ("
                    "'information_schema', 'pg_catalog') AND table_schema IN('public', 'myschema');")
@@ -337,7 +341,8 @@ def menu_navigation(menu: str):
         button_info.pack(side=TOP, pady=5, anchor=N)
         button_settings.pack(side=TOP, anchor=N)
         button_groups.pack(side=TOP, pady=5, anchor=N)
-        button_logout.pack(side=TOP, anchor=N)
+        label_fixed.pack(side=TOP, anchor=N)
+        button_logout.pack(side=TOP, pady=5, anchor=N)
         button_back.pack_forget()
         button_chat.configure(bg="#2E8B57")
         button_info.configure(bg="#A9A9A9")
@@ -377,6 +382,7 @@ def menu_navigation(menu: str):
         button_chat.pack_forget()
         button_settings.pack_forget()
         button_info.pack_forget()
+        label_fixed.pack_forget()
         button_logout.pack_forget()
         button_groups.pack_forget()
         main_frame.pack_forget()
@@ -1104,6 +1110,28 @@ def open_chat():
     connect.close()
 
 
+def pin_chat():
+    try:
+        pass
+    except Exception as e:
+        print(e)
+
+
+def get_pin_chats():
+    try:
+        pin1 = keyring.get_password('datachat', 'pin1')
+        if pin1 is None:
+            return
+        pin2 = keyring.get_password('datachat', 'pin2')
+        if pin2 is None:
+            return
+        pin3 = keyring.get_password('datachat', 'pin3')
+        if pin3 is None:
+            return
+    except Exception as e:
+        print(e)
+
+
 def OnMouseWheel(event):
     canvas.yview("scroll", event.delta, "units")
     return "break"
@@ -1211,9 +1239,12 @@ button_settings = tk.Button(menu_frame, text="SETTINGS", bg='#A9A9A9', width=17,
 button_settings.pack(side=TOP, anchor=N)
 button_groups = tk.Button(menu_frame, text="GROUPS", bg='#A9A9A9', width=17, command=lambda: menu_navigation("group"))
 button_groups.pack(side=TOP, pady=5, anchor=N)
-button_logout = tk.Button(menu_frame, text="LOGOUT", bg='#A9A9A9', width=17, command=lambda: logout())
-button_logout.pack(side=TOP, anchor=N)
-button_back = tk.Button(menu_frame, text="BACK", bg='#A9A9A9', width=17, command=lambda: menu_navigation("chat"))
+label_fixed = tk.Label(menu_frame, font=10, text="Закреплено", fg="black")
+label_fixed.pack(side=TOP, anchor=N)
+get_pin_chats()
+button_logout = tk.Button(menu_frame, text="LOGOUT", bg='#B22222', width=17, command=lambda: logout())
+button_logout.pack(side=BOTTOM, pady=5, anchor=N)
+button_back = tk.Button(menu_frame, text="BACK", bg='#B22222', width=17, command=lambda: menu_navigation("chat"))
 main2_frame = LabelFrame(main_frame, width=600, height=350, relief=FLAT)
 main2_frame.pack(side=TOP, anchor=CENTER)
 main2_frame2 = LabelFrame(group_frame, width=600, height=350, relief=FLAT)
@@ -1301,6 +1332,15 @@ entry_chat = tk.Entry(settings_frame7, font=12, width=20, fg="black")
 entry_chat.pack(side=LEFT, padx=170, anchor=CENTER)
 button_c_chat = tk.Button(settings_frame7, text="CREATE", bg='#2E8B57', width=15, command=lambda: create_chat())
 button_c_chat.pack(side=RIGHT, anchor=E)
+
+settings_frame11 = LabelFrame(settings_frame, width=600, height=25, relief=FLAT)
+settings_frame11.pack(side=TOP, pady=2, anchor=N)
+label_pin = tk.Label(settings_frame11, font=10, text="  Pin chat:", fg="black", width=18, anchor=W)
+label_pin.pack(side=LEFT, anchor=W)
+entry_pin = tk.Entry(settings_frame11, font=12, width=20, fg="black")
+entry_pin.pack(side=LEFT, padx=170, anchor=CENTER)
+button_pin = tk.Button(settings_frame11, text="PIN", bg='#2E8B57', width=15, command=lambda: pin_chat())
+button_pin.pack(side=RIGHT, anchor=E)
 
 settings_frame8 = LabelFrame(settings_frame, width=600, height=25, relief=FLAT)
 settings_frame8.pack(side=TOP, pady=2, anchor=N)
