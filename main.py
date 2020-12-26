@@ -26,6 +26,7 @@ y = yadisk.YaDisk(token="AgAAAABITC7sAAbGEG8sF3E00UCxjTQXUS5Vu28")
 
 code = None
 chats = {}
+pin_chats = []
 current_chat = "-1"
 root = tk.Tk()
 spacing, spacing_2 = 0, 0
@@ -333,7 +334,7 @@ def hide_auth_menu():
 
 
 def menu_navigation(menu: str):
-    global current_chat, chats, spacing, spacing_2, checker, private_key, user_id
+    global current_chat, chats, spacing, spacing_2, checker, private_key, user_id, pin_chats
     if menu == "chat":
         for key in chats:
             chats[key].pack_forget()
@@ -342,6 +343,11 @@ def menu_navigation(menu: str):
         button_settings.pack(side=TOP, anchor=N)
         button_groups.pack(side=TOP, pady=5, anchor=N)
         label_fixed.pack(side=TOP, anchor=N)
+        for i in range(len(pin_chats)):
+            if i % 2 == 0:
+                pin_chats[i].pack(side=TOP, pady=5, anchor=N)
+            else:
+                pin_chats[i].pack(side=TOP, anchor=N)
         button_logout.pack(side=TOP, pady=5, anchor=N)
         button_back.pack_forget()
         button_chat.configure(bg="#2E8B57")
@@ -383,6 +389,8 @@ def menu_navigation(menu: str):
         button_settings.pack_forget()
         button_info.pack_forget()
         label_fixed.pack_forget()
+        for i in pin_chats:
+            i.pack_forget()
         button_logout.pack_forget()
         button_groups.pack_forget()
         main_frame.pack_forget()
@@ -1083,10 +1091,10 @@ def pass_code():
         exception_handler(e, connect, cursor)
 
 
-def open_chat():
+def open_chat(chat_id):
     global current_chat
     root.update()
-    chat = entry_chat_id.get()
+    chat = chat_id
     connect, cursor = pg_connect()
     if len(chat) == 0 or not chat.isnumeric():
         messagebox.showerror('Input error', 'Chat id must be a number')
@@ -1111,23 +1119,58 @@ def open_chat():
 
 
 def pin_chat():
+    connect, cursor = pg_connect()
     try:
-        pass
-    except Exception as e:
-        print(e)
-
-
-def get_pin_chats():
-    try:
+        user = entry_pin.get()
+        if len(user) == 0:
+            messagebox.showerror('Input error', 'Empty input')
+            return
+        name = get_user_nickname(user, cursor)
+        info = user + ' ' + name
         pin1 = keyring.get_password('datachat', 'pin1')
         if pin1 is None:
+            keyring.set_password('datachat', 'pin1', info)
             return
         pin2 = keyring.get_password('datachat', 'pin2')
         if pin2 is None:
+            keyring.set_password('datachat', 'pin2', info)
             return
         pin3 = keyring.get_password('datachat', 'pin3')
         if pin3 is None:
+            keyring.set_password('datachat', 'pin3', info)
             return
+        messagebox.showerror('Pin error', 'Pin limit')
+        cursor.close()
+        connect.close()
+    except Exception as e:
+        exception_handler(e, connect, cursor)
+
+
+def get_pin_chats():
+    global pin_chats
+    try:
+        pin1 = keyring.get_password('datachat', 'pin1')
+        if pin1 is None:
+            label_fixed.pack_forget()
+            return
+        pin1 = pin1.split()
+        button_pin1 = tk.Button(menu_frame, text=pin1[1], bg='#A9A9A9', width=17, command=lambda: open_chat(pin1[0]))
+        button_pin1.pack(side=TOP, pady=5, anchor=N)
+        pin_chats.append(button_pin1)
+        pin2 = keyring.get_password('datachat', 'pin2')
+        if pin2 is None:
+            return
+        pin2 = pin2.split()
+        button_pin2 = tk.Button(menu_frame, text=pin2[1], bg='#A9A9A9', width=17, command=lambda: open_chat(pin2[0]))
+        button_pin2.pack(side=TOP, anchor=N)
+        pin_chats.append(button_pin2)
+        pin3 = keyring.get_password('datachat', 'pin3')
+        if pin3 is None:
+            return
+        pin3 = pin3.split()
+        button_pin3 = tk.Button(menu_frame, text=pin3[1], bg='#A9A9A9', width=17, command=lambda: open_chat(pin3[0]))
+        button_pin3.pack(side=TOP, pady=5, anchor=N)
+        pin_chats.append(button_pin3)
     except Exception as e:
         print(e)
 
@@ -1257,7 +1300,7 @@ label_chat_id = tk.Label(chat_frame, font=10, text="Current chat with: ", fg="bl
 label_chat_id.pack(side=LEFT, anchor=W)
 entry_chat_id = tk.Entry(chat_frame, font=12, width=20, fg="black")
 entry_chat_id.pack(side=LEFT, padx=165, anchor=CENTER)
-button_chat_id = tk.Button(chat_frame, text="OPEN", bg='#2E8B57', width=15, command=lambda: open_chat())
+button_chat_id = tk.Button(chat_frame, text="OPEN", bg='#2E8B57', width=15, command=lambda: open_chat(entry_chat_id.get()))
 button_chat_id.pack(side=RIGHT, anchor=E)
 
 frame = Frame(main2_frame, width=850, height=450)
