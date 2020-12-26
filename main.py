@@ -342,12 +342,15 @@ def menu_navigation(menu: str):
         button_info.pack(side=TOP, pady=5, anchor=N)
         button_settings.pack(side=TOP, anchor=N)
         button_groups.pack(side=TOP, pady=5, anchor=N)
-        label_fixed.pack(side=TOP, anchor=N)
-        for i in range(len(pin_chats)):
-            if i % 2 == 0:
-                pin_chats[i].pack(side=TOP, pady=5, anchor=N)
-            else:
-                pin_chats[i].pack(side=TOP, anchor=N)
+        if len(pin_chats) != 0:
+            label_line1.pack(side=TOP, anchor=N)
+            label_fixed.pack(side=TOP, anchor=N)
+            for i in range(len(pin_chats)):
+                if i % 2 == 0:
+                    pin_chats[i].pack(side=TOP, pady=5, anchor=N)
+                else:
+                    pin_chats[i].pack(side=TOP, anchor=N)
+            label_line2.pack(side=TOP, anchor=N)
         button_logout.pack(side=TOP, pady=5, anchor=N)
         button_back.pack_forget()
         button_chat.configure(bg="#2E8B57")
@@ -389,6 +392,8 @@ def menu_navigation(menu: str):
         button_settings.pack_forget()
         button_info.pack_forget()
         label_fixed.pack_forget()
+        label_line1.pack_forget()
+        label_line2.pack_forget()
         for i in pin_chats:
             i.pack_forget()
         button_logout.pack_forget()
@@ -1152,23 +1157,28 @@ def get_pin_chats():
         pin1 = keyring.get_password('datachat', 'pin1')
         if pin1 is None:
             label_fixed.pack_forget()
+            label_line1.pack_forget()
+            label_line2.pack_forget()
             return
         pin1 = pin1.split()
-        button_pin1 = tk.Button(menu_frame, text=pin1[1], bg='#A9A9A9', width=17, command=lambda: open_chat(pin1[0]))
+        button_pin1 = tk.Button(menu_frame, text=pin1[1], bg='#A9A9A9', width=17, command=lambda:
+        (menu_navigation("chat"), open_chat(pin1[0])))
         button_pin1.pack(side=TOP, pady=5, anchor=N)
         pin_chats.append(button_pin1)
         pin2 = keyring.get_password('datachat', 'pin2')
         if pin2 is None:
             return
         pin2 = pin2.split()
-        button_pin2 = tk.Button(menu_frame, text=pin2[1], bg='#A9A9A9', width=17, command=lambda: open_chat(pin2[0]))
+        button_pin2 = tk.Button(menu_frame, text=pin2[1], bg='#A9A9A9', width=17, command=lambda:
+        (menu_navigation("chat"), open_chat(pin2[0])))
         button_pin2.pack(side=TOP, anchor=N)
         pin_chats.append(button_pin2)
         pin3 = keyring.get_password('datachat', 'pin3')
         if pin3 is None:
             return
         pin3 = pin3.split()
-        button_pin3 = tk.Button(menu_frame, text=pin3[1], bg='#A9A9A9', width=17, command=lambda: open_chat(pin3[0]))
+        button_pin3 = tk.Button(menu_frame, text=pin3[1], bg='#A9A9A9', width=17, command=lambda:
+        (menu_navigation("chat"), open_chat(pin3[0])))
         button_pin3.pack(side=TOP, pady=5, anchor=N)
         pin_chats.append(button_pin3)
     except Exception as e:
@@ -1189,6 +1199,9 @@ def auto_check():
         time_to_check = 60
         label_check2.configure(text='1 Min')
     elif time_to_check == 60:
+        time_to_check = -1
+        label_check2.configure(text='Never')
+    elif time_to_check == -1:
         time_to_check = 30
         label_check2.configure(text='30 Sec')
     keyring.set_password('datachat', 'update', time_to_check)
@@ -1198,26 +1211,27 @@ def loop_get_msg():
     global time_to_check
     timing = time.time()
     while True:
-        if time.time() - timing > time_to_check:
-            timing = time.time()
-            connect, cursor = pg_connect()
-            cursor.execute("SELECT from_id FROM messages WHERE to_id='{0}' AND read=0".format(user_id))
-            res = cursor.fetchall()
-            print(res)
-            new_msgs = []
-            temp = ''
-            for i in res:
-                if i[0] not in new_msgs:
-                    new_msgs.append(i[0])
-            for i in new_msgs:
-                temp += i + ', '
-            if temp != '':
-                messagebox.showinfo('New messages!', 'You have new messages in chats: ' + temp[:-2])
-            if current_chat != '-1':
-                if current_chat[0] != 'g':
-                    get_message()
-                elif current_chat[0] == 'g':
-                    get_chat_message()
+        if time_to_check > 0:
+            if time.time() - timing > time_to_check:
+                timing = time.time()
+                connect, cursor = pg_connect()
+                cursor.execute("SELECT from_id FROM messages WHERE to_id='{0}' AND read=0".format(user_id))
+                res = cursor.fetchall()
+                print(res)
+                new_msgs = []
+                temp = ''
+                for i in res:
+                    if i[0] not in new_msgs:
+                        new_msgs.append(i[0])
+                for i in new_msgs:
+                    temp += i + ', '
+                if temp != '':
+                    messagebox.showinfo('New messages!', 'You have new messages in chats: ' + temp[:-2])
+                if current_chat != '-1':
+                    if current_chat[0] != 'g':
+                        get_message()
+                    elif current_chat[0] == 'g':
+                        get_chat_message()
 
 
 create_tables()
@@ -1282,9 +1296,13 @@ button_settings = tk.Button(menu_frame, text="SETTINGS", bg='#A9A9A9', width=17,
 button_settings.pack(side=TOP, anchor=N)
 button_groups = tk.Button(menu_frame, text="GROUPS", bg='#A9A9A9', width=17, command=lambda: menu_navigation("group"))
 button_groups.pack(side=TOP, pady=5, anchor=N)
+label_line1 = tk.Label(menu_frame, font=16, text="-------------------------", fg="black")
+label_line1.pack(side=TOP, anchor=N)
 label_fixed = tk.Label(menu_frame, font=10, text="Закреплено", fg="black")
 label_fixed.pack(side=TOP, anchor=N)
 get_pin_chats()
+label_line2 = tk.Label(menu_frame, font=16, text="-------------------------", fg="black")
+label_line2.pack(side=TOP, anchor=N)
 button_logout = tk.Button(menu_frame, text="LOGOUT", bg='#B22222', width=17, command=lambda: logout())
 button_logout.pack(side=BOTTOM, pady=5, anchor=N)
 button_back = tk.Button(menu_frame, text="BACK", bg='#B22222', width=17, command=lambda: menu_navigation("chat"))
