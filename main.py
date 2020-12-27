@@ -36,8 +36,6 @@ user_id, email, user_login = '', '', ''
 var = IntVar()
 private_key = rsa.PrivateKey(1, 2, 3, 4, 5)
 files_dir = 'files'
-auto_fill_data_file = files_dir + '/rem.rm'
-private_key_file = files_dir + '/priv_key.PEM'
 time_to_check = 60.0
 dt = datetime.now(timezone.utc).astimezone()
 utc_diff = dt.utcoffset()
@@ -697,8 +695,7 @@ def keys_generation():
     try:
         (pubkey, privkey) = rsa.newkeys(1024)
         pubkey = str(pubkey)[10:-1]
-        with open(private_key_file, 'w') as file:
-            file.write(privkey.save_pkcs1().decode('ascii'))
+        keyring.set_password('datachat', 'private_key', privkey.save_pkcs1().decode('ascii'))
         private_key = privkey
         return pubkey
     except Exception as e:
@@ -708,9 +705,7 @@ def keys_generation():
 def get_private_key():
     try:
         global private_key
-        with open(private_key_file, 'rb') as file:
-            data = file.read()
-        private_key = rsa.PrivateKey.load_pkcs1(data)
+        private_key = rsa.PrivateKey.load_pkcs1(keyring.get_password('datachat', 'private_key'))
     except FileNotFoundError:
         pass
 
@@ -1151,6 +1146,29 @@ def pin_chat():
         exception_handler(e, connect, cursor)
 
 
+def unpin_chat(chat, frame):
+    try:
+        pin_chats.remove(frame)
+        messagebox.showerror('В разработке', 'кнопка имеет неполный функционал')
+        frame.pack_forget()
+    except Exception as e:
+        print(e)
+
+
+def pin_constructor(text, chat):
+    try:
+        local_frame = tk.LabelFrame(menu_frame, width=150, height=50, relief=FLAT)
+        button1 = tk.Button(local_frame, text=text, bg='#A9A9A9', width=13, command=lambda:
+        (menu_navigation("chat"), open_chat(chat)))
+        button2 = tk.Button(local_frame, text='-', bg='#B00000', width=2, command=lambda: unpin_chat(chat, local_frame))
+        button1.pack(side=LEFT, anchor=N)
+        button2.pack(side=LEFT, anchor=N, padx=3)
+        local_frame.pack(side=TOP, pady=1, anchor=N)
+        pin_chats.append(local_frame)
+    except Exception as e:
+        print(e)
+
+
 def get_pin_chats():
     global pin_chats
     try:
@@ -1161,26 +1179,17 @@ def get_pin_chats():
             label_line2.pack_forget()
             return
         pin1 = pin1.split()
-        button_pin1 = tk.Button(menu_frame, text=pin1[1], bg='#A9A9A9', width=17, command=lambda:
-        (menu_navigation("chat"), open_chat(pin1[0])))
-        button_pin1.pack(side=TOP, pady=5, anchor=N)
-        pin_chats.append(button_pin1)
+        pin_constructor(pin1[1], pin1[0])
         pin2 = keyring.get_password('datachat', 'pin2')
         if pin2 is None:
             return
         pin2 = pin2.split()
-        button_pin2 = tk.Button(menu_frame, text=pin2[1], bg='#A9A9A9', width=17, command=lambda:
-        (menu_navigation("chat"), open_chat(pin2[0])))
-        button_pin2.pack(side=TOP, anchor=N)
-        pin_chats.append(button_pin2)
+        pin_constructor(pin2[1], pin2[0])
         pin3 = keyring.get_password('datachat', 'pin3')
         if pin3 is None:
             return
         pin3 = pin3.split()
-        button_pin3 = tk.Button(menu_frame, text=pin3[1], bg='#A9A9A9', width=17, command=lambda:
-        (menu_navigation("chat"), open_chat(pin3[0])))
-        button_pin3.pack(side=TOP, pady=5, anchor=N)
-        pin_chats.append(button_pin3)
+        pin_constructor(pin3[1], pin3[0])
     except Exception as e:
         print(e)
 
@@ -1298,7 +1307,7 @@ button_groups = tk.Button(menu_frame, text="GROUPS", bg='#A9A9A9', width=17, com
 button_groups.pack(side=TOP, pady=5, anchor=N)
 label_line1 = tk.Label(menu_frame, font=16, text="-------------------------", fg="black")
 label_line1.pack(side=TOP, anchor=N)
-label_fixed = tk.Label(menu_frame, font=10, text="Закреплено", fg="black")
+label_fixed = tk.Label(menu_frame, font=8, text="PIN CHATS", fg="black")
 label_fixed.pack(side=TOP, anchor=N)
 get_pin_chats()
 label_line2 = tk.Label(menu_frame, font=16, text="-------------------------", fg="black")
