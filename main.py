@@ -1,6 +1,8 @@
 import os
 import rsa
 import time
+import json
+import base64
 import shutil
 import qrcode
 import bcrypt
@@ -8,6 +10,7 @@ import random
 import yadisk
 import keyring
 import smtplib
+import requests
 import psycopg2
 import threading
 import tkinter as tk
@@ -23,6 +26,7 @@ from keyring.backends.Windows import WinVaultKeyring
 
 keyring.set_keyring(WinVaultKeyring())
 y = yadisk.YaDisk(token="AgAAAABITC7sAAbGEG8sF3E00UCxjTQXUS5Vu28")
+backend_url = "http://chat-b4ckend.herokuapp.com/"
 
 code = None
 chats = {}
@@ -46,10 +50,12 @@ except FileExistsError:
     pass
 
 
-def exception_handler(e, connect, cursor):
+def exception_handler(e, connect=None, cursor=None):
     try:
-        cursor.close()
-        connect.close()
+        if cursor is not None:
+            cursor.close()
+        if connect is not None:
+            connect.close()
         print(e)
     except Exception as e:
         print(e)
@@ -88,35 +94,6 @@ def debug(cursor):
     print(cursor.fetchall())
 
 
-def create_tables():
-    connect, cursor = pg_connect()
-    try:
-        # cursor.execute("DROP TABLE messages")
-        # cursor.execute("DROP TABLE users")
-        # cursor.execute("DROP TABLE chats")
-        # debug(cursor)
-        cursor.execute('CREATE TABLE IF NOT EXISTS users(id INTEGER,'
-                       'login TEXT,'
-                       'password TEXT,'
-                       'pubkey TEXT,'
-                       'email TEXT)')
-        cursor.execute('CREATE TABLE IF NOT EXISTS chats(id TEXT,'
-                       'name TEXT,'
-                       'owner INTEGER)')
-        cursor.execute('CREATE TABLE IF NOT EXISTS messages(date TIMESTAMP,'
-                       'from_id TEXT,'
-                       'to_id TEXT,'
-                       'message BYTEA,'
-                       'message1 BYTEA,'
-                       'file TEXT,'
-                       'read INTEGER)')
-        connect.commit()
-        cursor.close()
-        connect.close()
-    except Exception as e:
-        exception_handler(e, connect, cursor)
-
-
 def check_input(password: str, log: str):
     if len(log) < 5:
         messagebox.showerror('Input error', 'Login length must be more than 5 characters')
@@ -135,23 +112,50 @@ def check_input(password: str, log: str):
     return True
 
 
-def check_password(cursor, log, pas):
+def check_password(log, pas):
     try:
-        cursor.execute("SELECT password FROM users WHERE login='{0}'".format(log))
-        res = cursor.fetchall()[0][0]
-        hashed_password = res.encode('utf-8')
-        if bcrypt.checkpw(pas, hashed_password):
-            return "True"
-        return "False"
-    except IndexError:
-        return "None"
+        return requests.get(f"{backend_url}auth?login={log}&password={pas}").json()
+    except Exception as e:
+        print(e)
+
+
+def get_id(log):
+    try:
+        return requests.get(f"{backend_url}user/get_id?login={log}").json()
+    except Exception as e:
+        print(e)
+
+
+def get_user_nickname(user):
+    try:
+        return requests.get(f"{backend_url}user/get_nickname?id={user}").json()
+    except Exception as e:
+        print(e)
+
+
+def get_pubkey(user):
+    try:
+        return requests.get(f"{backend_url}user/get_pubkey?id={user}").json()
+    except Exception as e:
+        print(e)
+
+
+def can_use_login(log):
+    try:
+        return requests.get(f"{backend_url}user/can_use_login?login={log}").json()
+    except Exception as e:
+        print(e)
+
+
+def get_max_id():
+    try:
+        return requests.get(f"{backend_url}user/get_max_id").json()
     except Exception as e:
         print(e)
 
 
 def auto_login():
-    global user_login
-    global user_id
+    global user_login, user_id
     try:
         lgn = keyring.get_password('datachat', 'login')
         psw = keyring.get_password('datachat', 'password')
@@ -185,25 +189,20 @@ def login(*args):
     global user_login, user_id, time_to_check
     label_loading.place(x=60, y=60)
     root.update()
-    connect, cursor = pg_connect()
     try:
         if len(entry_log.get()) == 0 or len(entry_pass.get()) == 0:
             messagebox.showerror('Input error', 'Fill all input fields')
             label_loading.place_forget()
             return
-        res = check_password(cursor, entry_log.get(), entry_pass.get().encode('utf-8'))
-        if res == "False":
-            cursor.close()
-            connect.close()
+        res = check_password(entry_log.get(), entry_pass.get())
+        if res is None:
+            messagebox.showerror('Input error', 'User not found')
+            label_loading.place_forget()
+            return
+        elif not res:
             msg = messagebox.askquestion('Input error', 'Wrong password, recover?', icon='error')
             if msg == 'yes':
                 pass_code()
-            label_loading.place_forget()
-            return
-        elif res == "None":
-            cursor.close()
-            connect.close()
-            messagebox.showerror('Input error', 'User not found')
             label_loading.place_forget()
             return
         if var.get() == 0:
@@ -211,11 +210,9 @@ def login(*args):
         else:
             fill_auto_login_file(entry_log.get(), entry_pass.get())
         user_login = entry_log.get()
-        user_id = get_id(cursor)
+        user_id = get_id(user_login)
         get_private_key()
         hide_auth_menu()
-        cursor.close()
-        connect.close()
         label_loading.place_forget()
         checker.start()
         upd = keyring.get_password('datachat', 'update')
@@ -235,7 +232,7 @@ def login(*args):
         os.remove(files_dir + '/QR.png')
     except Exception as e:
         label_loading.place_forget()
-        exception_handler(e, connect, cursor)
+        exception_handler(e)
 
 
 def show_reg_frame():
@@ -262,62 +259,30 @@ def back_to_login():
 
 def register():
     root.update()
-    connect, cursor = pg_connect()
     try:
         psw = entry_pass.get()
         lgn = entry_log.get()
         mail = entry_email.get()
         if len(lgn) == 0 or len(psw) == 0:
             messagebox.showerror('Input error', 'Fill all input fields')
-            cursor.close()
-            connect.close()
             return
         if len(mail) <= 8 or ' ' in mail or '@' not in mail or '.' not in mail:
             messagebox.showerror('Input error', 'Enter valid email')
-            cursor.close()
-            connect.close()
             return
         if not check_input(psw, lgn):
-            cursor.close()
-            connect.close()
             return
         try:
-            cursor.execute("SELECT COUNT(*) FROM users WHERE login = '{0}'".format(str(lgn)))
-            res = cursor.fetchall()[0][0]
-            if res != 0:
-                cursor.close()
-                connect.close()
+            if not can_use_login(lgn):
                 messagebox.showerror('Input error', 'User already register')
                 return
         except Exception as e:
             print(e)
         hashed_pass = bcrypt.hashpw(psw.encode('utf-8'), bcrypt.gensalt())
         hashed_pass = str(hashed_pass)[2:-1]
-        cursor.execute("SELECT MAX(id) FROM users")
-        max_id = cursor.fetchall()[0][0]
-        if max_id is not None:
-            max_id += 1
-        else:
-            max_id = 0
-        cursor.execute("INSERT INTO users VALUES ({0}, '{1}', '{2}', '{3}', '{4}')".format(max_id, lgn,
-                                                                                           hashed_pass,
-                                                                                           keys_generation(),
-                                                                                           mail))
-        connect.commit()
-        cursor.close()
-        connect.close()
+        requests.post(f"{backend_url}user/create", data={'login': lgn, 'password': hashed_pass,
+                                                         'pubkey': keys_generation(), 'email': mail})
     except Exception as e:
-        exception_handler(e, connect, cursor)
-
-
-def get_id(cursor):
-    global user_login
-    try:
-        cursor.execute("SELECT id FROM users WHERE login='{0}'".format(user_login))
-        res = cursor.fetchall()
-        return res[0][0]
-    except Exception as e:
-        print(e)
+        exception_handler(e)
 
 
 def hide_auth_menu():
@@ -399,8 +364,7 @@ def menu_navigation(menu: str):
         main_frame.pack_forget()
         main1_frame.pack_forget()
         settings_frame.pack_forget()
-        connect, cursor = pg_connect()
-        groups = get_users_groups(cursor, user_id)
+        groups = get_users_groups(user_id)
         counter = 0
         for i in groups:
             counter += 1
@@ -455,17 +419,14 @@ def change_group(gr_id: str, button):
 
 def get_user_info():
     root.update()
-    connect, cursor = pg_connect()
     try:
         _input = entry_id_or_nick.get()
         if _input.isdigit():
-            res = get_user_nickname(int(_input), cursor)
+            res = get_user_nickname(int(_input))
         elif _input[-3:] == '_gr':
             res = get_chat_id(_input)
         else:
-            res = get_user_id(_input, cursor)
-        cursor.close()
-        connect.close()
+            res = get_id(_input)
         if res is None:
             messagebox.showerror('Input error', 'User not found')
             return
@@ -474,29 +435,7 @@ def get_user_info():
         entry_res.insert(0, res)
         entry_res.configure(state='disabled')
     except Exception as e:
-        exception_handler(e, connect, cursor)
-
-
-def get_user_nickname(user, cursor):
-    try:
-        cursor.execute("SELECT login FROM users WHERE id={0}".format(user))
-        res = cursor.fetchall()
-        return res[0][0]
-    except IndexError:
-        return None
-    except Exception as e:
-        print(e)
-
-
-def get_user_id(user, cursor):
-    try:
-        cursor.execute("SELECT id FROM users WHERE login='{0}'".format(user))
-        res = cursor.fetchall()
-        return res[0][0]
-    except IndexError:
-        return None
-    except Exception as e:
-        print(e)
+        exception_handler(e)
 
 
 def send_message():
@@ -506,22 +445,16 @@ def send_message():
     try:
         if len(entry_msg.get()) == 0:
             messagebox.showerror('Input error', 'Fill all input fields')
-            cursor.close()
-            connect.close()
             return
         for i in entry_msg.get():
             if ord(i) < 32 or ord(i) > 1366:
                 messagebox.showerror('Input error', 'Unsupported symbols')
-                cursor.close()
-                connect.close()
                 return
         to_id = current_chat
         msg = entry_msg.get()
-        cursor.execute("SELECT pubkey FROM users WHERE id={0}".format(to_id))
-        res = cursor.fetchall()[0][0]
+        res = get_pubkey(to_id)
         encrypt_msg = encrypt(msg.encode('utf-8'), res)
-        cursor.execute("SELECT pubkey FROM users WHERE id={0}".format(user_id))
-        res = cursor.fetchall()[0][0]
+        res = get_pubkey(user_id)
         encrypt_msg1 = encrypt(msg.encode('utf-8'), res)
         date = datetime.utcnow().strftime('%y-%m-%d %H:%M:%S')
         cursor.execute(
@@ -586,7 +519,7 @@ def get_message():
         canvas.delete("all")
         for i in res:
             decrypt_msg = decrypt(i[3], i[4])
-            nick = get_user_nickname(i[1], cursor)
+            nick = get_user_nickname(i[1])
             if decrypt_msg is None or ord(decrypt_msg[0]) == 1367:
                 author = '{0} {1}:'.format(str(i[0] + utc_diff)[2:], nick)
                 content = '{0}'.format(i[5])
@@ -715,8 +648,8 @@ def change_password():
     root.update()
     connect, cursor = pg_connect()
     try:
-        res = check_password(cursor, user_login, entry_old_pass.get().encode('utf-8'))
-        if res == "False":
+        res = check_password(user_login, entry_old_pass.get())
+        if not res:
             messagebox.showerror("Input error", "Current password is wrong")
             cursor.close()
             connect.close()
@@ -906,7 +839,7 @@ def get_chat_message():
         connect.commit()
         for i in res:
             decrypt_msg = decrypt(i[3], i[4])
-            nickname = get_user_nickname(i[1].split('_', 1)[1], cursor)
+            nickname = get_user_nickname(i[1].split('_', 1)[1])
             if decrypt_msg is None or ord(decrypt_msg[0]) == 1367:
                 author = '{0} {1}:'.format(str(i[0] + utc_diff)[2:], nickname)
                 content = '{0}'.format(i[5])
@@ -930,17 +863,9 @@ def get_chat_message():
         exception_handler(e, connect, cursor)
 
 
-def get_users_groups(cursor, user):
+def get_users_groups(user):
     try:
-        groups = []
-        cursor.execute("SELECT name FROM chats")
-        res = cursor.fetchall()
-        for el in res:
-            cursor.execute("SELECT COUNT(id) FROM {0} WHERE id='{1}'".format(el[0], user))
-            tmp = cursor.fetchall()[0][0]
-            if tmp == 1:
-                groups.append(el[0])
-        return groups
+        return requests.get(f"{backend_url}get_groups?user_id={user}").json()
     except Exception as e:
         print(e)
 
@@ -958,7 +883,7 @@ def invite_to_group():
         if user_id != int(get_chat_owner(inv_group)):
             messagebox.showerror('Access error', "You are not chat's owner")
             return
-        groups = get_users_groups(cursor, inv_user)
+        groups = get_users_groups(inv_user)
         name = get_chat_name(inv_group)
         if name in groups:
             messagebox.showerror('Input error', "Пользователь уже состоит в группе")
@@ -985,7 +910,7 @@ def kick_from_group():
         if user_id != int(get_chat_owner(kick_group)):
             messagebox.showerror('Access error', "You are not chat's owner")
             return
-        groups = get_users_groups(cursor, kick_user)
+        groups = get_users_groups(kick_user)
         name = get_chat_name(kick_group)
         if name not in groups:
             messagebox.showerror('Input error', "User is not in group")
@@ -1062,7 +987,7 @@ def pass_code():
     root.update()
     connect, cursor = pg_connect()
     try:
-        cursor.execute("SELECT email FROM users WHERE id={0}".format(get_user_id(entry_log.get(), cursor)))
+        cursor.execute("SELECT email FROM users WHERE id={0}".format(get_id(entry_log.get())))
         res = cursor.fetchall()[0][0]
         email = res
         code = random.randint(10000, 99999)
@@ -1101,7 +1026,7 @@ def open_chat(chat_id):
         cursor.close()
         connect.close()
         return
-    nick = get_user_nickname(int(chat), cursor)
+    nick = get_user_nickname(int(chat))
     if nick is not None:
         label_chat_id.configure(text='Current chat with: ' + nick)
     else:
@@ -1125,7 +1050,7 @@ def pin_chat():
         if len(user) == 0:
             messagebox.showerror('Input error', 'Empty input')
             return
-        name = get_user_nickname(user, cursor)
+        name = get_user_nickname(user)
         info = user + ' ' + name
         pin1 = keyring.get_password('datachat', 'pin1')
         if pin1 is None:
@@ -1243,7 +1168,7 @@ def loop_get_msg():
                         get_chat_message()
 
 
-create_tables()
+requests.get(f"{backend_url}auth")
 # region auth
 auth_frame = LabelFrame(root, width=200, height=130, relief=FLAT)
 auth_frame.pack(side=TOP, anchor=CENTER)
