@@ -22,6 +22,7 @@ from tkinter import filedialog
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from keyring.backends.Windows import WinVaultKeyring
+
 # from keyring.backends.OS_X import Keyring
 
 keyring.set_keyring(WinVaultKeyring())
@@ -36,7 +37,7 @@ root = tk.Tk()
 spacing, spacing_2 = 0, 0
 w = root.winfo_screenwidth() // 2 - 140
 h = root.winfo_screenheight() // 2 - 100
-user_id, email, user_login = '', '', ''
+user_id, email, user_login, user_password = '', '', '', ''
 var = IntVar()
 private_key = rsa.PrivateKey(1, 2, 3, 4, 5)
 files_dir = 'files'
@@ -154,6 +155,55 @@ def get_max_id():
         print(e)
 
 
+def regenerate_keys():
+    root.update()
+    global user_id, user_login, user_password
+    try:
+        if requests.put(f"{backend_url}user/update_pubkey", json={'login': user_login, 'password': user_password,
+                                                                  'pubkey': keys_generation(),
+                                                                  'user_id': user_id}).json():
+            messagebox.showinfo("Success", "Regeneration successful!")
+        else:
+            messagebox.showerror("Failed", "Regeneration failed!")
+    except Exception as e:
+        exception_handler(e)
+
+
+def get_chat_id(name: str):
+    try:
+        return requests.get(f"{backend_url}chat/get_id?name={name}").json()
+    except Exception as e:
+        exception_handler(e)
+
+
+def get_chat_name(group_id: str):
+    try:
+        return requests.get(f"{backend_url}chat/get_name?group_id={group_id}").json()
+    except Exception as e:
+        exception_handler(e)
+
+
+def get_max_chat_id():
+    try:
+        return requests.get(f"{backend_url}chat/get_max_id").json()
+    except Exception as e:
+        exception_handler(e)
+
+
+def get_chat_owner(group_id: str):
+    try:
+        return requests.get(f"{backend_url}chat/get_owner?group_id={group_id}").json()
+    except Exception as e:
+        exception_handler(e)
+
+
+def get_users_groups(user):
+    try:
+        return requests.get(f"{backend_url}get_groups?user_id={user}").json()
+    except Exception as e:
+        print(e)
+
+
 def auto_login():
     global user_login, user_id
     try:
@@ -186,7 +236,7 @@ def fill_auto_login_file(lgn, psw):
 
 
 def login(*args):
-    global user_login, user_id, time_to_check
+    global user_login, user_id, time_to_check, user_password
     label_loading.place(x=60, y=60)
     root.update()
     try:
@@ -195,6 +245,7 @@ def login(*args):
             label_loading.place_forget()
             return
         res = check_password(entry_log.get(), entry_pass.get())
+        user_password = entry_pass.get()
         if res is None:
             messagebox.showerror('Input error', 'User not found')
             label_loading.place_forget()
@@ -279,8 +330,12 @@ def register():
             print(e)
         hashed_pass = bcrypt.hashpw(psw.encode('utf-8'), bcrypt.gensalt())
         hashed_pass = str(hashed_pass)[2:-1]
-        requests.post(f"{backend_url}user/create", data={'login': lgn, 'password': hashed_pass,
-                                                         'pubkey': keys_generation(), 'email': mail})
+        res = requests.post(f"{backend_url}user/create", json={'login': lgn, 'password': hashed_pass,
+                                                               'pubkey': keys_generation(), 'email': mail}).json()
+        if res:
+            messagebox.showinfo("Success", "Register success!")
+        else:
+            messagebox.showerror("Failed", "Register failed!")
     except Exception as e:
         exception_handler(e)
 
@@ -452,10 +507,8 @@ def send_message():
                 return
         to_id = current_chat
         msg = entry_msg.get()
-        res = get_pubkey(to_id)
-        encrypt_msg = encrypt(msg.encode('utf-8'), res)
-        res = get_pubkey(user_id)
-        encrypt_msg1 = encrypt(msg.encode('utf-8'), res)
+        encrypt_msg = psycopg2.Binary(encrypt(msg.encode('utf-8'), get_pubkey(to_id)))
+        encrypt_msg1 = psycopg2.Binary(encrypt(msg.encode('utf-8'), get_pubkey(user_id)))
         date = datetime.utcnow().strftime('%y-%m-%d %H:%M:%S')
         cursor.execute(
             "INSERT INTO messages VALUES (to_timestamp('{0}', 'dd-mm-yy hh24:mi:ss'), '{1}', '{2}', {3}, {4},"
@@ -485,9 +538,7 @@ def send_doc():
         except Exception:
             pass
         link = y.get_download_link('/' + path)
-        cursor.execute("SELECT pubkey FROM users WHERE id={0}".format(current_chat))
-        res = cursor.fetchall()[0][0]
-        encrypt_msg = encrypt('՗'.encode('utf-8'), res)
+        encrypt_msg = encrypt('՗'.encode('utf-8'), get_pubkey(current_chat))
         date = datetime.utcnow().strftime('%d/%m/%y %H:%M:%S')
         cursor.execute("INSERT INTO messages VALUES (to_timestamp('{0}', 'yy-mm-dd hh24:mi:ss'), '{1}', '{2}', "
                        "{3}, {3}, '{4}', 0)".format(date, user_id, current_chat, encrypt_msg, link))
@@ -548,8 +599,7 @@ def encrypt(msg: bytes, pubkey):
         pubkey = pubkey.split(', ')
         pubkey = rsa.PublicKey(int(pubkey[0]), int(pubkey[1]))
         encrypt_message = rsa.encrypt(msg, pubkey)
-        encrypt_message = encrypt_message
-        return psycopg2.Binary(encrypt_message)
+        return encrypt_message
     except Exception as e:
         print(e)
 
@@ -610,19 +660,6 @@ def change_pass_handler(*args):
             return
 
 
-def regenerate_keys():
-    root.update()
-    global user_id
-    connect, cursor = pg_connect()
-    try:
-        cursor.execute("UPDATE users SET pubkey='{0}' WHERE id={1}".format(keys_generation(), user_id))
-        connect.commit()
-        cursor.close()
-        connect.close()
-    except Exception as e:
-        exception_handler(e, connect, cursor)
-
-
 def keys_generation():
     global private_key
     try:
@@ -641,30 +678,6 @@ def get_private_key():
         private_key = rsa.PrivateKey.load_pkcs1(keyring.get_password('datachat', 'private_key'))
     except FileNotFoundError:
         pass
-
-
-def change_password():
-    global user_login
-    root.update()
-    connect, cursor = pg_connect()
-    try:
-        res = check_password(user_login, entry_old_pass.get())
-        if not res:
-            messagebox.showerror("Input error", "Current password is wrong")
-            cursor.close()
-            connect.close()
-            return
-        if check_input(entry_new_pass.get(), entry_old_pass.get()):
-            hashed_pass = bcrypt.hashpw(entry_new_pass.get().encode('utf-8'), bcrypt.gensalt())
-            hashed_pass = str(hashed_pass)[2:-1]
-            cursor.execute("UPDATE users SET password='{0}' WHERE login='{1}'".format(hashed_pass, user_login))
-            connect.commit()
-            messagebox.showinfo("Success", "Password has been changed")
-        cursor.close()
-        connect.close()
-        fill_auto_login_file(user_login, entry_new_pass.get())
-    except Exception as e:
-        exception_handler(e, connect, cursor)
 
 
 def create_chat():
@@ -697,7 +710,7 @@ def create_chat():
             cursor.close()
             connect.close()
             return
-        max_id = get_max_chat_id(cursor) + 1
+        max_id = get_max_chat_id() + 1
         cursor.execute("INSERT INTO chats VALUES ('g{0}', '{1}', {2})".format(max_id, name, user_id))
         cursor.execute('CREATE TABLE IF NOT EXISTS {0}(id INTEGER)'.format(name))
         connect.commit()
@@ -710,50 +723,12 @@ def create_chat():
         exception_handler(e, connect, cursor)
 
 
-def get_chat_id(name: str):
-    connect, cursor = pg_connect()
-    cursor.execute("SELECT id FROM chats WHERE name='{0}'".format(name))
-    group_id = cursor.fetchall()[0][0]
-    cursor.close()
-    connect.close()
-    return group_id
-
-
-def get_chat_name(group_id: str):
-    connect, cursor = pg_connect()
-    cursor.execute("SELECT name FROM chats WHERE id='{0}'".format(group_id))
-    name = cursor.fetchall()[0][0]
-    cursor.close()
-    connect.close()
-    return name
-
-
-def get_max_chat_id(cursor):
-    cursor.execute("SELECT COUNT(*) FROM chats")
-    res = cursor.fetchall()[0]
-    res = str(res).split(',', 1)[0]
-    return int(str(res)[1:])
-
-
 def get_chat_users(name: str):
     global user_id
     connect, cursor = pg_connect()
     try:
         cursor.execute("SELECT id FROM {0}".format(name))
         return cursor.fetchall()
-    except Exception as e:
-        exception_handler(e, connect, cursor)
-
-
-def get_chat_owner(group_id: str):
-    global user_id
-    connect, cursor = pg_connect()
-    try:
-        cursor.execute("SELECT owner FROM chats WHERE id='{0}'".format(group_id))
-        res = cursor.fetchall()[0][0]
-        cursor.close()
-        connect.close()
-        return res
     except Exception as e:
         exception_handler(e, connect, cursor)
 
@@ -774,11 +749,11 @@ def send_chat_message():
         for i in users:
             cursor.execute("SELECT pubkey FROM users WHERE id={0}".format(i[0]))
             res = cursor.fetchall()[0][0]
-            encrypt_msg = encrypt(message.encode('utf-8'), res)
+            encrypt_msg = psycopg2.Binary(encrypt(message.encode('utf-8'), res))
             date = datetime.utcnow().strftime('%d/%m/%y %H:%M:%S')
             cursor.execute(
                 "INSERT INTO messages VALUES (to_timestamp('{0}', 'yy-mm-dd hh24:mi:ss'), '{1}', '{2}', {3}, {3},"
-                "'-', 0)".format(date, current_chat + '_' + str(user_id),  i[0], encrypt_msg))
+                "'-', 0)".format(date, current_chat + '_' + str(user_id), i[0], encrypt_msg))
             entry_msg2.delete(0, tk.END)
         connect.commit()
         cursor.close()
@@ -811,7 +786,7 @@ def send_chat_doc():
         for i in users:
             cursor.execute("SELECT pubkey FROM users WHERE id={0}".format(i[0]))
             res = cursor.fetchall()[0][0]
-            encrypt_msg = encrypt('՗'.encode('utf-8'), res)
+            encrypt_msg = psycopg2.Binary(encrypt('՗'.encode('utf-8'), res))
             date = datetime.utcnow().strftime('%d/%m/%y %H:%M:%S')
             cursor.execute(
                 "INSERT INTO messages VALUES (to_timestamp('{0}', 'yy-mm-dd hh24:mi:ss'), '{1}', '{2}', {3}, {3},"
@@ -863,13 +838,6 @@ def get_chat_message():
         exception_handler(e, connect, cursor)
 
 
-def get_users_groups(user):
-    try:
-        return requests.get(f"{backend_url}get_groups?user_id={user}").json()
-    except Exception as e:
-        print(e)
-
-
 def invite_to_group():
     global user_id
     root.update()
@@ -878,7 +846,6 @@ def invite_to_group():
     if len(inv_user) == 0 and len(inv_group) == 0:
         messagebox.showerror('Input error', 'Entries lenght must be more than 0 characters')
         return
-    connect, cursor = pg_connect()
     try:
         if user_id != int(get_chat_owner(inv_group)):
             messagebox.showerror('Access error', "You are not chat's owner")
@@ -888,13 +855,10 @@ def invite_to_group():
         if name in groups:
             messagebox.showerror('Input error', "Пользователь уже состоит в группе")
             return
-        cursor.execute("INSERT INTO {0} VALUES({1})".format(name, int(inv_user)))
-        connect.commit()
+        requests.post(f"{backend_url}chat/invite", json={"name": name, "user": int(inv_user)})
         messagebox.showinfo('Success', "Success")
-        cursor.close()
-        connect.close()
     except Exception as e:
-        exception_handler(e, connect, cursor)
+        exception_handler(e)
 
 
 def kick_from_group():
@@ -905,7 +869,6 @@ def kick_from_group():
     if len(kick_user) == 0 and len(kick_group) == 0:
         messagebox.showerror('Input error', 'Entries lenght must be more than 0 characters')
         return
-    connect, cursor = pg_connect()
     try:
         if user_id != int(get_chat_owner(kick_group)):
             messagebox.showerror('Access error', "You are not chat's owner")
@@ -915,13 +878,10 @@ def kick_from_group():
         if name not in groups:
             messagebox.showerror('Input error', "User is not in group")
             return
-        cursor.execute("DELETE FROM {0} WHERE id={1}".format(name, int(kick_user)))
-        connect.commit()
+        requests.post(f"{backend_url}chat/kick", json={"name": name, "user": int(kick_user)})
         messagebox.showinfo('Success', "Success")
-        cursor.close()
-        connect.close()
     except Exception as e:
-        exception_handler(e, connect, cursor)
+        exception_handler(e)
 
 
 def logout():
@@ -946,9 +906,12 @@ def recovery_menu():
 
 
 def new_pass_menu():
-    global w, h, code
+    global w, h, user_login, code
     try:
-        if not entry_code.get() == str(code):
+        code = entry_code.get()
+        res = requests.post(f"{backend_url}recovery/validate", json={"code": entry_code.get(),
+                                                                     "login": user_login}).json
+        if not res:
             messagebox.showerror('Input error', 'Incorrect code')
             return
         recovery_frame.pack_forget()
@@ -958,62 +921,69 @@ def new_pass_menu():
         print(e)
 
 
+def change_password():
+    global user_login
+    root.update()
+    try:
+        hashed_pass = bcrypt.hashpw(entry_new_pass.get().encode('utf-8'), bcrypt.gensalt())
+        hashed_pass = str(hashed_pass)[2:-1]
+        response = requests.put(f"{backend_url}user/update_password", json={"login": user_login,
+                                                                            "old_password": entry_old_pass.get(),
+                                                                            "new_password": hashed_pass}).json()
+        if response:
+            messagebox.showinfo("Success", "Password has been changed")
+            fill_auto_login_file(user_login, entry_new_pass.get())
+            return
+        elif response is None:
+            messagebox.showerror('Input error', 'User not found')
+            return
+        else:
+            messagebox.showerror("Input error", "Current password is wrong")
+    except Exception as e:
+        exception_handler(e)
+
+
 def set_new_pass():
-    global user_login, email
+    global user_login, email, code
     root.update()
     user_login = entry_log.get()
-    connect, cursor = pg_connect()
     try:
         if check_input(entry_new_p2.get(), entry_new_p.get()):
-            hashed_pass = bcrypt.hashpw(entry_new_p.get().encode('utf-8'), bcrypt.gensalt())
-            hashed_pass = str(hashed_pass)[2:-1]
-            cursor.execute("UPDATE users SET password='{0}' WHERE email='{1}'".format(hashed_pass, email))
-            connect.commit()
-            messagebox.showinfo("Success", "Password has been changed")
-            fill_auto_login_file(user_login, entry_new_p.get())
-            entry_pass.delete(0, tk.END)
-            entry_pass.insert(0, entry_new_p.get())
-            root.geometry("200x160+{}+{}".format(w, h))
-            new_pass_frame.pack_forget()
-            auth_frame.pack(side=TOP, anchor=CENTER)
-        cursor.close()
-        connect.close()
+            if entry_new_p.get() == entry_new_p2.get():
+                hashed_pass = bcrypt.hashpw(entry_new_p.get().encode('utf-8'), bcrypt.gensalt())
+                hashed_pass = str(hashed_pass)[2:-1]
+                res = requests.post(f"{backend_url}recovery/validate", json={"code": code,
+                                                                             "login": email,
+                                                                             "password": hashed_pass}).json()
+                if res:
+                    messagebox.showinfo("Success", "Password has been changed")
+                    fill_auto_login_file(user_login, entry_new_p.get())
+                    entry_pass.delete(0, tk.END)
+                    entry_pass.insert(0, entry_new_p.get())
+                    root.geometry("200x160+{}+{}".format(w, h))
+                    new_pass_frame.pack_forget()
+                    auth_frame.pack(side=TOP, anchor=CENTER)
+                else:
+                    messagebox.showerror("Success", "Password has not been changed")
     except Exception as e:
-        exception_handler(e, connect, cursor)
+        exception_handler(e)
 
 
 def pass_code():
-    global code, user_id, email
     root.update()
-    connect, cursor = pg_connect()
     try:
-        cursor.execute("SELECT email FROM users WHERE id={0}".format(get_id(entry_log.get())))
-        res = cursor.fetchall()[0][0]
-        email = res
-        code = random.randint(10000, 99999)
-        password = "d8fi2kbfpchos"
-        mail_login = "recovery.chat@mail.ru"
-        url = "smtp.mail.ru"
-        server = smtplib.SMTP_SSL(url, 465)
-        target = res
-        title = "Recovery code"
-        text = "Your code: {0}".format(code)
-        msg = MIMEMultipart()
-        msg['Subject'] = title
-        msg['From'] = mail_login
-        body = text
-        msg.attach(MIMEText(body, 'plain'))
-        try:
-            server.login(mail_login, password)
-            server.sendmail(mail_login, target, msg.as_string())
-        except Exception as e:
-            messagebox.showerror('Error', str(e))
-        messagebox.showinfo('Recovery', 'Recovery code has been sent to your email')
-        recovery_menu()
-        cursor.close()
-        connect.close()
+        res = requests.post(f"{backend_url}recovery?login={entry_log.get()}").json()
+        if res:
+            messagebox.showinfo('Recovery', 'Recovery code has been sent to your email')
+            recovery_menu()
+            return
+        elif res is None:
+            messagebox.showwarning('Recovery', 'User not found')
+            return
+        else:
+            messagebox.showerror('Recovery', 'Recovery code has not been sent')
     except Exception as e:
-        exception_handler(e, connect, cursor)
+        exception_handler(e)
 
 
 def open_chat(chat_id):
@@ -1252,7 +1222,8 @@ label_chat_id = tk.Label(chat_frame, font=10, text="Current chat with: ", fg="bl
 label_chat_id.pack(side=LEFT, anchor=W)
 entry_chat_id = tk.Entry(chat_frame, font=12, width=20, fg="black")
 entry_chat_id.pack(side=LEFT, padx=165, anchor=CENTER)
-button_chat_id = tk.Button(chat_frame, text="OPEN", bg='#2E8B57', width=15, command=lambda: open_chat(entry_chat_id.get()))
+button_chat_id = tk.Button(chat_frame, text="OPEN", bg='#2E8B57', width=15,
+                           command=lambda: open_chat(entry_chat_id.get()))
 button_chat_id.pack(side=RIGHT, anchor=E)
 
 frame = Frame(main2_frame, width=850, height=450)
