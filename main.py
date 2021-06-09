@@ -1,5 +1,6 @@
 import os
 import rsa
+from rsa.transform import int2bytes, bytes2int
 import time
 import json
 import base64
@@ -19,8 +20,6 @@ from PIL import Image
 from datetime import datetime, timezone
 from tkinter import messagebox
 from tkinter import filedialog
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 from keyring.backends.Windows import WinVaultKeyring
 
 # from keyring.backends.OS_X import Keyring
@@ -117,42 +116,42 @@ def check_password(log, pas):
     try:
         return requests.get(f"{backend_url}auth?login={log}&password={pas}").json()
     except Exception as e:
-        print(e)
+        exception_handler(e)
 
 
 def get_id(log):
     try:
         return requests.get(f"{backend_url}user/get_id?login={log}").json()
     except Exception as e:
-        print(e)
+        exception_handler(e)
 
 
 def get_user_nickname(user):
     try:
         return requests.get(f"{backend_url}user/get_nickname?id={user}").json()
     except Exception as e:
-        print(e)
+        exception_handler(e)
 
 
 def get_pubkey(user):
     try:
         return requests.get(f"{backend_url}user/get_pubkey?id={user}").json()
     except Exception as e:
-        print(e)
+        exception_handler(e)
 
 
 def can_use_login(log):
     try:
         return requests.get(f"{backend_url}user/can_use_login?login={log}").json()
     except Exception as e:
-        print(e)
+        exception_handler(e)
 
 
 def get_max_id():
     try:
         return requests.get(f"{backend_url}user/get_max_id").json()
     except Exception as e:
-        print(e)
+        exception_handler(e)
 
 
 def regenerate_keys():
@@ -183,13 +182,6 @@ def get_chat_name(group_id: str):
         exception_handler(e)
 
 
-def get_max_chat_id():
-    try:
-        return requests.get(f"{backend_url}chat/get_max_id").json()
-    except Exception as e:
-        exception_handler(e)
-
-
 def get_chat_owner(group_id: str):
     try:
         return requests.get(f"{backend_url}chat/get_owner?group_id={group_id}").json()
@@ -199,9 +191,16 @@ def get_chat_owner(group_id: str):
 
 def get_users_groups(user):
     try:
-        return requests.get(f"{backend_url}get_groups?user_id={user}").json()
+        return requests.get(f"{backend_url}user/get_groups?user_id={user}").json()
     except Exception as e:
-        print(e)
+        exception_handler(e)
+
+
+def get_chat_users(name: str):
+    try:
+        return requests.get(f"{backend_url}chat/get_users?{name}").json()
+    except Exception as e:
+        exception_handler(e)
 
 
 def auto_login():
@@ -496,7 +495,6 @@ def get_user_info():
 def send_message():
     global user_id, current_chat
     root.update()
-    connect, cursor = pg_connect()
     try:
         if len(entry_msg.get()) == 0:
             messagebox.showerror('Input error', 'Fill all input fields')
@@ -507,19 +505,16 @@ def send_message():
                 return
         to_id = current_chat
         msg = entry_msg.get()
-        encrypt_msg = psycopg2.Binary(encrypt(msg.encode('utf-8'), get_pubkey(to_id)))
-        encrypt_msg1 = psycopg2.Binary(encrypt(msg.encode('utf-8'), get_pubkey(user_id)))
+        encrypt_msg = encrypt(msg.encode('utf-8'), get_pubkey(to_id))
+        encrypt_msg1 = encrypt(msg.encode('utf-8'), get_pubkey(user_id))
         date = datetime.utcnow().strftime('%y-%m-%d %H:%M:%S')
-        cursor.execute(
-            "INSERT INTO messages VALUES (to_timestamp('{0}', 'dd-mm-yy hh24:mi:ss'), '{1}', '{2}', {3}, {4},"
-            "'-', 0)".format(date, user_id, to_id, encrypt_msg, encrypt_msg1))
+        requests.post(f"{backend_url}message/send", json={"date": date, "sender": user_id,
+                                                          "destination": to_id, "message": encrypt_msg,
+                                                          "message1": encrypt_msg1}).json()
         entry_msg.delete(0, tk.END)
-        connect.commit()
-        cursor.close()
-        connect.close()
         get_message()
     except Exception as e:
-        exception_handler(e, connect, cursor)
+        exception_handler(e)
 
 
 def send_doc():
@@ -599,7 +594,15 @@ def encrypt(msg: bytes, pubkey):
         pubkey = pubkey.split(', ')
         pubkey = rsa.PublicKey(int(pubkey[0]), int(pubkey[1]))
         encrypt_message = rsa.encrypt(msg, pubkey)
-        return encrypt_message
+        """try:
+            print(encrypt_message)
+            res = bytes2int(encrypt_message)
+            print(f"{res} {type(res)}")
+            print(int2bytes(res))
+            print("-------")
+        except Exception as e:
+            print(e)"""
+        return bytes2int(encrypt_message)
     except Exception as e:
         print(e)
 
@@ -683,84 +686,51 @@ def get_private_key():
 def create_chat():
     global user_id
     root.update()
-    connect, cursor = pg_connect()
     try:
         name = entry_chat.get()
         if len(name) < 5:
             messagebox.showerror("Input error", "Name lenght must be more than 5 characters")
-            cursor.close()
-            connect.close()
             return
         if name[-3:] != '_gr':
             messagebox.showerror("Input error", "Name must contain '_gr' in the end")
-            cursor.close()
-            connect.close()
             return
         for i in name:
             if ord(i) < 45 or ord(i) > 122:
                 messagebox.showerror('Input error', 'Unsupported symbols')
-                cursor.close()
-                connect.close()
                 return
-        cursor.execute("SELECT table_name FROM information_schema.tables WHERE table_schema NOT IN ("
-                       "'information_schema', 'pg_catalog') AND table_schema IN('public', 'myschema');")
-        res = cursor.fetchall()
-        if ('{0}'.format(name),) in res:
-            messagebox.showerror('Name error', 'Name exists')
-            cursor.close()
-            connect.close()
+        res = requests.post(f"{backend_url}chat/create", json={"name": name, "owner": user_id})
+        if res:
+            messagebox.showinfo('Success', 'Chat created')
             return
-        max_id = get_max_chat_id() + 1
-        cursor.execute("INSERT INTO chats VALUES ('g{0}', '{1}', {2})".format(max_id, name, user_id))
-        cursor.execute('CREATE TABLE IF NOT EXISTS {0}(id INTEGER)'.format(name))
-        connect.commit()
-        cursor.execute("INSERT INTO {0} VALUES({1})".format(name, user_id))
-        connect.commit()
-        messagebox.showinfo('Success', 'Chat created')
-        cursor.close()
-        connect.close()
+        elif res is None:
+            messagebox.showerror('Name error', 'Name exists')
+            return
+        else:
+            messagebox.showerror('Unknown error', 'oooops!')
     except Exception as e:
-        exception_handler(e, connect, cursor)
-
-
-def get_chat_users(name: str):
-    global user_id
-    connect, cursor = pg_connect()
-    try:
-        cursor.execute("SELECT id FROM {0}".format(name))
-        return cursor.fetchall()
-    except Exception as e:
-        exception_handler(e, connect, cursor)
+        exception_handler(e)
 
 
 def send_chat_message():
     global user_id, current_chat
     root.update()
-    connect, cursor = pg_connect()
     message = entry_msg2.get()
     try:
         if len(message) == 0:
             messagebox.showerror('Input error', 'Fill all input fields')
-            cursor.close()
-            connect.close()
             return
         name = get_chat_name(current_chat)
         users = get_chat_users(name)
         for i in users:
-            cursor.execute("SELECT pubkey FROM users WHERE id={0}".format(i[0]))
-            res = cursor.fetchall()[0][0]
-            encrypt_msg = psycopg2.Binary(encrypt(message.encode('utf-8'), res))
+            encrypt_msg = encrypt(message.encode('utf-8'), get_pubkey(i[0]))
             date = datetime.utcnow().strftime('%d/%m/%y %H:%M:%S')
-            cursor.execute(
-                "INSERT INTO messages VALUES (to_timestamp('{0}', 'yy-mm-dd hh24:mi:ss'), '{1}', '{2}', {3}, {3},"
-                "'-', 0)".format(date, current_chat + '_' + str(user_id), i[0], encrypt_msg))
+            requests.post(f"{backend_url}message/send/chat", json={"date": date,
+                                                                   "sender": f"{current_chat}_{user_id}",
+                                                                   "destination": i[0], "message": encrypt_msg})
             entry_msg2.delete(0, tk.END)
-        connect.commit()
-        cursor.close()
-        connect.close()
         get_chat_message()
     except Exception as e:
-        exception_handler(e, connect, cursor)
+        exception_handler(e)
 
 
 def send_chat_doc():
@@ -990,31 +960,23 @@ def open_chat(chat_id):
     global current_chat
     root.update()
     chat = chat_id
-    connect, cursor = pg_connect()
     if len(chat) == 0 or not chat.isnumeric():
         messagebox.showerror('Input error', 'Chat id must be a number')
-        cursor.close()
-        connect.close()
         return
     nick = get_user_nickname(int(chat))
     if nick is not None:
         label_chat_id.configure(text='Current chat with: ' + nick)
     else:
         messagebox.showerror('Input error', 'User not found')
-        cursor.close()
-        connect.close()
         return
     current_chat = chat
     button_send.configure(state='normal')
     button_img.configure(state='normal')
     canvas.delete("all")
     get_message()
-    cursor.close()
-    connect.close()
 
 
 def pin_chat():
-    connect, cursor = pg_connect()
     try:
         user = entry_pin.get()
         if len(user) == 0:
@@ -1035,10 +997,8 @@ def pin_chat():
             keyring.set_password('datachat', 'pin3', info)
             return
         messagebox.showerror('Pin error', 'Pin limit')
-        cursor.close()
-        connect.close()
     except Exception as e:
-        exception_handler(e, connect, cursor)
+        exception_handler(e)
 
 
 def unpin_chat(chat, frame):
