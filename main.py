@@ -112,6 +112,7 @@ def check_input(password: str, log: str):
     return True
 
 
+# region API
 def check_password(log, pas):
     try:
         return requests.get(f"{backend_url}auth?login={log}&password={pas}").json()
@@ -201,6 +202,9 @@ def get_chat_users(name: str):
         return requests.get(f"{backend_url}chat/get_users?{name}").json()
     except Exception as e:
         exception_handler(e)
+
+
+# endregion
 
 
 def auto_login():
@@ -351,7 +355,7 @@ def hide_auth_menu():
 
 
 def menu_navigation(menu: str):
-    global current_chat, chats, spacing, spacing_2, checker, private_key, user_id, pin_chats
+    global current_chat, chats, spacing, spacing_2, private_key, user_id, pin_chats
     if menu == "chat":
         for key in chats:
             chats[key].pack_forget()
@@ -535,7 +539,7 @@ def send_doc():
         link = y.get_download_link('/' + path)
         encrypt_msg = encrypt('՗'.encode('utf-8'), get_pubkey(current_chat))
         date = datetime.utcnow().strftime('%d/%m/%y %H:%M:%S')
-        cursor.execute("INSERT INTO messages VALUES (to_timestamp('{0}', 'yy-mm-dd hh24:mi:ss'), '{1}', '{2}', "
+        cursor.execute("INSERT INTO messages VALUES (to_timestamp('{0}', 'dd-mm-yy hh24:mi:ss'), '{1}', '{2}', "
                        "{3}, {3}, '{4}', 0)".format(date, user_id, current_chat, encrypt_msg, link))
         connect.commit()
         cursor.close()
@@ -549,44 +553,38 @@ def send_doc():
 def get_message():
     root.update()
     global user_id, spacing, current_chat
-    connect, cursor = pg_connect()
-    spacing = 0
+    spacing, nick = 0, 0
+    res = requests.get(f"{backend_url}message/get?user_id={user_id}&chat_id={current_chat}&is_chat=0").json()
     try:
-        cursor.execute("SELECT * FROM messages WHERE to_id='{0}' AND from_id='{1}' AND NOT from_id LIKE 'g%' "
-                       "ORDER BY date".format(user_id, current_chat))
-        res = cursor.fetchall()
-        cursor.execute("SELECT * FROM messages WHERE to_id='{1}' AND from_id='{0}' AND NOT from_id LIKE 'g%' "
-                       "ORDER BY date".format(user_id, current_chat))
-        res += cursor.fetchall()
-        cursor.execute("UPDATE messages SET read=1 WHERE to_id='{0}' AND from_id LIKE '{1}' AND read=0".
-                       format(user_id, current_chat))
-        connect.commit()
-        res.sort()
         canvas.delete("all")
-        for i in res:
-            decrypt_msg = decrypt(i[3], i[4])
-            nick = get_user_nickname(i[1])
-            if decrypt_msg is None or ord(decrypt_msg[0]) == 1367:
-                author = '{0} {1}:'.format(str(i[0] + utc_diff)[2:], nick)
-                content = '{0}'.format(i[5])
-                msg_frame = Frame(canvas)
-                widget = tk.Listbox(msg_frame, bg='white', fg='black', font=14, width=95, height=1)
-                widget.insert(0, content)
-                widget2 = tk.Label(msg_frame, bg='white', fg='black', text=author, font=14)
-                widget2.pack(side=LEFT)
-                widget.pack(side=LEFT)
-                canvas.create_window(0, spacing, window=msg_frame, anchor='nw')
-                spacing += 25
-            else:
-                content = '{0} {2}: {1}'.format(str(i[0] + utc_diff)[2:], decrypt_msg, nick)
-                widget = Label(canvas, text=content, bg='white', fg='black', font=14)
-                canvas.create_window(0, spacing, window=widget, anchor='nw')
-                spacing += 25
+        for i in range(2000):
+            try:
+                message = res[f"item_{i}"]
+                if nick == 0:
+                    nick = get_user_nickname(message["from_id"])
+                decrypt_msg = decrypt(int2bytes(message["message"]), int2bytes(message["message1"]))
+                date = datetime.strptime(message["date"], "%Y-%m-%dT%H:%M:%S")
+                if decrypt_msg is None or ord(decrypt_msg[0]) == 1367:
+                    author = f'{str(date + utc_diff)[2:]} {nick}:'
+                    content = f'{message["file"]}'
+                    msg_frame = Frame(canvas)
+                    widget = tk.Listbox(msg_frame, bg='white', fg='black', font=14, width=95, height=1)
+                    widget.insert(0, content)
+                    widget2 = tk.Label(msg_frame, bg='white', fg='black', text=author, font=14)
+                    widget2.pack(side=LEFT)
+                    widget.pack(side=LEFT)
+                    canvas.create_window(0, spacing, window=msg_frame, anchor='nw')
+                    spacing += 25
+                else:
+                    content = f'{str(date + utc_diff)[2:]} {nick}: {decrypt_msg}'
+                    widget = Label(canvas, text=content, bg='white', fg='black', font=14)
+                    canvas.create_window(0, spacing, window=widget, anchor='nw')
+                    spacing += 25
+            except KeyError:
+                break
         canvas.config(scrollregion=canvas.bbox("all"))
-        cursor.close()
-        connect.close()
-    except Exception as e:
-        exception_handler(e, connect, cursor)
+    except Exception as er:
+        exception_handler(er)
 
 
 def encrypt(msg: bytes, pubkey):
@@ -594,20 +592,12 @@ def encrypt(msg: bytes, pubkey):
         pubkey = pubkey.split(', ')
         pubkey = rsa.PublicKey(int(pubkey[0]), int(pubkey[1]))
         encrypt_message = rsa.encrypt(msg, pubkey)
-        """try:
-            print(encrypt_message)
-            res = bytes2int(encrypt_message)
-            print(f"{res} {type(res)}")
-            print(int2bytes(res))
-            print("-------")
-        except Exception as e:
-            print(e)"""
         return bytes2int(encrypt_message)
     except Exception as e:
         print(e)
 
 
-def decrypt(msg: bytes, msg1: bytes):
+def decrypt(msg: bytes, msg1: bytes):  # переписать
     global private_key
     try:
         decrypted_message = rsa.decrypt(msg, private_key)
@@ -772,40 +762,37 @@ def send_chat_doc():
 
 def get_chat_message():
     global user_id, spacing_2, current_chat
-    connect, cursor = pg_connect()
     canvas_2.delete("all")
     spacing_2 = 0
+    res = requests.get(f"{backend_url}message/get?user_id={user_id}&chat_id={current_chat}&is_chat=1").json()
     try:
-        cursor.execute("SELECT * FROM messages WHERE to_id='{0}' AND from_id LIKE '{1}%' ORDER BY "
-                       "date".format(user_id, current_chat))
-        res = cursor.fetchall()
-        cursor.execute("UPDATE messages SET read=1 WHERE to_id='{0}' AND from_id LIKE '{1}%' AND read=0".
-                       format(user_id, current_chat))
-        connect.commit()
-        for i in res:
-            decrypt_msg = decrypt(i[3], i[4])
-            nickname = get_user_nickname(i[1].split('_', 1)[1])
-            if decrypt_msg is None or ord(decrypt_msg[0]) == 1367:
-                author = '{0} {1}:'.format(str(i[0] + utc_diff)[2:], nickname)
-                content = '{0}'.format(i[5])
-                msg_frame = Frame(canvas_2)
-                widget = tk.Listbox(msg_frame, bg='white', fg='black', font=14, width=95, height=1)
-                widget.insert(0, content)
-                widget2 = tk.Label(msg_frame, bg='white', fg='black', text=author, font=14)
-                widget2.pack(side=LEFT)
-                widget.pack(side=LEFT)
-                canvas_2.create_window(0, spacing_2, window=msg_frame, anchor='nw')
-                spacing_2 += 25
-            else:
-                content = '{0} {1}: {2}'.format(str(i[0] + utc_diff)[2:], nickname, decrypt_msg)
-                widget = Label(canvas_2, text=content, bg='white', fg='black', font=14)
-                canvas_2.create_window(0, spacing_2, window=widget, anchor='nw')
-                spacing_2 += 25
+        for i in range(2000):
+            try:
+                message = res[f"item_{i}"]
+                decrypt_msg = decrypt(int2bytes(message["message"]), int2bytes(message["message1"]))
+                date = datetime.strptime(message["date"], "%Y-%m-%dT%H:%M:%S")
+                nickname = get_user_nickname(message["from_id"].split('_', 1)[1])
+                if decrypt_msg is None or ord(decrypt_msg[0]) == 1367:
+                    author = f'{str(date + utc_diff)[2:]} {nickname}:'
+                    content = f'{message["file"]}'
+                    msg_frame = Frame(canvas_2)
+                    widget = tk.Listbox(msg_frame, bg='white', fg='black', font=14, width=95, height=1)
+                    widget.insert(0, content)
+                    widget2 = tk.Label(msg_frame, bg='white', fg='black', text=author, font=14)
+                    widget2.pack(side=LEFT)
+                    widget.pack(side=LEFT)
+                    canvas_2.create_window(0, spacing_2, window=msg_frame, anchor='nw')
+                    spacing_2 += 25
+                else:
+                    content = f'{str(date + utc_diff)[2:]} {nickname}: {decrypt_msg}'
+                    widget = Label(canvas_2, text=content, bg='white', fg='black', font=14)
+                    canvas_2.create_window(0, spacing_2, window=widget, anchor='nw')
+                    spacing_2 += 25
+            except KeyError:
+                break
         canvas_2.config(scrollregion=canvas_2.bbox("all"))
-        cursor.close()
-        connect.close()
     except Exception as e:
-        exception_handler(e, connect, cursor)
+        exception_handler(e)
 
 
 def invite_to_group():
@@ -1078,19 +1065,9 @@ def loop_get_msg():
         if time_to_check > 0:
             if time.time() - timing > time_to_check:
                 timing = time.time()
-                connect, cursor = pg_connect()
-                cursor.execute("SELECT from_id FROM messages WHERE to_id='{0}' AND read=0".format(user_id))
-                res = cursor.fetchall()
-                print(res)
-                new_msgs = []
-                temp = ''
-                for i in res:
-                    if i[0] not in new_msgs:
-                        new_msgs.append(i[0])
-                for i in new_msgs:
-                    temp += i + ', '
-                if temp != '':
-                    messagebox.showinfo('New messages!', 'You have new messages in chats: ' + temp[:-2])
+                res = requests.get(f"{backend_url}message/loop?user_id={user_id}").json()
+                if res is not None:
+                    messagebox.showinfo('New messages!', 'You have new messages in chats: ' + res)
                 if current_chat != '-1':
                     if current_chat[0] != 'g':
                         get_message()
@@ -1098,7 +1075,14 @@ def loop_get_msg():
                         get_chat_message()
 
 
-requests.get(f"{backend_url}auth")
+def api_awake():
+    requests.get(f"{backend_url}api/awake")
+
+
+awake_thread = threading.Thread(target=api_awake, daemon=True)
+awake_thread.start()
+
+
 # region auth
 auth_frame = LabelFrame(root, width=200, height=130, relief=FLAT)
 auth_frame.pack(side=TOP, anchor=CENTER)
