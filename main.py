@@ -27,6 +27,7 @@ from keyring.backends.Windows import WinVaultKeyring
 keyring.set_keyring(WinVaultKeyring())
 y = yadisk.YaDisk(token="AgAAAABITC7sAAbGEG8sF3E00UCxjTQXUS5Vu28")
 backend_url = "http://chat-b4ckend.herokuapp.com/"
+Auth_header = {'Authorization': 'Bearer {}'}
 
 code = None
 chats = {}
@@ -36,7 +37,7 @@ root = tk.Tk()
 spacing, spacing_2 = 0, 0
 w = root.winfo_screenwidth() // 2 - 140
 h = root.winfo_screenheight() // 2 - 100
-user_id, email, user_login, user_password = '', '', '', ''
+user_id, email, user_login, user_password, auth_token = '', '', '', '', ''
 var = IntVar()
 private_key = rsa.PrivateKey(1, 2, 3, 4, 5)
 files_dir = 'files'
@@ -82,18 +83,6 @@ def auto_check_message():
         print(e)
 
 
-def debug(cursor):
-    cursor.execute("SELECT * FROM users")
-    print(cursor.fetchall())
-    cursor.execute("SELECT * FROM chats")
-    print(cursor.fetchall())
-    cursor.execute("SELECT * FROM messages")
-    print(cursor.fetchall())
-    cursor.execute("SELECT table_name FROM information_schema.tables WHERE table_schema NOT IN ("
-                   "'information_schema', 'pg_catalog') AND table_schema IN('public', 'myschema');")
-    print(cursor.fetchall())
-
-
 def check_input(password: str, log: str):
     if len(log) < 5:
         messagebox.showerror('Input error', 'Login length must be more than 5 characters')
@@ -115,7 +104,9 @@ def check_input(password: str, log: str):
 # region API
 def check_password(log, pas):
     try:
-        return requests.get(f"{backend_url}auth?login={log}&password={pas}").json()
+        token = requests.post(f"{backend_url}auth", json={"login": log,
+                                                          "password": pas}).json()
+        return token
     except Exception as e:
         exception_handler(e)
 
@@ -148,20 +139,12 @@ def can_use_login(log):
         exception_handler(e)
 
 
-def get_max_id():
-    try:
-        return requests.get(f"{backend_url}user/get_max_id").json()
-    except Exception as e:
-        exception_handler(e)
-
-
 def regenerate_keys():
     root.update()
     global user_id, user_login, user_password
     try:
-        if requests.put(f"{backend_url}user/update_pubkey", json={'login': user_login, 'password': user_password,
-                                                                  'pubkey': keys_generation(),
-                                                                  'user_id': user_id}).json():
+        if requests.put(f"{backend_url}user/update_pubkey", json={'pubkey': keys_generation()},
+                        headers={'Authorization': f'Bearer {auth_token}'}).json():
             messagebox.showinfo("Success", "Regeneration successful!")
         else:
             messagebox.showerror("Failed", "Regeneration failed!")
@@ -239,7 +222,7 @@ def fill_auto_login_file(lgn, psw):
 
 
 def login(*args):
-    global user_login, user_id, time_to_check, user_password
+    global user_login, user_id, time_to_check, user_password, auth_token
     label_loading.place(x=60, y=60)
     root.update()
     try:
@@ -259,6 +242,7 @@ def login(*args):
                 pass_code()
             label_loading.place_forget()
             return
+        auth_token = res
         if var.get() == 0:
             clear_auto_login()
         else:
@@ -884,9 +868,10 @@ def change_password():
     try:
         hashed_pass = bcrypt.hashpw(entry_new_pass.get().encode('utf-8'), bcrypt.gensalt())
         hashed_pass = str(hashed_pass)[2:-1]
-        response = requests.put(f"{backend_url}user/update_password", json={"login": user_login,
-                                                                            "old_password": entry_old_pass.get(),
-                                                                            "new_password": hashed_pass}).json()
+        response = requests.put(f"{backend_url}user/update_password", json={"old_password": entry_old_pass.get(),
+                                                                            "new_password": hashed_pass},
+                                headers={'Authorization': f'Bearer {auth_token}'}).json()
+        print(response)
         if response:
             messagebox.showinfo("Success", "Password has been changed")
             fill_auto_login_file(user_login, entry_new_pass.get())
@@ -1076,12 +1061,11 @@ def loop_get_msg():
 
 
 def api_awake():
-    requests.get(f"{backend_url}api/awake")
+    requests.head(f"{backend_url}api/awake")
 
 
 awake_thread = threading.Thread(target=api_awake, daemon=True)
 awake_thread.start()
-
 
 # region auth
 auth_frame = LabelFrame(root, width=200, height=130, relief=FLAT)
