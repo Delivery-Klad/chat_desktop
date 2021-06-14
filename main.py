@@ -166,14 +166,7 @@ def get_chat_name(group_id: str):
         exception_handler(e)
 
 
-def get_chat_owner(group_id: str):
-    try:
-        return requests.get(f"{backend_url}chat/get_owner?group_id={group_id}").json()
-    except Exception as e:
-        exception_handler(e)
-
-
-def get_users_groups(user):
+def get_user_groups(user):
     try:
         return requests.get(f"{backend_url}user/get_groups?user_id={user}").json()
     except Exception as e:
@@ -406,7 +399,7 @@ def menu_navigation(menu: str):
         main_frame.pack_forget()
         main1_frame.pack_forget()
         settings_frame.pack_forget()
-        groups = get_users_groups(user_id)
+        groups = get_user_groups(user_id)
         counter = 0
         for i in groups:
             counter += 1
@@ -672,7 +665,8 @@ def create_chat():
             if ord(i) < 45 or ord(i) > 122:
                 messagebox.showerror('Input error', 'Unsupported symbols')
                 return
-        res = requests.post(f"{backend_url}chat/create", json={"name": name, "owner": user_id})
+        res = requests.post(f"{backend_url}chat/create", json={"name": name},
+                            headers={'Authorization': f'Bearer {auth_token}'}).json()
         if res:
             messagebox.showinfo('Success', 'Chat created')
             return
@@ -785,18 +779,19 @@ def invite_to_group():
     inv_user = entry_inv_id.get()
     inv_group = entry_gr_toinv.get()
     if len(inv_user) == 0 and len(inv_group) == 0:
-        messagebox.showerror('Input error', 'Entries lenght must be more than 0 characters')
+        messagebox.showerror('Input error', 'Entries length must be more than 0 characters')
         return
     try:
-        if user_id != int(get_chat_owner(inv_group)):
-            messagebox.showerror('Access error', "You are not chat's owner")
-            return
-        groups = get_users_groups(inv_user)
         name = get_chat_name(inv_group)
+        groups = get_user_groups(inv_user)
         if name in groups:
             messagebox.showerror('Input error', "Пользователь уже состоит в группе")
             return
-        requests.post(f"{backend_url}chat/invite", json={"name": name, "user": int(inv_user)})
+        res = requests.post(f"{backend_url}chat/invite", json={"name": name, "user": int(inv_user)},
+                            headers={'Authorization': f'Bearer {auth_token}'}).json()
+        if not res:
+            messagebox.showerror('Access error', "You are not chat's owner")
+            return
         messagebox.showinfo('Success', "Success")
     except Exception as e:
         exception_handler(e)
@@ -811,15 +806,16 @@ def kick_from_group():
         messagebox.showerror('Input error', 'Entries lenght must be more than 0 characters')
         return
     try:
-        if user_id != int(get_chat_owner(kick_group)):
-            messagebox.showerror('Access error', "You are not chat's owner")
-            return
-        groups = get_users_groups(kick_user)
         name = get_chat_name(kick_group)
+        groups = get_user_groups(kick_user)
         if name not in groups:
             messagebox.showerror('Input error', "User is not in group")
             return
-        requests.post(f"{backend_url}chat/kick", json={"name": name, "user": int(kick_user)})
+        res = requests.post(f"{backend_url}chat/kick", json={"name": name, "user": int(kick_user)},
+                            headers={'Authorization': f'Bearer {auth_token}'}).json()
+        if not res:
+            messagebox.showerror('Access error', "You are not chat's owner")
+            return
         messagebox.showinfo('Success', "Success")
     except Exception as e:
         exception_handler(e)
