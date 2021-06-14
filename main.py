@@ -175,7 +175,7 @@ def get_user_groups(user):
 
 def get_chat_users(name: str):
     try:
-        return requests.get(f"{backend_url}chat/get_users?{name}").json()
+        return requests.get(f"{backend_url}chat/get_users?name={name}").json()
     except Exception as e:
         exception_handler(e)
 
@@ -359,7 +359,9 @@ def menu_navigation(menu: str):
         settings_frame.pack_forget()
         group_frame.pack_forget()
         main_frame.pack(side=LEFT, anchor=CENTER)
-        canvas.delete("all")
+        canvas.configure(state='normal')
+        canvas.delete(0.0, END)
+        canvas.configure(state='disable')
         current_chat = "-1"
         label_chat_id.configure(text='Current chat with: ')
         entry_chat_id.delete(0, tk.END)
@@ -529,37 +531,29 @@ def send_doc():
 
 def get_message():
     root.update()
-    global user_id, spacing, current_chat
-    spacing, nick = 0, 0
+    global user_id, current_chat
+    chat_nick = 0
     res = requests.get(f"{backend_url}message/get?user_id={user_id}&chat_id={current_chat}&is_chat=0").json()
     try:
-        canvas.delete("all")
+        canvas.configure(state='normal')
+        canvas.delete(0.0, END)
         for i in range(2000):
             try:
                 message = res[f"item_{i}"]
-                if nick == 0:
-                    nick = get_user_nickname(message["from_id"])
+                if chat_nick == 0 and int(message["from_id"]) != user_id:
+                    chat_nick = get_user_nickname(message["from_id"])
+                nick = user_login if int(message["from_id"]) == user_id else chat_nick
                 decrypt_msg = decrypt(int2bytes(message["message"]), int2bytes(message["message1"]))
                 date = datetime.strptime(message["date"], "%Y-%m-%dT%H:%M:%S")
                 if decrypt_msg is None or ord(decrypt_msg[0]) == 1367:
-                    author = f'{str(date + utc_diff)[2:]} {nick}:'
-                    content = f'{message["file"]}'
-                    msg_frame = Frame(canvas)
-                    widget = tk.Listbox(msg_frame, bg='white', fg='black', font=14, width=95, height=1)
-                    widget.insert(0, content)
-                    widget2 = tk.Label(msg_frame, bg='white', fg='black', text=author, font=14)
-                    widget2.pack(side=LEFT)
-                    widget.pack(side=LEFT)
-                    canvas.create_window(0, spacing, window=msg_frame, anchor='nw')
-                    spacing += 25
+                    content = f'{str(date + utc_diff)[2:]} {nick}: {message["file"]}\n'
+                    canvas.insert(END, content)
                 else:
-                    content = f'{str(date + utc_diff)[2:]} {nick}: {decrypt_msg}'
-                    widget = Label(canvas, text=content, bg='white', fg='black', font=14)
-                    canvas.create_window(0, spacing, window=widget, anchor='nw')
-                    spacing += 25
+                    content = f'{str(date + utc_diff)[2:]} {nick}: {decrypt_msg}\n'
+                    canvas.insert(END, content)
             except KeyError:
                 break
-        canvas.config(scrollregion=canvas.bbox("all"))
+        canvas.configure(state='disabled')
     except Exception as er:
         exception_handler(er)
 
@@ -739,36 +733,27 @@ def send_chat_doc():
 
 
 def get_chat_message():
-    global user_id, spacing_2, current_chat
-    canvas_2.delete("all")
-    spacing_2 = 0
+    global user_id, current_chat
     res = requests.get(f"{backend_url}message/get?user_id={user_id}&chat_id={current_chat}&is_chat=1").json()
     try:
+        canvas_2.configure(state='normal')
+        canvas_2.delete(0.0, END)
         for i in range(2000):
             try:
                 message = res[f"item_{i}"]
+                print(message)
                 decrypt_msg = decrypt(int2bytes(message["message"]), int2bytes(message["message1"]))
                 date = datetime.strptime(message["date"], "%Y-%m-%dT%H:%M:%S")
                 nickname = get_user_nickname(message["from_id"].split('_', 1)[1])
                 if decrypt_msg is None or ord(decrypt_msg[0]) == 1367:
-                    author = f'{str(date + utc_diff)[2:]} {nickname}:'
-                    content = f'{message["file"]}'
-                    msg_frame = Frame(canvas_2)
-                    widget = tk.Listbox(msg_frame, bg='white', fg='black', font=14, width=95, height=1)
-                    widget.insert(0, content)
-                    widget2 = tk.Label(msg_frame, bg='white', fg='black', text=author, font=14)
-                    widget2.pack(side=LEFT)
-                    widget.pack(side=LEFT)
-                    canvas_2.create_window(0, spacing_2, window=msg_frame, anchor='nw')
-                    spacing_2 += 25
+                    content = f'{str(date + utc_diff)[2:]} {nickname}: {message["file"]}\n'
+                    canvas_2.insert(END, content)
                 else:
-                    content = f'{str(date + utc_diff)[2:]} {nickname}: {decrypt_msg}'
-                    widget = Label(canvas_2, text=content, bg='white', fg='black', font=14)
-                    canvas_2.create_window(0, spacing_2, window=widget, anchor='nw')
-                    spacing_2 += 25
+                    content = f'{str(date + utc_diff)[2:]} {nickname}: {decrypt_msg}\n'
+                    canvas_2.insert(END, content)
             except KeyError:
                 break
-        canvas_2.config(scrollregion=canvas_2.bbox("all"))
+        canvas_2.configure(state='disabled')
     except Exception as e:
         exception_handler(e)
 
@@ -940,7 +925,9 @@ def open_chat(chat_id):
     current_chat = chat
     button_send.configure(state='normal')
     button_img.configure(state='normal')
-    canvas.delete("all")
+    canvas.configure(state='normal')
+    canvas.delete(0.0, END)
+    canvas.configure(state='disable')
     get_message()
 
 
@@ -1015,11 +1002,6 @@ def get_pin_chats():
         pin_constructor(pin3[1], pin3[0])
     except Exception as e:
         print(e)
-
-
-def OnMouseWheel(event):
-    canvas.yview("scroll", event.delta, "units")
-    return "break"
 
 
 def auto_check():
@@ -1151,34 +1133,22 @@ button_chat_id = tk.Button(chat_frame, text="OPEN", bg='#2E8B57', width=15,
 button_chat_id.pack(side=RIGHT, anchor=E)
 
 frame = Frame(main2_frame, width=850, height=450)
-frame.pack(expand=True, fill=BOTH)
-canvas = Canvas(frame, bg='#FFFFFF', width=850, height=370, scrollregion=(0, 0, 500, 450))
-vbar = Scrollbar(frame, orient=VERTICAL)
-vbar.pack(side=RIGHT, fill=Y)
-vbar.config(command=canvas.yview)
-hbar = Scrollbar(frame, orient=HORIZONTAL)
-hbar.pack(side=BOTTOM, fill=X)
-hbar.config(command=canvas.xview)
-canvas.config(width=850, height=370)
-canvas.config(xscrollcommand=hbar.set, yscrollcommand=vbar.set)
-canvas.pack(side=TOP, expand=True, fill=BOTH)
-canvas.bind("<MouseWheel>", OnMouseWheel)
-canvas.config(scrollregion=canvas.bbox("all"))
+frame.pack()
+canvas = Text(frame, bg='#FFFFFF', width=105)
+scroll = Scrollbar(frame, command=canvas.yview)
+scroll.pack(side=RIGHT, fill=Y)
+canvas.pack(side=RIGHT, expand=True, fill=BOTH)
+canvas.config(yscrollcommand=scroll.set)
+canvas.configure(state='disabled')
 
 frame_2 = Frame(main2_frame2, width=850, height=500)
-frame_2.pack(expand=True, fill=BOTH)
-canvas_2 = Canvas(frame_2, bg='#FFFFFF', width=850, height=410, scrollregion=(0, 0, 500, 500))
-vbar_2 = Scrollbar(frame_2, orient=VERTICAL)
-vbar_2.pack(side=RIGHT, fill=Y)
-vbar_2.config(command=canvas_2.yview)
-hbar_2 = Scrollbar(frame_2, orient=HORIZONTAL)
-hbar_2.pack(side=BOTTOM, fill=X)
-hbar_2.config(command=canvas_2.xview)
-canvas_2.config(width=850, height=410)
-canvas_2.config(xscrollcommand=hbar_2.set, yscrollcommand=vbar_2.set)
-canvas_2.pack(side=TOP, expand=True, fill=BOTH)
-canvas_2.bind("<MouseWheel>", OnMouseWheel)
-canvas_2.config(scrollregion=canvas_2.bbox("all"))
+frame_2.pack()
+canvas_2 = Text(frame_2, bg='#FFFFFF', width=105)
+scroll_2 = Scrollbar(frame_2, command=canvas_2.yview)
+scroll_2.pack(side=RIGHT, fill=Y)
+canvas_2.pack(side=RIGHT, expand=True, fill=BOTH)
+canvas_2.config(yscrollcommand=scroll_2.set)
+canvas_2.configure(state='disabled')
 
 button_refresh = tk.Button(main_frame, text="REFRESH", bg='#2E8B57', width=128, command=lambda: get_message())
 button_refresh.pack(side=TOP, pady=3, anchor=CENTER)
