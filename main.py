@@ -7,10 +7,8 @@ import base64
 import shutil
 import qrcode
 import bcrypt
-import random
 import yadisk
 import keyring
-import smtplib
 import requests
 import psycopg2
 import threading
@@ -25,7 +23,6 @@ from keyring.backends.Windows import WinVaultKeyring
 # from keyring.backends.OS_X import Keyring
 
 keyring.set_keyring(WinVaultKeyring())
-y = yadisk.YaDisk(token="AgAAAABITC7sAAbGEG8sF3E00UCxjTQXUS5Vu28")
 backend_url = "http://chat-b4ckend.herokuapp.com/"
 Auth_header = {'Authorization': 'Bearer {}'}
 
@@ -176,6 +173,13 @@ def get_user_groups(user):
 def get_chat_users(name: str):
     try:
         return requests.get(f"{backend_url}chat/get_users?name={name}").json()
+    except Exception as e:
+        exception_handler(e)
+
+
+def upload_file(path: str):
+    try:
+        return requests.post(f"{backend_url}file/upload", files={"file": open(path, "rb")}).json()
     except Exception as e:
         exception_handler(e)
 
@@ -493,7 +497,8 @@ def send_message():
         date = datetime.utcnow().strftime('%y-%m-%d %H:%M:%S')
         requests.post(f"{backend_url}message/send", json={"date": date, "sender": user_id,
                                                           "destination": to_id, "message": encrypt_msg,
-                                                          "message1": encrypt_msg1}).json()
+                                                          "message1": encrypt_msg1},
+                      headers={'Authorization': f'Bearer {auth_token}'}).json()
         entry_msg.delete(0, tk.END)
         get_message()
     except Exception as e:
@@ -502,14 +507,17 @@ def send_message():
 
 def send_doc():
     root.update()
-    global user_id, current_chat, y
+    global user_id, current_chat
     connect, cursor = pg_connect()
     try:
         path = filedialog.askopenfilename(filetypes=[("All files", "*.*")])
         if len(path) == 0:
             return
-        shutil.copy(r'{0}'.format(path), r'{0}'.format(os.path.abspath("")))
+        """shutil.copy(r'{0}'.format(path), r'{0}'.format(os.path.abspath("")))
         path = path.split('/')
+        print(path)"""
+        upload_file(path)
+        return
         path = path[len(path) - 1]
         try:
             y.upload(path, '/' + path)
@@ -533,7 +541,8 @@ def get_message():
     root.update()
     global user_id, current_chat
     chat_nick = 0
-    res = requests.get(f"{backend_url}message/get?user_id={user_id}&chat_id={current_chat}&is_chat=0").json()
+    res = requests.get(f"{backend_url}message/get?chat_id={current_chat}&is_chat=0",
+                       headers={'Authorization': f'Bearer {auth_token}'}).json()
     try:
         canvas.configure(state='normal')
         canvas.delete(0.0, END)
@@ -734,7 +743,8 @@ def send_chat_doc():
 
 def get_chat_message():
     global user_id, current_chat
-    res = requests.get(f"{backend_url}message/get?user_id={user_id}&chat_id={current_chat}&is_chat=1").json()
+    res = requests.get(f"{backend_url}message/get?chat_id={current_chat}&is_chat=1",
+                       headers={'Authorization': f'Bearer {auth_token}'}).json()
     try:
         canvas_2.configure(state='normal')
         canvas_2.delete(0.0, END)
@@ -956,9 +966,10 @@ def pin_chat():
         exception_handler(e)
 
 
-def unpin_chat(chat, frame):
+def unpin_chat(chat, l_frame):
     try:
-        pin_chats.remove(frame)
+        print(chat)
+        pin_chats.remove(l_frame)
         messagebox.showerror('В разработке', 'кнопка имеет неполный функционал')
         frame.pack_forget()
     except Exception as e:
@@ -969,7 +980,7 @@ def pin_constructor(text, chat):
     try:
         local_frame = tk.LabelFrame(menu_frame, width=150, height=50, relief=FLAT)
         button1 = tk.Button(local_frame, text=text, bg='#A9A9A9', width=13, command=lambda:
-        (menu_navigation("chat"), open_chat(chat)))
+                            (menu_navigation("chat"), open_chat(chat)))
         button2 = tk.Button(local_frame, text='-', bg='#B00000', width=2, command=lambda: unpin_chat(chat, local_frame))
         button1.pack(side=LEFT, anchor=N)
         button2.pack(side=LEFT, anchor=N, padx=3)
@@ -1028,7 +1039,8 @@ def loop_get_msg():
         if time_to_check > 0:
             if time.time() - timing > time_to_check:
                 timing = time.time()
-                res = requests.get(f"{backend_url}message/loop?user_id={user_id}").json()
+                res = requests.get(f"{backend_url}message/loop",
+                                   headers={'Authorization': f'Bearer {auth_token}'}).json()
                 if res is not None:
                     messagebox.showinfo('New messages!', 'You have new messages in chats: ' + res)
                 if current_chat != '-1':
