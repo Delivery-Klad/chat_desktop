@@ -508,33 +508,15 @@ def send_message():
 def send_doc():
     root.update()
     global user_id, current_chat
-    connect, cursor = pg_connect()
     try:
         path = filedialog.askopenfilename(filetypes=[("All files", "*.*")])
         if len(path) == 0:
             return
-        """shutil.copy(r'{0}'.format(path), r'{0}'.format(os.path.abspath("")))
-        path = path.split('/')
-        print(path)"""
-        upload_file(path)
-        return
-        path = path[len(path) - 1]
-        try:
-            y.upload(path, '/' + path)
-        except Exception:
-            pass
-        link = y.get_download_link('/' + path)
-        encrypt_msg = encrypt('՗'.encode('utf-8'), get_pubkey(current_chat))
-        date = datetime.utcnow().strftime('%d/%m/%y %H:%M:%S')
-        cursor.execute("INSERT INTO messages VALUES (to_timestamp('{0}', 'dd-mm-yy hh24:mi:ss'), '{1}', '{2}', "
-                       "{3}, {3}, '{4}', 0)".format(date, user_id, current_chat, encrypt_msg, link))
-        connect.commit()
-        cursor.close()
-        connect.close()
-        os.remove(path)
+        requests.get(f"{backend_url}url/shorter?url={upload_file(path)}&destination={current_chat}",
+                     headers={'Authorization': f'Bearer {auth_token}'}).json()
         get_message()
     except Exception as e:
-        exception_handler(e, connect, cursor)
+        exception_handler(e)
 
 
 def get_message():
@@ -711,8 +693,6 @@ def send_chat_doc():
     try:
         path = filedialog.askopenfilename(filetypes=[("All files", "*.*")])
         if len(path) == 0:
-            cursor.close()
-            connect.close()
             return
         shutil.copy(r'{0}'.format(path), r'{0}'.format(os.path.abspath("")))
         path = path.split('/')
@@ -738,7 +718,7 @@ def send_chat_doc():
         connect.close()
         get_chat_message()
     except Exception as e:
-        exception_handler(e, connect, cursor)
+        exception_handler(e)
 
 
 def get_chat_message():
@@ -980,7 +960,7 @@ def pin_constructor(text, chat):
     try:
         local_frame = tk.LabelFrame(menu_frame, width=150, height=50, relief=FLAT)
         button1 = tk.Button(local_frame, text=text, bg='#A9A9A9', width=13, command=lambda:
-                            (menu_navigation("chat"), open_chat(chat)))
+        (menu_navigation("chat"), open_chat(chat)))
         button2 = tk.Button(local_frame, text='-', bg='#B00000', width=2, command=lambda: unpin_chat(chat, local_frame))
         button1.pack(side=LEFT, anchor=N)
         button2.pack(side=LEFT, anchor=N, padx=3)
