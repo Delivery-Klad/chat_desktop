@@ -2,12 +2,8 @@ import os
 import rsa
 from rsa.transform import int2bytes, bytes2int
 import time
-import json
-import base64
-import shutil
 import qrcode
 import bcrypt
-import yadisk
 import keyring
 import requests
 import psycopg2
@@ -19,12 +15,11 @@ from datetime import datetime, timezone
 from tkinter import messagebox
 from tkinter import filedialog
 from keyring.backends.Windows import WinVaultKeyring
-
+from keyring import errors
 # from keyring.backends.OS_X import Keyring
 
 keyring.set_keyring(WinVaultKeyring())
 backend_url = "http://chat-b4ckend.herokuapp.com/"
-Auth_header = {'Authorization': 'Bearer {}'}
 
 code = None
 chats = {}
@@ -182,8 +177,6 @@ def upload_file(path: str):
         return requests.post(f"{backend_url}file/upload", files={"file": open(path, "rb")}).json()
     except Exception as e:
         exception_handler(e)
-
-
 # endregion
 
 
@@ -205,11 +198,11 @@ def auto_login():
 def clear_auto_login():
     try:
         keyring.delete_password('datachat', 'login')
-    except Exception:
+    except errors.PasswordDeleteError:
         pass
     try:
         keyring.delete_password('datachat', 'password')
-    except Exception:
+    except errors.PasswordDeleteError:
         pass
 
 
@@ -536,12 +529,8 @@ def get_message():
                 nick = user_login if int(message["from_id"]) == user_id else chat_nick
                 decrypt_msg = decrypt(int2bytes(message["message"]), int2bytes(message["message1"]))
                 date = datetime.strptime(message["date"], "%Y-%m-%dT%H:%M:%S")
-                if decrypt_msg is None or ord(decrypt_msg[0]) == 1367:
-                    content = f'{str(date + utc_diff)[2:]} {nick}: {message["file"]}\n'
-                    canvas.insert(END, content)
-                else:
-                    content = f'{str(date + utc_diff)[2:]} {nick}: {decrypt_msg}\n'
-                    canvas.insert(END, content)
+                content = f'{str(date + utc_diff)[2:]} {nick}: {decrypt_msg}\n'
+                canvas.insert(END, content)
             except KeyError:
                 break
         canvas.configure(state='disabled')
@@ -687,35 +676,18 @@ def send_chat_message():
 
 
 def send_chat_doc():
-    global user_id, current_chat, y
+    global user_id, current_chat
     root.update()
-    connect, cursor = pg_connect()
     try:
         path = filedialog.askopenfilename(filetypes=[("All files", "*.*")])
         if len(path) == 0:
             return
-        shutil.copy(r'{0}'.format(path), r'{0}'.format(os.path.abspath("")))
-        path = path.split('/')
-        path = path[len(path) - 1]
-        try:
-            y.upload(path, '/' + path)
-        except Exception:
-            pass
-        link = y.get_download_link('/' + path)
         name = get_chat_name(current_chat)
         users = get_chat_users(name)
         for i in users:
-            cursor.execute("SELECT pubkey FROM users WHERE id={0}".format(i[0]))
-            res = cursor.fetchall()[0][0]
-            encrypt_msg = psycopg2.Binary(encrypt('՗'.encode('utf-8'), res))
-            date = datetime.utcnow().strftime('%d/%m/%y %H:%M:%S')
-            cursor.execute(
-                "INSERT INTO messages VALUES (to_timestamp('{0}', 'yy-mm-dd hh24:mi:ss'), '{1}', '{2}', {3}, {3},"
-                "'{4}', 0)".format(date, current_chat + '_' + str(user_id), i[0], encrypt_msg, link))
-        connect.commit()
-        cursor.close()
-        os.remove(path)
-        connect.close()
+            requests.get(f"{backend_url}url/shorter/chat?url={upload_file(path)}&sender={current_chat}_{user_id}&"
+                         f"destination={i[0]}",
+                         headers={'Authorization': f'Bearer {auth_token}'}).json()
         get_chat_message()
     except Exception as e:
         exception_handler(e)
@@ -960,7 +932,7 @@ def pin_constructor(text, chat):
     try:
         local_frame = tk.LabelFrame(menu_frame, width=150, height=50, relief=FLAT)
         button1 = tk.Button(local_frame, text=text, bg='#A9A9A9', width=13, command=lambda:
-        (menu_navigation("chat"), open_chat(chat)))
+                            (menu_navigation("chat"), open_chat(chat)))
         button2 = tk.Button(local_frame, text='-', bg='#B00000', width=2, command=lambda: unpin_chat(chat, local_frame))
         button1.pack(side=LEFT, anchor=N)
         button2.pack(side=LEFT, anchor=N, padx=3)
