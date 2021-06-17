@@ -176,7 +176,7 @@ def get_chat_name(group_id: str):
         exception_handler(e)
 
 
-def get_user_groups(user):
+def get_user_groups(user: int):
     try:
         return requests.get(f"{backend_url}user/get_groups?user_id={user}").json()
     except Exception as e:
@@ -349,7 +349,7 @@ def hide_auth_menu():
 def menu_navigation(menu: str):
     global current_chat, chats, spacing, spacing_2, private_key, user_id, pin_chats
     if menu == "chat":
-        root.update()
+        button_chat.update()
         for key in chats:
             chats[key].pack_forget()
         button_chat.pack(side=TOP, anchor=N)
@@ -405,7 +405,7 @@ def menu_navigation(menu: str):
         group_frame.pack_forget()
         main1_frame.pack(side=LEFT, anchor=NW)
     elif menu == "group":
-        root.update()
+        button_groups.update()
         button_chat.pack_forget()
         button_settings.pack_forget()
         button_info.pack_forget()
@@ -419,8 +419,7 @@ def menu_navigation(menu: str):
         main_frame.pack_forget()
         main1_frame.pack_forget()
         settings_frame.pack_forget()
-        groups = get_user_groups(user_id)
-        print(groups)
+        groups = get_user_groups(int(user_id))
         counter = 0
         for i in groups:
             counter += 1
@@ -731,16 +730,12 @@ def get_chat_message():
         for i in range(2000):
             try:
                 message = res[f"item_{i}"]
-                print(message)
                 decrypt_msg = decrypt(int2bytes(message["message"]), int2bytes(message["message1"]))
                 date = datetime.strptime(message["date"], "%Y-%m-%dT%H:%M:%S")
                 nickname = get_user_nickname(message["from_id"].split('_', 1)[1])
-                if decrypt_msg is None or ord(decrypt_msg[0]) == 1367:
-                    content = f'{str(date + utc_diff)[2:]} {nickname}: {message["file"]}\n'
-                    canvas_2.insert(END, content)
-                else:
-                    content = f'{str(date + utc_diff)[2:]} {nickname}: {decrypt_msg}\n'
-                    canvas_2.insert(END, content)
+                content = f'{str(date + utc_diff)[2:]} {nickname}: {decrypt_msg}\n'
+                canvas_2.insert(END, content)
+                canvas_2.update()
             except KeyError:
                 break
         canvas_2.configure(state='disabled')
