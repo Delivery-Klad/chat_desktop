@@ -13,6 +13,6 @@ options = {'build_exe': {'packages': packages, }, }
 
 setup(name="main",
       options=options,
-      version="1.0.02",
+      version="1.0.2",
       description='description',
       executables=[Executable("main.py", base=base)])
