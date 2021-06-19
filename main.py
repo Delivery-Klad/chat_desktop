@@ -1,24 +1,28 @@
 import os
-import rsa
-from rsa.transform import int2bytes, bytes2int
-import time
-import qrcode
-import bcrypt
-import keyring
-import requests
+import platform
 import threading
+import time
 import tkinter as tk
-from tkinter import *
-from PIL import Image
 from datetime import datetime, timezone
+from tkinter import *
 from tkinter import messagebox, filedialog
 from tkinter.font import Font
-from keyring.backends.Windows import WinVaultKeyring
+import bcrypt
+import keyring
+import qrcode
+import requests
+import rsa
+from PIL import Image
 from keyring import errors
+from keyring.backends.Windows import WinVaultKeyring
+from keyring.backends.OS_X import Keyring
+from rsa.transform import int2bytes, bytes2int
 
-# from keyring.backends.OS_X import Keyring
+if platform.uname().system == "Windows":
+    keyring.set_keyring(WinVaultKeyring())
+elif platform.uname().system == "Darwin":
+    keyring.set_keyring(Keyring())
 
-keyring.set_keyring(WinVaultKeyring())
 backend_url = "http://chat-b4ckend.herokuapp.com/"
 
 code = None
@@ -76,15 +80,26 @@ set_theme()
 def exception_handler(e):
     try:
         print(e)
-    except Exception as e:
-        print(e)
+    except Exception as er:
+        print(er)
+
+
+def response_handler(res: requests.models.Response):
+    try:
+        if res.status_code == 200:
+            return res.json()
+        else:
+            messagebox.showerror("Something went wrong!", res)
+            return None
+    except Exception as er:
+        exception_handler(er)
 
 
 def auto_check_message():
     try:
         get_message()
-    except Exception as e:
-        print(e)
+    except Exception as er:
+        exception_handler(er)
 
 
 def check_input(password: str, log: str):
@@ -108,45 +123,51 @@ def check_input(password: str, log: str):
 # region API
 def check_password(log, pas):
     try:
-        return requests.post(f"{backend_url}auth", json={"login": log, "password": pas}).json()
-    except Exception as e:
-        exception_handler(e)
+        res = requests.post(f"{backend_url}auth", json={"login": log, "password": pas})
+        return response_handler(res)
+    except Exception as er:
+        exception_handler(er)
 
 
 def get_id(log):
     try:
-        return requests.get(f"{backend_url}user/get_id?login={log}").json()
-    except Exception as e:
-        exception_handler(e)
+        res = requests.get(f"{backend_url}user/get_id?login={log}")
+        return response_handler(res)
+    except Exception as er:
+        exception_handler(er)
 
 
 def get_user_nickname(user):
     try:
-        return requests.get(f"{backend_url}user/get_nickname?id={user}").json()
-    except Exception as e:
-        exception_handler(e)
+        res = requests.get(f"{backend_url}user/get_nickname?id={user}")
+        return response_handler(res)
+    except Exception as er:
+        exception_handler(er)
 
 
 def get_pubkey(user):
     try:
-        return requests.get(f"{backend_url}user/get_pubkey?id={user}").json()
-    except Exception as e:
-        exception_handler(e)
+        res = requests.get(f"{backend_url}user/get_pubkey?id={user}")
+        return response_handler(res)
+    except Exception as er:
+        exception_handler(er)
 
 
 def get_messages(cur_chat, is_chat):
     try:
-        return requests.get(f"{backend_url}message/get?chat_id={cur_chat}&is_chat={is_chat}",
-                            headers={'Authorization': f'Bearer {auth_token}'}).json()
-    except Exception as e:
-        exception_handler(e)
+        res = requests.get(f"{backend_url}message/get?chat_id={cur_chat}&is_chat={is_chat}",
+                            headers={'Authorization': f'Bearer {auth_token}'})
+        return response_handler(res)
+    except Exception as er:
+        exception_handler(er)
 
 
 def can_use_login(log):
     try:
-        return requests.get(f"{backend_url}user/can_use_login?login={log}").json()
-    except Exception as e:
-        exception_handler(e)
+        res = requests.get(f"{backend_url}user/can_use_login?login={log}")
+        return response_handler(res)
+    except Exception as er:
+        exception_handler(er)
 
 
 def regenerate_keys():
@@ -158,43 +179,48 @@ def regenerate_keys():
             messagebox.showinfo("Success", "Regeneration successful!")
         else:
             messagebox.showerror("Failed", "Regeneration failed!")
-    except Exception as e:
-        exception_handler(e)
+    except Exception as er:
+        exception_handler(er)
 
 
 def get_chat_id(name: str):
     try:
-        return requests.get(f"{backend_url}chat/get_id?name={name}").json()
-    except Exception as e:
-        exception_handler(e)
+        res = requests.get(f"{backend_url}chat/get_id?name={name}")
+        return response_handler(res)
+    except Exception as er:
+        exception_handler(er)
 
 
 def get_chat_name(group_id: str):
     try:
-        return requests.get(f"{backend_url}chat/get_name?group_id={group_id}").json()
-    except Exception as e:
-        exception_handler(e)
+        res = requests.get(f"{backend_url}chat/get_name?group_id={group_id}")
+        return response_handler(res)
+    except Exception as er:
+        exception_handler(er)
 
 
 def get_user_groups(user: int):
     try:
-        return requests.get(f"{backend_url}user/get_groups?user_id={user}").json()
-    except Exception as e:
-        exception_handler(e)
+        res = requests.get(f"{backend_url}user/get_groups?user_id={user}")
+        return response_handler(res)
+    except Exception as er:
+        exception_handler(er)
 
 
 def get_chat_users(name: str):
     try:
-        return requests.get(f"{backend_url}chat/get_users?name={name}").json()
-    except Exception as e:
-        exception_handler(e)
+        res = requests.get(f"{backend_url}chat/get_users?name={name}")
+        return response_handler(res)
+    except Exception as er:
+        exception_handler(er)
 
 
 def upload_file(path: str):
     try:
-        return requests.post(f"{backend_url}file/upload", files={"file": open(path, "rb")}).json()
-    except Exception as e:
-        exception_handler(e)
+        res = requests.post(f"{backend_url}file/upload", files={"file": open(path, "rb")})
+        return response_handler(res)
+    except Exception as er:
+        exception_handler(er)
 # endregion
 
 
@@ -209,8 +235,8 @@ def auto_login():
             var.set(1)
     except FileNotFoundError:
         pass
-    except Exception as e:
-        print(e)
+    except Exception as er:
+        exception_handler(er)
 
 
 def clear_auto_login():
@@ -322,8 +348,8 @@ def register():
             if not can_use_login(lgn):
                 messagebox.showerror('Input error', 'User already register')
                 return
-        except Exception as e:
-            print(e)
+        except Exception as er:
+            exception_handler(er)
         hashed_pass = bcrypt.hashpw(psw.encode('utf-8'), bcrypt.gensalt())
         hashed_pass = str(hashed_pass)[2:-1]
         res = requests.post(f"{backend_url}user/create", json={'login': lgn, 'password': hashed_pass,
@@ -572,8 +598,8 @@ def encrypt(msg: bytes, pubkey):
         pubkey = rsa.PublicKey(int(pubkey[0]), int(pubkey[1]))
         encrypt_message = rsa.encrypt(msg, pubkey)
         return bytes2int(encrypt_message)
-    except Exception as e:
-        print(e)
+    except Exception as er:
+        exception_handler(er)
 
 
 def decrypt(msg: bytes, msg1: bytes):  # переписать
@@ -640,14 +666,14 @@ def keys_generation():
         keyring.set_password('datachat', 'private_key', privkey.save_pkcs1().decode('ascii'))
         private_key = privkey
         return pubkey
-    except Exception as e:
-        print(e)
+    except Exception as er:
+        exception_handler(er)
 
 
 def get_private_key():
     try:
         global private_key
-        private_key = rsa.PrivateKey.load_pkcs1(keyring.get_password('datachat', 'private_key'))
+        private_key = rsa.PrivateKey.load_pkcs1(keyring.get_password('datachat', 'private_key').encode('utf-8'))
     except FileNotFoundError:
         pass
 
@@ -808,8 +834,8 @@ def recovery_menu():
         auth_frame.pack_forget()
         root.geometry("200x100+{}+{}".format(w, h))
         recovery_frame.pack(side=TOP, anchor=CENTER)
-    except Exception as e:
-        print(e)
+    except Exception as er:
+        exception_handler(er)
 
 
 def new_pass_menu():
@@ -824,8 +850,8 @@ def new_pass_menu():
         recovery_frame.pack_forget()
         root.geometry("200x130+{}+{}".format(w, h))
         new_pass_frame.pack(side=TOP, anchor=CENTER)
-    except Exception as e:
-        print(e)
+    except Exception as er:
+        exception_handler(er)
 
 
 def change_password():
@@ -837,7 +863,6 @@ def change_password():
         response = requests.put(f"{backend_url}user/update_password", json={"old_password": entry_old_pass.get(),
                                                                             "new_password": hashed_pass},
                                 headers={'Authorization': f'Bearer {auth_token}'}).json()
-        print(response)
         if response:
             messagebox.showinfo("Success", "Password has been changed")
             fill_auto_login_file(user_login, entry_new_pass.get())
@@ -873,8 +898,8 @@ def set_new_pass():
                     auth_frame.pack(side=TOP, anchor=CENTER)
                 else:
                     messagebox.showerror("Success", "Password has not been changed")
-    except Exception as e:
-        exception_handler(e)
+    except Exception as er:
+        exception_handler(er)
 
 
 def pass_code():
@@ -946,8 +971,8 @@ def unpin_chat(chat, l_frame):
         pin_chats.remove(l_frame)
         messagebox.showerror('В разработке', 'кнопка имеет неполный функционал')
         frame.pack_forget()
-    except Exception as e:
-        print(e)
+    except Exception as er:
+        exception_handler(er)
 
 
 def pin_constructor(text, chat):
@@ -961,8 +986,8 @@ def pin_constructor(text, chat):
         button2.pack(side=LEFT, anchor=N, padx=3)
         local_frame.pack(side=TOP, pady=1, anchor=N)
         pin_chats.append(local_frame)
-    except Exception as e:
-        print(e)
+    except Exception as er:
+        exception_handler(er)
 
 
 def get_pin_chats():
@@ -986,8 +1011,8 @@ def get_pin_chats():
             return
         pin3 = pin3.split()
         pin_constructor(pin3[1], pin3[0])
-    except Exception as e:
-        print(e)
+    except Exception as er:
+        exception_handler(er)
 
 
 def save_theme():
@@ -1010,7 +1035,7 @@ def auto_check():
     elif time_to_check == -1:
         time_to_check = 30
         label_check2.configure(text='30 Sec')
-    keyring.set_password('datachat', 'update', time_to_check)
+    keyring.set_password('datachat', 'update', str(time_to_check))
 
 
 def loop_get_msg():
