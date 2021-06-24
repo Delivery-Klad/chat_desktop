@@ -1,6 +1,7 @@
 import os
 import platform
 import threading
+import schedule
 import time
 import tkinter as tk
 from datetime import datetime, timezone
@@ -306,10 +307,10 @@ def login(*args):
         get_private_key()
         hide_auth_menu()
         label_loading.place_forget()
-        checker.start()
-        upd = keyring.get_password('datachat', 'update')
-        if upd is not None:
-            time_to_check = int(upd)
+        try:
+            checker.start()
+        except NameError:
+            pass
         qr = qrcode.make(private_key)
         qr.save(files_dir + '/QR.png')
         qr = Image.open(files_dir + '/QR.png')
@@ -1028,23 +1029,37 @@ def pin_chat():
         exception_handler(e)
 
 
-def unpin_chat(chat, l_frame):
+def unpin_chat(l_frame, id):
     try:
-        print(chat)
         pin_chats.remove(l_frame)
-        messagebox.showerror('В разработке', 'кнопка имеет неполный функционал')
-        frame.pack_forget()
+        l_frame.pack_forget()
+        if id == 1:
+            chat = keyring.get_password('datachat', 'pin2')
+            if chat is not None:
+                keyring.set_password('datachat', 'pin1', chat)
+            chat = keyring.get_password('datachat', 'pin3')
+            if chat is not None:
+                keyring.set_password('datachat', 'pin2', chat)
+            keyring.delete_password('datachat', 'pin3')
+        elif id == 2:
+            chat = keyring.get_password('datachat', 'pin3')
+            if chat is not None:
+                keyring.set_password('datachat', 'pin2', chat)
+            keyring.delete_password('datachat', 'pin3')
+        else:
+            keyring.delete_password('datachat', 'pin3')
+        # messagebox.showerror('В разработке', 'кнопка имеет неполный функционал')
     except Exception as er:
         exception_handler(er)
 
 
-def pin_constructor(text, chat):
+def pin_constructor(text, chat, id):
     try:
         local_frame = tk.LabelFrame(menu_frame, width=150, height=50, relief=FLAT, bg=theme['bg'])
         button1 = tk.Button(local_frame, text=text, bg='#A9A9A9', width=13, relief=theme['relief'],
                             font=theme['button_font'], command=lambda: (menu_navigation("chat"), open_chat(chat)))
         button2 = tk.Button(local_frame, text='-', bg='#B00000', width=2, relief=theme['relief'],
-                            font=theme['button_font'], command=lambda: unpin_chat(chat, local_frame))
+                            font=theme['button_font'], command=lambda: unpin_chat(local_frame, id))
         button1.pack(side=LEFT, anchor=N)
         button2.pack(side=LEFT, anchor=N, padx=3)
         local_frame.pack(side=TOP, pady=1, anchor=N)
@@ -1056,24 +1071,16 @@ def pin_constructor(text, chat):
 def get_pin_chats():
     global pin_chats
     try:
-        pin1 = keyring.get_password('datachat', 'pin1')
-        if pin1 is None:
-            label_fixed.pack_forget()
-            label_line1.pack_forget()
-            label_line2.pack_forget()
-            return
-        pin1 = pin1.split()
-        pin_constructor(pin1[1], pin1[0])
-        pin2 = keyring.get_password('datachat', 'pin2')
-        if pin2 is None:
-            return
-        pin2 = pin2.split()
-        pin_constructor(pin2[1], pin2[0])
-        pin3 = keyring.get_password('datachat', 'pin3')
-        if pin3 is None:
-            return
-        pin3 = pin3.split()
-        pin_constructor(pin3[1], pin3[0])
+        for i in range(3):
+            pin = keyring.get_password('datachat', f'pin{i + 1}')
+            if pin is None:
+                if i == 0:
+                    label_fixed.pack_forget()
+                    label_line1.pack_forget()
+                    label_line2.pack_forget()
+                    return
+            pin = pin.split()
+            pin_constructor(pin[1], pin[0], i + 1)
     except Exception as er:
         exception_handler(er)
 
@@ -1086,43 +1093,48 @@ def save_theme():
 
 def auto_check():
     global time_to_check
-    if time_to_check == 30:
+    if int(time_to_check) == 30:
         time_to_check = 45
         label_check2.configure(text='45 Sec')
-    elif time_to_check == 45:
+    elif int(time_to_check) == 45:
         time_to_check = 60
         label_check2.configure(text='1 Min')
-    elif time_to_check == 60:
+    elif int(time_to_check) == 60:
         time_to_check = -1
         label_check2.configure(text='Never')
-    elif time_to_check == -1:
+    elif int(time_to_check) == -1:
         time_to_check = 30
         label_check2.configure(text='30 Sec')
+    print(time_to_check)
+    label_check2.update()
     keyring.set_password('datachat', 'update', str(time_to_check))
 
 
-def loop_get_msg():
+def loop_msg_func():
+    print('check')
     global time_to_check, auth_token, user_login, user_password
-    timing = time.time()
+    if auth_token == '':
+        return
+    res = requests.get(f"{backend_url}message/loop",
+                       headers={'Authorization': f'Bearer {auth_token}'})
+    if res.status_code == 401:
+        auth_token = check_password(user_login, user_password)
+        res = requests.get(f"{backend_url}message/loop",
+                           headers={'Authorization': f'Bearer {auth_token}'}).json()
+    else:
+        res = res.json()
+    if res is not None:
+        messagebox.showinfo('New messages!', 'You have new messages in chats: ' + res)
+    if current_chat != '-1':
+        if current_chat[0] != 'g':
+            get_message()
+        elif current_chat[0] == 'g':
+            get_chat_message()
+
+
+def loop_get_msg():
     while True:
-        if time_to_check > 0:
-            if time.time() - timing > time_to_check:
-                timing = time.time()
-                res = requests.get(f"{backend_url}message/loop",
-                                   headers={'Authorization': f'Bearer {auth_token}'})
-                if res.status_code == 401:
-                    auth_token = check_password(user_login, user_password)
-                    res = requests.get(f"{backend_url}message/loop",
-                                       headers={'Authorization': f'Bearer {auth_token}'}).json()
-                else:
-                    res = res.json()
-                if res is not None:
-                    messagebox.showinfo('New messages!', 'You have new messages in chats: ' + res)
-                if current_chat != '-1':
-                    if current_chat[0] != 'g':
-                        get_message()
-                    elif current_chat[0] == 'g':
-                        get_chat_message()
+        schedule.run_pending()
 
 
 def api_awake():
@@ -1131,7 +1143,6 @@ def api_awake():
 
 awake_thread = threading.Thread(target=api_awake, daemon=True)
 awake_thread.start()
-
 """m = Menu(root)
 root.config(menu=m)
 fm = Menu(m)
@@ -1434,7 +1445,11 @@ button_check.pack(side=TOP, padx=2, pady=3, anchor=SW)
 label_loading = Label(root, font=10, text="LOADING", fg=theme['tc'], bg=theme['bg'])
 # endregion
 auto_login()
-checker = threading.Thread(target=loop_get_msg, daemon=True)
+time_to_check = keyring.get_password('datachat', 'update')
+if time_to_check is not None:
+    if int(time_to_check) != -1:
+        checker = threading.Thread(target=loop_get_msg, daemon=True)
+        schedule.every(int(time_to_check)).seconds.do(loop_msg_func)
 
 if __name__ == "__main__":
     root.title("Chat")
