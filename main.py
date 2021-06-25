@@ -1,7 +1,7 @@
 import os
 import platform
 import threading
-import schedule
+import schedule  # найти более оптимальную библиотеку
 import time
 import tkinter as tk
 from datetime import datetime, timezone
@@ -149,6 +149,14 @@ def get_user_nickname(user):
         exception_handler(er)
 
 
+def get_random_users():  # дописать
+    try:
+        res = requests.get(f"{backend_url}user/get_random")
+        return response_handler(res).json()
+    except Exception as er:
+        exception_handler(er)
+
+
 def get_pubkey(user):
     try:
         res = requests.get(f"{backend_url}user/get_pubkey?id={user}")
@@ -276,7 +284,7 @@ def fill_auto_login_file(lgn, psw):
 
 
 def login(*args):
-    global user_login, user_id, time_to_check, user_password, auth_token
+    global user_login, user_id, user_password, auth_token
     label_loading.place(x=60, y=60)
     button_login.update()
     awake_thread.join()
@@ -450,6 +458,18 @@ def menu_navigation(menu: str):
         settings_frame.pack_forget()
         group_frame.pack_forget()
         main1_frame.pack(side=LEFT, anchor=NW)
+        users_list = get_random_users()  # дописать
+        canvas_users.configure(state='normal')
+        canvas_users.delete(0.0, END)
+        for i in range(20):
+            try:
+                user = users_list[f'user_{i}']
+                content = f"{user}"
+                canvas.insert(END, content)
+                canvas.update()
+            except KeyError:
+                break
+        canvas_users.configure(state='disabled')
     elif menu == "group":
         button_groups.update()
         button_chat.pack_forget()
@@ -523,27 +543,6 @@ def change_group(gr_id: str, button):
         chats[key].configure(bg='#A9A9A9')
     button.configure(bg="#2E8B57")
     get_chat_message()
-
-
-def get_user_info():
-    button_check.update()
-    try:
-        _input = entry_id_or_nick.get()
-        if _input.isdigit():
-            res = get_user_nickname(int(_input))
-        elif _input[-3:] == '_gr':
-            res = get_chat_id(_input)
-        else:
-            res = get_id(_input)
-        if res is None:
-            messagebox.showerror('Input error', 'User not found')
-            return
-        entry_res.configure(state='normal')
-        entry_res.delete(0, tk.END)
-        entry_res.insert(0, res)
-        entry_res.configure(state='disabled')
-    except Exception as e:
-        exception_handler(e)
 
 
 def send_message():
@@ -1004,6 +1003,10 @@ def open_chat(chat_id):
     get_message()
 
 
+def search_user():  # дописать
+    pass
+
+
 def pin_chat():
     try:
         user = entry_pin.get()
@@ -1048,7 +1051,6 @@ def unpin_chat(l_frame, id):
             keyring.delete_password('datachat', 'pin3')
         else:
             keyring.delete_password('datachat', 'pin3')
-        # messagebox.showerror('В разработке', 'кнопка имеет неполный функционал')
     except Exception as er:
         exception_handler(er)
 
@@ -1091,6 +1093,23 @@ def save_theme():
     messagebox.showinfo("Success!", "Theme will be changed on next launch!")
 
 
+def get_update_time():
+    global time_to_check
+    if int(time_to_check) == 30:
+        time_to_check = 45
+        label_check2.configure(text='45 Sec')
+    elif int(time_to_check) == 45:
+        time_to_check = 60
+        label_check2.configure(text='1 Min')
+    elif int(time_to_check) == 60:
+        time_to_check = -1
+        label_check2.configure(text='Never')
+    elif int(time_to_check) == -1:
+        time_to_check = 30
+        label_check2.configure(text='30 Sec')
+    label_check2.update()
+
+
 def auto_check():
     global time_to_check
     if int(time_to_check) == 30:
@@ -1105,14 +1124,13 @@ def auto_check():
     elif int(time_to_check) == -1:
         time_to_check = 30
         label_check2.configure(text='30 Sec')
-    print(time_to_check)
     label_check2.update()
     keyring.set_password('datachat', 'update', str(time_to_check))
 
 
 def loop_msg_func():
     print('check')
-    global time_to_check, auth_token, user_login, user_password
+    global auth_token, user_login, user_password
     if auth_token == '':
         return
     res = requests.get(f"{backend_url}message/loop",
@@ -1427,24 +1445,31 @@ button_regenerate = tk.Button(settings_frame, text="REGENERATE ENCRYPTION KEYS",
 button_regenerate.pack(side=TOP, anchor=CENTER)
 # endregion
 # region info
-main1_frame = LabelFrame(root, width=600, height=350, relief=SUNKEN, bg=theme['bg'])
+main1_frame = LabelFrame(root, width=850, height=500, relief=theme['relief'], bg=theme['bg'])
 info_frame = LabelFrame(main1_frame, bg=theme['bg'], relief=theme['relief'])
 info_frame.pack(side=LEFT, anchor=NW)
-label_info = tk.Label(info_frame, font=10, text="ID/Nickname/Group", fg=theme['tc'], bg=theme['bg'],
-                      relief=theme['relief'], width=18)
-label_info.pack(side=TOP, anchor=SW)
-entry_res = tk.Entry(info_frame, font=10, width=20, state='disabled', fg=theme['tc'], bg=theme['entry'],
-                     cursor=theme['cursor'], relief=theme['relief'])
-entry_res.pack(side=TOP, padx=2, pady=3, anchor=SW)
-entry_id_or_nick = tk.Entry(info_frame, font=10, width=20, fg=theme['tc'], bg=theme['entry'], cursor=theme['cursor'],
-                            relief=theme['relief'])
-entry_id_or_nick.pack(side=TOP, padx=2, anchor=SW)
-button_check = tk.Button(info_frame, text="CHECK", bg='#2E8B57', width=25, relief=theme['relief'],
-                         command=lambda: get_user_info())
-button_check.pack(side=TOP, padx=2, pady=3, anchor=SW)
+
+info_frame_2 = LabelFrame(info_frame, bg=theme['bg'], relief=theme['relief'])
+info_frame_2.pack(side=TOP, anchor=NW)
+entry_user_search = tk.Entry(info_frame_2, font=10, width=87, relief=theme['relief'], fg=theme['tc'], bg=theme['entry'],
+                             cursor=theme['cursor'])
+entry_user_search.pack(side=LEFT, padx=3)
+button_search = tk.Button(info_frame_2, text="SEARCH", bg='#2E8B57', width=8, relief=theme['relief'],
+                          command=lambda: search_user())
+button_search.pack(side=LEFT, anchor=E, padx=3)
+frame_users = Frame(info_frame, width=800, height=450)
+frame_users.pack()
+canvas_users = Text(frame_users, fg=theme['tc'], bg=theme['entry'], width=103, height=29, cursor='arrow')
+scroll_users = Scrollbar(frame_users, command=canvas_users.yview, bg=theme['bg'])
+scroll_users.pack(side=RIGHT, fill=Y)
+canvas_users.pack(side=RIGHT, expand=True, fill=BOTH)
+canvas_users.config(yscrollcommand=scroll_users.set)
+canvas_users.configure(state='disabled')
+
 label_loading = Label(root, font=10, text="LOADING", fg=theme['tc'], bg=theme['bg'])
 # endregion
 auto_login()
+get_update_time()
 time_to_check = keyring.get_password('datachat', 'update')
 if time_to_check is not None:
     if int(time_to_check) != -1:

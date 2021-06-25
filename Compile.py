@@ -3,11 +3,11 @@ from distutils.extension import Extension
 from Cython.Distutils import build_ext
 
 ext_modules = [
-    Extension("TestModule.Config", ["TestModule/Config.py"]),
+    Extension("main", ["TestModule/Config.py"]),
 ]
 
 setup(
-    name='Test App',
+    name='Main',
     cmdclass={'build_ext': build_ext},
     ext_modules=ext_modules
 )
