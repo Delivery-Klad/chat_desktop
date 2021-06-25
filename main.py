@@ -1,8 +1,9 @@
+# if res.status_code == 401 заменить на response_handler
+
 import os
 import platform
 import threading
 import schedule  # найти более оптимальную библиотеку
-import time
 import tkinter as tk
 from datetime import datetime, timezone
 from tkinter import *
@@ -61,6 +62,7 @@ def set_theme():  # доделать для кнопок
                  "frame_relief": FLAT,  # RIDGE
                  "bg": "#48494f",
                  "font10": Font(family='Candara', size=13),
+                 "font_p": Font(family='Candara', size=15),
                  "button_font": Font(family='Candara', size=10),
                  "cursor": "pencil"}
     else:
@@ -71,6 +73,7 @@ def set_theme():  # доделать для кнопок
                  "frame_relief": None,
                  "bg": None,
                  "font10": Font(family='Ubuntu', size=13),
+                 "font_p": Font(family='Ubuntu', size=15),
                  "button_font": None,
                  "cursor": None}
 
@@ -174,7 +177,10 @@ def get_messages(cur_chat, is_chat):
             auth_token = check_password(user_login, user_password)
         res = requests.get(f"{backend_url}message/get?chat_id={cur_chat}&is_chat={is_chat}",
                            headers={'Authorization': f'Bearer {auth_token}'})
-        return response_handler(res).json()
+        try:
+            return response_handler(res).json()
+        except AttributeError:
+            return None
     except Exception as er:
         exception_handler(er)
 
@@ -458,15 +464,18 @@ def menu_navigation(menu: str):
         settings_frame.pack_forget()
         group_frame.pack_forget()
         main1_frame.pack(side=LEFT, anchor=NW)
-        users_list = get_random_users()  # дописать
+        users_list = get_random_users()
         canvas_users.configure(state='normal')
         canvas_users.delete(0.0, END)
         for i in range(20):
             try:
                 user = users_list[f'user_{i}']
-                content = f"{user}"
-                canvas.insert(END, content)
-                canvas.update()
+                content = f"{user['id']}"
+                while len(content) < 10:
+                    content += " "
+                content += f"{user['login']}\n"
+                canvas_users.insert(END, content)
+                canvas_users.update()
             except KeyError:
                 break
         canvas_users.configure(state='disabled')
@@ -600,6 +609,8 @@ def get_message():
     global user_id, current_chat
     chat_nick = 0
     res = get_messages(current_chat, 0)
+    if res is None:
+        return
     try:
         canvas.configure(state='normal')
         canvas.delete(0.0, END)
@@ -794,6 +805,8 @@ def get_chat_message():
     global user_id, current_chat
     button_refresh2.update()
     res = get_messages(current_chat, 1)
+    if res is None:
+        return
     try:
         canvas_2.configure(state='normal')
         canvas_2.delete(0.0, END)
@@ -1003,8 +1016,25 @@ def open_chat(chat_id):
     get_message()
 
 
-def search_user():  # дописать
-    pass
+def search_user():
+    res = entry_user_search.get()
+    if len(res) == 0:
+        return
+    users_list = requests.get(f'{backend_url}user/find?login={res}').json()
+    canvas_users.configure(state='normal')
+    canvas_users.delete(0.0, END)
+    for i in range(20):
+        try:
+            user = users_list[f'user_{i}']
+            content = f"{user['id']}"
+            while len(content) < 10:
+                content += " "
+            content += f"{user['login']}\n"
+            canvas_users.insert(END, content)
+            canvas_users.update()
+        except KeyError:
+            break
+    canvas_users.configure(state='disabled')
 
 
 def pin_chat():
@@ -1457,9 +1487,10 @@ entry_user_search.pack(side=LEFT, padx=3)
 button_search = tk.Button(info_frame_2, text="SEARCH", bg='#2E8B57', width=8, relief=theme['relief'],
                           command=lambda: search_user())
 button_search.pack(side=LEFT, anchor=E, padx=3)
-frame_users = Frame(info_frame, width=800, height=450)
+frame_users = Frame(info_frame, width=800, height=400)
 frame_users.pack()
-canvas_users = Text(frame_users, fg=theme['tc'], bg=theme['entry'], width=103, height=29, cursor='arrow')
+canvas_users = Text(frame_users, fg=theme['tc'], bg=theme['entry'], font=theme['font_p'], width=90, height=29,
+                    cursor='arrow')
 scroll_users = Scrollbar(frame_users, command=canvas_users.yview, bg=theme['bg'])
 scroll_users.pack(side=RIGHT, fill=Y)
 canvas_users.pack(side=RIGHT, expand=True, fill=BOTH)
