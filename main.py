@@ -3,7 +3,7 @@
 import os
 import platform
 import threading
-import schedule  # найти более оптимальную библиотеку
+import schedule  # найти более оптимизированную библиотеку
 import tkinter as tk
 from datetime import datetime, timezone
 from tkinter import *
@@ -25,7 +25,7 @@ if platform.uname().system == "Windows":
 elif platform.uname().system == "Darwin":
     keyring.set_keyring(Keyring())
 
-backend_url = "http://chat-b4ckend.herokuapp.com/"
+backend_url = "https://chat-b4ckend.herokuapp.com/"
 
 code = None
 chats = {}
@@ -64,6 +64,9 @@ def set_theme():  # доделать для кнопок
                  "font10": Font(family='Candara', size=13),
                  "font_p": Font(family='Candara', size=15),
                  "button_font": Font(family='Candara', size=10),
+                 "button_bg": "#A9A9A9",
+                 "button_bg_positive": "#2E8B57",
+                 "button_bg_negative": "#B22222",
                  "cursor": "pencil"}
     else:
         theme_var.set(0)
@@ -75,6 +78,9 @@ def set_theme():  # доделать для кнопок
                  "font10": Font(family='Ubuntu', size=13),
                  "font_p": Font(family='Ubuntu', size=15),
                  "button_font": None,
+                 "button_bg": "#A9A9A9",
+                 "button_bg_positive": "#2E8B57",
+                 "button_bg_negative": "#B22222",
                  "cursor": None}
 
 
@@ -267,8 +273,6 @@ def auto_login():
             entry_log.insert(0, lgn)
             entry_pass.insert(0, psw)
             var.set(1)
-    except FileNotFoundError:
-        pass
     except Exception as er:
         exception_handler(er)
 
@@ -427,10 +431,10 @@ def menu_navigation(menu: str):
             label_line2.pack(side=TOP, anchor=N)
         button_logout.pack(side=TOP, pady=5, anchor=N)
         button_back.pack_forget()
-        button_chat.configure(bg="#2E8B57")
-        button_info.configure(bg="#A9A9A9")
-        button_settings.configure(bg="#A9A9A9")
-        button_groups.configure(bg="#A9A9A9")
+        button_chat.configure(bg=theme['button_bg_positive'])
+        button_info.configure(bg=theme['button_bg'])
+        button_settings.configure(bg=theme['button_bg'])
+        button_groups.configure(bg=theme['button_bg'])
         main1_frame.pack_forget()
         settings_frame.pack_forget()
         group_frame.pack_forget()
@@ -446,20 +450,20 @@ def menu_navigation(menu: str):
         button_img2.configure(state='disabled')
     elif menu == "set":
         button_settings.update()
-        button_chat.configure(bg="#A9A9A9")
-        button_info.configure(bg="#A9A9A9")
-        button_settings.configure(bg="#2E8B57")
-        button_groups.configure(bg="#A9A9A9")
+        button_chat.configure(bg=theme['button_bg'])
+        button_info.configure(bg=theme['button_bg'])
+        button_settings.configure(bg=theme['button_bg_positive'])
+        button_groups.configure(bg=theme['button_bg'])
         main_frame.pack_forget()
         main1_frame.pack_forget()
         group_frame.pack_forget()
         settings_frame.pack(side=LEFT, anchor=N)
     elif menu == "info":
         button_info.update()
-        button_chat.configure(bg="#A9A9A9")
-        button_info.configure(bg="#2E8B57")
-        button_settings.configure(bg="#A9A9A9")
-        button_groups.configure(bg="#A9A9A9")
+        button_chat.configure(bg=theme['button_bg'])
+        button_info.configure(bg=theme['button_bg_positive'])
+        button_settings.configure(bg=theme['button_bg'])
+        button_groups.configure(bg=theme['button_bg'])
         main_frame.pack_forget()
         settings_frame.pack_forget()
         group_frame.pack_forget()
@@ -498,7 +502,7 @@ def menu_navigation(menu: str):
         counter = 0
         for i in groups:
             counter += 1
-            chats[i] = tk.Button(menu_frame, text=i, bg='#A9A9A9', width=17, relief=theme['relief'],
+            chats[i] = tk.Button(menu_frame, text=i, bg=theme['button_bg'], width=17, relief=theme['relief'],
                                  font=theme['button_font'])
             if counter % 2 == 0:
                 chats[i].pack(side=TOP, anchor=N)
@@ -549,8 +553,8 @@ def change_group(gr_id: str, button):
     global current_chat, chats
     current_chat = gr_id
     for key in chats:
-        chats[key].configure(bg='#A9A9A9')
-    button.configure(bg="#2E8B57")
+        chats[key].configure(bg=theme['button_bg'])
+    button.configure(bg=theme['button_bg_positive'])
     get_chat_message()
 
 
@@ -620,7 +624,10 @@ def get_message():
                 if chat_nick == 0 and int(message["from_id"]) != user_id:
                     chat_nick = get_user_nickname(message["from_id"])
                 nick = user_login if int(message["from_id"]) == user_id else chat_nick
-                decrypt_msg = decrypt(int2bytes(message["message"]), int2bytes(message["message1"]))
+                if int(message['from_id']) == int(user_id):
+                    decrypt_msg = decrypt(int2bytes(message["message1"]))
+                else:
+                    decrypt_msg = decrypt(int2bytes(message["message"]))
                 date = datetime.strptime(message["date"], "%Y-%m-%dT%H:%M:%S")
                 content = f'{str(date + utc_diff)[2:]} {nick}: {decrypt_msg}\n'
                 canvas.insert(END, content)
@@ -642,17 +649,14 @@ def encrypt(msg: bytes, pubkey):
         exception_handler(er)
 
 
-def decrypt(msg: bytes, msg1: bytes):  # переписать
+def decrypt(msg: bytes):
     global private_key
     try:
         decrypted_message = rsa.decrypt(msg, private_key)
         return decrypted_message.decode('utf-8')
-    except Exception:
-        try:
-            decrypted_message = rsa.decrypt(msg1, private_key)
-            return decrypted_message.decode('utf-8')
-        except Exception:
-            return None
+    except Exception as er:
+        exception_handler(er)
+        return None
 
 
 def login_handler(*args):
@@ -813,7 +817,7 @@ def get_chat_message():
         for i in range(2000):
             try:
                 message = res[f"item_{i}"]
-                decrypt_msg = decrypt(int2bytes(message["message"]), int2bytes(message["message1"]))
+                decrypt_msg = decrypt(int2bytes(message["message"]))
                 date = datetime.strptime(message["date"], "%Y-%m-%dT%H:%M:%S")
                 nickname = get_user_nickname(message["from_id"].split('_', 1)[1])
                 content = f'{str(date + utc_diff)[2:]} {nickname}: {decrypt_msg}\n'
@@ -1088,7 +1092,7 @@ def unpin_chat(l_frame, id):
 def pin_constructor(text, chat, id):
     try:
         local_frame = tk.LabelFrame(menu_frame, width=150, height=50, relief=FLAT, bg=theme['bg'])
-        button1 = tk.Button(local_frame, text=text, bg='#A9A9A9', width=13, relief=theme['relief'],
+        button1 = tk.Button(local_frame, text=text, bg=theme['button_bg'], width=13, relief=theme['relief'],
                             font=theme['button_font'], command=lambda: (menu_navigation("chat"), open_chat(chat)))
         button2 = tk.Button(local_frame, text='-', bg='#B00000', width=2, relief=theme['relief'],
                             font=theme['button_font'], command=lambda: unpin_chat(local_frame, id))
@@ -1216,16 +1220,16 @@ entry_pass.pack(side=TOP)
 check_remember = tk.Checkbutton(auth_frame, font=theme['font10'], fg=theme['tc'], bg=theme['bg'], text='Remember me',
                                 activebackground=theme['bg'], selectcolor=theme['bg'], variable=var)
 check_remember.pack(side=TOP, anchor=S)
-button_login = tk.Button(auth_frame, text="LOGIN", bg='#2E8B57', width=11, command=lambda: login(),
+button_login = tk.Button(auth_frame, text="LOGIN", bg=theme['button_bg_positive'], width=11, command=lambda: login(),
                          relief=theme['relief'], font=theme['button_font'])
 button_login.pack(side=LEFT, pady=3, anchor=CENTER)
-button_reg_m = tk.Button(auth_frame, text="REGISTER", bg='#2E8B57', width=11, command=lambda: show_reg_frame(),
-                         relief=theme['relief'], font=theme['button_font'])
+button_reg_m = tk.Button(auth_frame, text="REGISTER", bg=theme['button_bg_positive'], width=11,
+                         command=lambda: show_reg_frame(), relief=theme['relief'], font=theme['button_font'])
 button_reg_m.pack(side=RIGHT, pady=3, anchor=CENTER)
-button_reg = tk.Button(auth_frame, text="REGISTER", bg='#2E8B57', width=11, command=lambda: register(),
-                       relief=theme['relief'], font=theme['button_font'])
-button_login_b = tk.Button(auth_frame, text="BACK", bg='#2E8B57', width=11, command=lambda: back_to_login(),
-                           relief=theme['relief'], font=theme['button_font'])
+button_reg = tk.Button(auth_frame, text="REGISTER", bg=theme['button_bg_positive'], width=11,
+                       command=lambda: register(), relief=theme['relief'], font=theme['button_font'])
+button_login_b = tk.Button(auth_frame, text="BACK", bg=theme['button_bg_positive'], width=11,
+                           command=lambda: back_to_login(), relief=theme['relief'], font=theme['button_font'])
 # endregion
 # region reg
 recovery_frame = LabelFrame(root, width=200, height=130, relief=FLAT, bg=theme['bg'])
@@ -1235,8 +1239,8 @@ label_code.pack(side=TOP, anchor=S)
 entry_code = tk.Entry(recovery_frame, font=12, width=20, fg=theme['tc'], bg=theme['entry'], relief=theme['relief'],
                       cursor=theme['cursor'])
 entry_code.pack(side=TOP)
-button_code = tk.Button(recovery_frame, text="SEND", bg='#2E8B57', width=11, command=lambda: new_pass_menu(),
-                        relief=theme['relief'], font=theme['button_font'])
+button_code = tk.Button(recovery_frame, text="SEND", bg=theme['button_bg_positive'], width=11,
+                        command=lambda: new_pass_menu(), relief=theme['relief'], font=theme['button_font'])
 button_code.pack(side=RIGHT, pady=3, anchor=CENTER)
 # endregion
 # region new pass
@@ -1253,8 +1257,8 @@ label_code2.pack(side=TOP, anchor=S)
 entry_new_p2 = tk.Entry(new_pass_frame, font=12, width=20, fg=theme['tc'], bg=theme['entry'], cursor=theme['cursor'],
                         show='•')
 entry_new_p2.pack(side=TOP)
-button_code = tk.Button(new_pass_frame, text="SET", bg='#2E8B57', width=11, command=lambda: set_new_pass(),
-                        relief=theme['relief'], font=theme['button_font'])
+button_code = tk.Button(new_pass_frame, text="SET", bg=theme['button_bg_positive'], width=11,
+                        command=lambda: set_new_pass(), relief=theme['relief'], font=theme['button_font'])
 button_code.pack(side=RIGHT, pady=3, anchor=CENTER)
 # endregion
 # region email
@@ -1268,16 +1272,16 @@ main_frame = LabelFrame(root, width=850, height=500, bg=theme['bg'], relief=them
 group_frame = LabelFrame(root, width=850, height=500, bg=theme['bg'], relief=theme['relief'])
 settings_frame = LabelFrame(root, width=600, height=500, bg=theme['bg'], relief=theme['frame_relief'])
 menu_frame = LabelFrame(root, width=150, height=500, relief=FLAT, bg=theme['bg'])
-button_chat = tk.Button(menu_frame, text="CHAT", bg='#2E8B57', width=17, relief=theme['relief'],
+button_chat = tk.Button(menu_frame, text="CHAT", bg=theme['button_bg_positive'], width=17, relief=theme['relief'],
                         command=lambda: menu_navigation("chat"), font=theme['button_font'])
 button_chat.pack(side=TOP, anchor=N)
-button_info = tk.Button(menu_frame, text="INFO", bg='#A9A9A9', width=17, relief=theme['relief'],
+button_info = tk.Button(menu_frame, text="INFO", bg=theme['button_bg'], width=17, relief=theme['relief'],
                         command=lambda: menu_navigation("info"), font=theme['button_font'])
 button_info.pack(side=TOP, pady=5, anchor=N)
-button_settings = tk.Button(menu_frame, text="SETTINGS", bg='#A9A9A9', width=17, relief=theme['relief'],
+button_settings = tk.Button(menu_frame, text="SETTINGS", bg=theme['button_bg'], width=17, relief=theme['relief'],
                             command=lambda: menu_navigation("set"), font=theme['button_font'])
 button_settings.pack(side=TOP, anchor=N)
-button_groups = tk.Button(menu_frame, text="GROUPS", bg='#A9A9A9', width=17, relief=theme['relief'],
+button_groups = tk.Button(menu_frame, text="GROUPS", bg=theme['button_bg'], width=17, relief=theme['relief'],
                           command=lambda: menu_navigation("group"), font=theme['button_font'])
 button_groups.pack(side=TOP, pady=5, anchor=N)
 label_line1 = tk.Label(menu_frame, font=theme['font10'], text="-" * 20, fg=theme['tc'], bg=theme['bg'])
@@ -1287,10 +1291,10 @@ label_fixed.pack(side=TOP, anchor=N)
 get_pin_chats()
 label_line2 = tk.Label(menu_frame, font=theme['font10'], text="-" * 20, fg=theme['tc'], bg=theme['bg'])
 label_line2.pack(side=TOP, anchor=N)
-button_logout = tk.Button(menu_frame, text="LOGOUT", bg='#B22222', width=17, relief=theme['relief'],
+button_logout = tk.Button(menu_frame, text="LOGOUT", bg=theme['button_bg_negative'], width=17, relief=theme['relief'],
                           command=lambda: logout(), font=theme['button_font'])
 button_logout.pack(side=BOTTOM, pady=5, anchor=N)
-button_back = tk.Button(menu_frame, text="BACK", bg='#B22222', width=17, relief=theme['relief'],
+button_back = tk.Button(menu_frame, text="BACK", bg=theme['button_bg_negative'], width=17, relief=theme['relief'],
                         command=lambda: menu_navigation("chat"), font=theme['button_font'])
 main2_frame = LabelFrame(main_frame, width=600, height=350, relief=FLAT, bg=theme['bg'])
 main2_frame.pack(side=TOP, anchor=CENTER)
@@ -1306,7 +1310,7 @@ label_chat_id.pack(side=LEFT, anchor=W)
 entry_chat_id = tk.Entry(chat_frame, font=12, width=20, fg=theme['tc'], bg=theme['entry'], relief=theme['relief'],
                          cursor='pencil')
 entry_chat_id.pack(side=LEFT, padx=165, anchor=CENTER)
-button_chat_id = tk.Button(chat_frame, text="OPEN", bg='#2E8B57', width=15, relief=theme['relief'],
+button_chat_id = tk.Button(chat_frame, text="OPEN", bg=theme['button_bg_positive'], width=15, relief=theme['relief'],
                            command=lambda: open_chat(entry_chat_id.get()))
 button_chat_id.pack(side=RIGHT, anchor=E)
 
@@ -1328,33 +1332,33 @@ canvas_2.pack(side=RIGHT, expand=True, fill=BOTH)
 canvas_2.config(yscrollcommand=scroll_2.set)
 canvas_2.configure(state='disabled')
 
-button_refresh = tk.Button(main_frame, text="REFRESH", bg='#2E8B57', width=120, relief=theme['relief'],
-                           command=lambda: get_message())
+button_refresh = tk.Button(main_frame, text="REFRESH", bg=theme['button_bg_positive'], width=120,
+                           relief=theme['relief'], command=lambda: get_message())
 button_refresh.pack(side=TOP, pady=3, anchor=CENTER)
 entry_msg = tk.Entry(main_frame, font=10, width=85, relief=theme['relief'], fg=theme['tc'], bg=theme['entry'],
                      cursor=theme['cursor'])
 entry_msg.bind("<Return>", send_message_handler)
 entry_msg.pack(side=LEFT, padx=3)
-button_img = tk.Button(main_frame, text="➕", bg='#2E8B57', width=3, relief=theme['relief'],
+button_img = tk.Button(main_frame, text="➕", bg=theme['button_bg_positive'], width=3, relief=theme['relief'],
                        command=lambda: send_doc(), state='disabled')
 button_img.pack(side=LEFT, anchor=E)
-button_send = tk.Button(main_frame, text="SEND", bg='#2E8B57', width=8, relief=theme['relief'],
+button_send = tk.Button(main_frame, text="SEND", bg=theme['button_bg_positive'], width=8, relief=theme['relief'],
                         command=lambda: send_message(),
                         state='disabled')
 button_send.pack(side=LEFT, anchor=E, padx=3)
 
-button_refresh2 = tk.Button(group_frame, text="REFRESH", bg='#2E8B57', width=121, relief=theme['relief'],
-                            command=lambda: get_chat_message())
+button_refresh2 = tk.Button(group_frame, text="REFRESH", bg=theme['button_bg_positive'], width=121,
+                            relief=theme['relief'], command=lambda: get_chat_message())
 button_refresh2.pack(side=TOP, pady=3, anchor=CENTER)
 entry_msg2 = tk.Entry(group_frame, font=10, width=85, relief=theme['relief'], fg=theme['tc'], bg=theme['entry'],
                       cursor=theme['cursor'])
 # entry_msg2.bind("<Return>", send_chat_message())
 entry_msg2.pack(side=LEFT, padx=3)
-button_img2 = tk.Button(group_frame, text="➕", bg='#2E8B57', width=3, relief=theme['relief'], state='disabled',
-                        command=lambda: send_chat_doc())
+button_img2 = tk.Button(group_frame, text="➕", bg=theme['button_bg_positive'], width=3, relief=theme['relief'],
+                        state='disabled', command=lambda: send_chat_doc())
 button_img2.pack(side=LEFT, anchor=E)
-button_send2 = tk.Button(group_frame, text="SEND", bg='#2E8B57', width=8, relief=theme['relief'], state='disabled',
-                         command=lambda: send_chat_message())
+button_send2 = tk.Button(group_frame, text="SEND", bg=theme['button_bg_positive'], width=8, relief=theme['relief'],
+                         state='disabled', command=lambda: send_chat_message())
 button_send2.pack(side=LEFT, anchor=E, padx=3)
 entry_log.focus_set()
 # root.after(500, loop)
@@ -1367,8 +1371,8 @@ label_check = tk.Label(settings_frame_2, font=10, text="  Update frequency:", fg
 label_check.pack(side=LEFT, anchor=W)
 label_check2 = tk.Label(settings_frame_2, font=12, text='1 min', width=20, fg=theme['tc'], bg=theme['bg'])
 label_check2.pack(side=LEFT, padx=170, anchor=CENTER)
-button_check_msg = tk.Button(settings_frame_2, text="UPDATE", bg='#2E8B57', width=15, relief=theme['relief'],
-                             command=lambda: auto_check())
+button_check_msg = tk.Button(settings_frame_2, text="UPDATE", bg=theme['button_bg_positive'], width=15,
+                             relief=theme['relief'], command=lambda: auto_check())
 button_check_msg.pack(side=RIGHT, anchor=E)
 
 settings_frame7 = LabelFrame(settings_frame, width=600, height=25, relief=FLAT, bg=theme['bg'])
@@ -1379,8 +1383,8 @@ label_chat.pack(side=LEFT, anchor=W)
 entry_chat = tk.Entry(settings_frame7, font=12, width=20, fg=theme['tc'], bg=theme['entry'], cursor=theme['cursor'],
                       relief=theme['relief'])
 entry_chat.pack(side=LEFT, padx=170, anchor=CENTER)
-button_c_chat = tk.Button(settings_frame7, text="CREATE", bg='#2E8B57', width=15, relief=theme['relief'],
-                          command=lambda: create_chat())
+button_c_chat = tk.Button(settings_frame7, text="CREATE", bg=theme['button_bg_positive'], width=15,
+                          relief=theme['relief'], command=lambda: create_chat())
 button_c_chat.pack(side=RIGHT, anchor=E)
 
 settings_frame11 = LabelFrame(settings_frame, width=600, height=25, relief=FLAT, bg=theme['bg'])
@@ -1390,7 +1394,7 @@ label_pin.pack(side=LEFT, anchor=W)
 entry_pin = tk.Entry(settings_frame11, font=12, width=20, fg=theme['tc'], bg=theme['entry'], cursor=theme['cursor'],
                      relief=theme['relief'])
 entry_pin.pack(side=LEFT, padx=170, anchor=CENTER)
-button_pin = tk.Button(settings_frame11, text="PIN", bg='#2E8B57', width=15, relief=theme['relief'],
+button_pin = tk.Button(settings_frame11, text="PIN", bg=theme['button_bg_positive'], width=15, relief=theme['relief'],
                        command=lambda: pin_chat())
 button_pin.pack(side=RIGHT, anchor=E)
 
@@ -1412,8 +1416,8 @@ label_gr_toinv.pack(side=TOP, anchor=W)
 entry_gr_toinv = tk.Entry(settings_frame10, font=12, width=20, fg=theme['tc'], bg=theme['entry'],
                           cursor=theme['cursor'], relief=theme['relief'])
 entry_gr_toinv.pack(side=TOP, anchor=CENTER)
-button_invite = tk.Button(settings_frame8, text="INVITE", bg='#2E8B57', width=15, relief=theme['relief'],
-                          command=lambda: invite_to_group())
+button_invite = tk.Button(settings_frame8, text="INVITE", bg=theme['button_bg_positive'], width=15,
+                          relief=theme['relief'], command=lambda: invite_to_group())
 button_invite.pack(side=RIGHT, anchor=S)
 
 settings_frame20 = LabelFrame(settings_frame, width=600, height=25, relief=FLAT, bg=theme['bg'])
@@ -1434,7 +1438,7 @@ label_gr_tokick.pack(side=TOP, anchor=W)
 entry_gr_tokick = tk.Entry(settings_frame10, font=12, width=20, fg=theme['tc'], bg=theme['entry'],
                            cursor=theme['cursor'], relief=theme['relief'])
 entry_gr_tokick.pack(side=TOP, anchor=CENTER)
-button_kick = tk.Button(settings_frame20, text="KICK", bg='#2E8B57', width=15, relief=theme['relief'],
+button_kick = tk.Button(settings_frame20, text="KICK", bg=theme['button_bg_positive'], width=15, relief=theme['relief'],
                         command=lambda: kick_from_group())
 button_kick.pack(side=RIGHT, anchor=S)
 
@@ -1458,8 +1462,8 @@ entry_new_pass = tk.Entry(settings_frame6, font=12, width=20, fg=theme['tc'], bg
                           relief=theme['relief'], show='•')
 entry_new_pass.bind("<Return>", change_pass_handler)
 entry_new_pass.pack(side=TOP, anchor=CENTER)
-button_pass_font = tk.Button(settings_frame3, text="CHANGE", bg='#2E8B57', width=15, relief=theme['relief'],
-                             command=lambda: change_password())
+button_pass_font = tk.Button(settings_frame3, text="CHANGE", bg=theme['button_bg_positive'], width=15,
+                             relief=theme['relief'], command=lambda: change_password())
 button_pass_font.pack(side=RIGHT, anchor=S)
 
 settings_frame4 = LabelFrame(settings_frame, width=600, height=25, relief=FLAT, bg=theme['bg'])
@@ -1470,8 +1474,8 @@ theme0.pack(side=LEFT)
 theme1 = Radiobutton(settings_frame4, text="Dark theme", bg=theme['bg'], fg=theme['tc'], font=theme['font10'],
                      variable=theme_var, value=1, command=lambda: save_theme())
 theme1.pack(side=LEFT)
-button_regenerate = tk.Button(settings_frame, text="REGENERATE ENCRYPTION KEYS", bg='#2E8B57', width=113,
-                              relief=theme['relief'], command=lambda: regenerate_keys())
+button_regenerate = tk.Button(settings_frame, text="REGENERATE ENCRYPTION KEYS", bg=theme['button_bg_positive'],
+                              width=113, relief=theme['relief'], command=lambda: regenerate_keys())
 button_regenerate.pack(side=TOP, anchor=CENTER)
 # endregion
 # region info
@@ -1484,7 +1488,7 @@ info_frame_2.pack(side=TOP, anchor=NW)
 entry_user_search = tk.Entry(info_frame_2, font=10, width=87, relief=theme['relief'], fg=theme['tc'], bg=theme['entry'],
                              cursor=theme['cursor'])
 entry_user_search.pack(side=LEFT, padx=3)
-button_search = tk.Button(info_frame_2, text="SEARCH", bg='#2E8B57', width=8, relief=theme['relief'],
+button_search = tk.Button(info_frame_2, text="SEARCH", bg=theme['button_bg_positive'], width=8, relief=theme['relief'],
                           command=lambda: search_user())
 button_search.pack(side=LEFT, anchor=E, padx=3)
 frame_users = Frame(info_frame, width=800, height=400)

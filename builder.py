@@ -7,7 +7,7 @@ if sys.platform == "win32":
 elif sys.platform == "win64":
     base = "Win64GUI"
 
-excludes = ['PyQt5', 'colorama', 'logging']
+excludes = ['PyQt5', 'colorama']
 
 packages = ["idna", "_cffi_backend", "bcrypt", "rsa", "os", "keyring", "keyring.backends",
             "win32ctypes", "shutil", "PIL", "qrcode"]
