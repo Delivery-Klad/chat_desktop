@@ -1,5 +1,3 @@
-# if res.status_code == 401 заменить на response_handler
-
 import os
 import platform
 import threading
@@ -26,7 +24,6 @@ elif platform.uname().system == "Darwin":
     keyring.set_keyring(Keyring())
 
 backend_url = "https://chat-b4ckend.herokuapp.com/"
-
 code = None
 chats = {}
 pin_chats = []
@@ -51,7 +48,7 @@ except FileExistsError:
     pass
 
 
-def set_theme():  # доделать для кнопок
+def set_theme():
     global theme
     temp = keyring.get_password('datachat', 'theme')
     if temp == "1":
@@ -720,8 +717,11 @@ def send_doc():
 
 
 def get_message():
-    button_refresh.update()
     global user_id, current_chat
+    try:
+        button_refresh.update()
+    except NotImplementedError:
+        pass
     chat_nick = 0
     res = get_messages(current_chat, 0)
     if res is None:
@@ -834,7 +834,7 @@ def get_private_key():
 
 
 def create_chat():
-    global user_id, auth_token, user_login, user_password
+    global user_id
     button_c_chat.update()
     try:
         name = entry_chat.get()
@@ -862,7 +862,7 @@ def create_chat():
 
 
 def send_chat_message():
-    global user_id, current_chat, user_login, user_password, auth_token
+    global user_id, current_chat
     button_send2.update()
     message = entry_msg2.get()
     try:
@@ -872,8 +872,7 @@ def send_chat_message():
         name = get_chat_name(current_chat)
         users = get_chat_users(name)
         for i in users:
-            encrypt_msg = encrypt(message.encode('utf-8'), get_pubkey(i[0]))
-            message_send_chat(current_chat, user_id, i[0], message)
+            message_send_chat(current_chat, user_id, i[0], encrypt(message.encode('utf-8'), get_pubkey(i[0])))
             entry_msg2.delete(0, tk.END)
         get_chat_message()
     except Exception as e:
@@ -881,7 +880,7 @@ def send_chat_message():
 
 
 def send_chat_doc():
-    global user_id, current_chat, auth_token, user_login, user_password
+    global user_id, current_chat
     button_img2.update()
     try:
         path = filedialog.askopenfilename(filetypes=[("All files", "*.*")])
@@ -898,7 +897,10 @@ def send_chat_doc():
 
 def get_chat_message():
     global user_id, current_chat
-    button_refresh2.update()
+    try:
+        button_refresh2.update()
+    except NotImplementedError:
+        pass
     res = get_messages(current_chat, 1)
     if res is None:
         return
@@ -922,7 +924,7 @@ def get_chat_message():
 
 
 def invite_to_group():
-    global user_id, auth_token, user_login, user_password
+    global user_id
     button_invite.update()
     inv_user = entry_inv_id.get()
     inv_group = entry_gr_toinv.get()
@@ -944,7 +946,7 @@ def invite_to_group():
 
 
 def kick_from_group():
-    global user_id, auth_token, user_login, user_password
+    global user_id
     button_kick.update()
     kick_user = entry_kick_id.get()
     kick_group = entry_gr_tokick.get()
@@ -1001,7 +1003,7 @@ def new_pass_menu():
 
 
 def change_password():
-    global user_login, auth_token, user_login, user_password
+    global user_login
     button_pass_font.update()
     try:
         hashed_pass = bcrypt.hashpw(entry_new_pass.get().encode('utf-8'), bcrypt.gensalt())
@@ -1063,17 +1065,16 @@ def pass_code():
 def open_chat(chat_id):
     global current_chat
     button_chat_id.update()
-    chat = chat_id
-    if len(chat) == 0 or not chat.isnumeric():
+    if len(chat_id) == 0 or not chat_id.isnumeric():
         messagebox.showerror('Input error', 'Chat id must be a number')
         return
-    nick = get_user_nickname(int(chat))
+    nick = get_user_nickname(int(chat_id))
     if nick is not None:
         label_chat_id.configure(text='Current chat with: ' + nick)
     else:
         messagebox.showerror('Input error', 'User not found')
         return
-    current_chat = chat
+    current_chat = chat_id
     button_send.configure(state='normal')
     button_img.configure(state='normal')
     canvas.configure(state='normal')
@@ -1228,7 +1229,6 @@ def auto_check():
 
 def loop_msg_func():
     print('check')
-    global auth_token, user_login, user_password
     if auth_token == '':
         return
     res = message_loop()

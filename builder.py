@@ -22,6 +22,6 @@ options = {'build_exe': {
 
 setup(name="main",
       options=options,
-      version="1.0.2",
+      version="1.4",
       description='description',
       executables=[Executable("main.py", base=base)])
