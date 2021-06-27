@@ -212,11 +212,33 @@ def message_loop():
         exception_handler(er)
 
 
+def message_send_chat(chat, user, target, message):
+    global auth_token
+    try:
+        date = datetime.utcnow().strftime('%d-%m-%Y %H:%M:%S')
+        res = requests.post(f"{backend_url}message/send/chat",
+                            json={"date": date, "sender": f"{chat}_{user}", "destination": target,
+                                  "message": message}, headers={'Authorization': f'Bearer {auth_token}'})
+        return response_handler(res).json()
+    except Exception as er:
+        exception_handler(er)
+
+
 def doc_send(path, chat):
     global auth_token
     try:
         res = requests.get(f"{backend_url}url/shorter?url={upload_file(path)}&destination={chat}",
                            headers={'Authorization': f'Bearer {auth_token}'})
+        return response_handler(res).json()
+    except Exception as er:
+        exception_handler(er)
+
+
+def chat_send_doc(path, chat, user, target):
+    global auth_token
+    try:
+        res = requests.get(f"{backend_url}url/shorter/chat?url={upload_file(path)}&sender={chat}_{user}&"
+                           f"destination={target}", headers={'Authorization': f'Bearer {auth_token}'})
         return response_handler(res).json()
     except Exception as er:
         exception_handler(er)
@@ -322,6 +344,46 @@ def upload_file(path: str):
 def send_recovery(user):
     try:
         res = requests.post(f"{backend_url}recovery/send?login={user}")
+        return response_handler(res).json()
+    except Exception as er:
+        exception_handler(er)
+
+
+def validate_recovery(local_code, lgn, hashed_pass=None):
+    try:
+        res = requests.post(f"{backend_url}recovery/validate", json={"code": local_code, "login": lgn,
+                                                                     "password": hashed_pass})
+        return response_handler(res).json()
+    except Exception as er:
+        exception_handler(er)
+
+
+def update_password(old_pass, new_pass):
+    global auth_token
+    try:
+        res = requests.put(f"{backend_url}user/update_password", json={"old_password": old_pass,
+                                                                       "new_password": new_pass},
+                           headers={'Authorization': f'Bearer {auth_token}'})
+        return response_handler(res).json()
+    except Exception as er:
+        exception_handler(er)
+
+
+def user_invite(name, user):
+    global auth_token
+    try:
+        res = requests.post(f"{backend_url}chat/invite", json={"name": name, "user": user},
+                            headers={'Authorization': f'Bearer {auth_token}'})
+        return response_handler(res).json()
+    except Exception as er:
+        exception_handler(er)
+
+
+def user_kick(name, user):
+    global auth_token
+    try:
+        res = requests.post(f"{backend_url}chat/kick", json={"name": name, "user": user},
+                            headers={'Authorization': f'Bearer {auth_token}'})
         return response_handler(res).json()
     except Exception as er:
         exception_handler(er)
@@ -811,15 +873,7 @@ def send_chat_message():
         users = get_chat_users(name)
         for i in users:
             encrypt_msg = encrypt(message.encode('utf-8'), get_pubkey(i[0]))
-            date = datetime.utcnow().strftime('%d-%m-%Y %H:%M:%S')
-            res = requests.post(f"{backend_url}message/send/chat",
-                                json={"date": date, "sender": f"{current_chat}_{user_id}", "destination": i[0],
-                                      "message": encrypt_msg}, headers={'Authorization': f'Bearer {auth_token}'})
-            if res.status_code == 401:
-                auth_token = check_password(user_login, user_password)
-                requests.post(f"{backend_url}message/send/chat",
-                              json={"date": date, "sender": f"{current_chat}_{user_id}", "destination": i[0],
-                                    "message": encrypt_msg}, headers={'Authorization': f'Bearer {auth_token}'})
+            message_send_chat(current_chat, user_id, i[0], message)
             entry_msg2.delete(0, tk.END)
         get_chat_message()
     except Exception as e:
@@ -836,12 +890,7 @@ def send_chat_doc():
         name = get_chat_name(current_chat)
         users = get_chat_users(name)
         for i in users:
-            res = requests.get(f"{backend_url}url/shorter/chat?url={upload_file(path)}&sender={current_chat}_{user_id}&"
-                               f"destination={i[0]}", headers={'Authorization': f'Bearer {auth_token}'})
-            if res.status_code == 401:
-                auth_token = check_password(user_login, user_password)
-                requests.get(f"{backend_url}url/shorter/chat?url={upload_file(path)}&sender={current_chat}_{user_id}&"
-                             f"destination={i[0]}", headers={'Authorization': f'Bearer {auth_token}'})
+            chat_send_doc(path, current_chat, user_id, i[0])
         get_chat_message()
     except Exception as e:
         exception_handler(e)
@@ -886,15 +935,7 @@ def invite_to_group():
         if name in groups:
             messagebox.showerror('Input error', "Пользователь уже состоит в группе")
             return
-        res = requests.post(f"{backend_url}chat/invite", json={"name": name, "user": int(inv_user)},
-                            headers={'Authorization': f'Bearer {auth_token}'})
-        if res.status_code == 401:
-            auth_token = check_password(user_login, user_password)
-            res = requests.post(f"{backend_url}chat/invite", json={"name": name, "user": int(inv_user)},
-                                headers={'Authorization': f'Bearer {auth_token}'}).json()
-        else:
-            res = res.json()
-        if not res:
+        if not user_invite(name, int(inv_user)):
             messagebox.showerror('Access error', "You are not chat's owner")
             return
         messagebox.showinfo('Success', "Success")
@@ -916,15 +957,7 @@ def kick_from_group():
         if name not in groups:
             messagebox.showerror('Input error', "User is not in group")
             return
-        res = requests.post(f"{backend_url}chat/kick", json={"name": name, "user": int(kick_user)},
-                            headers={'Authorization': f'Bearer {auth_token}'})
-        if res.status_code == 401:
-            auth_token = check_password(user_login, user_password)
-            res = requests.post(f"{backend_url}chat/kick", json={"name": name, "user": int(kick_user)},
-                                headers={'Authorization': f'Bearer {auth_token}'}).json()
-        else:
-            res = res.json()
-        if not res:
+        if not user_kick(name, int(kick_user)):
             messagebox.showerror('Access error', "You are not chat's owner")
             return
         messagebox.showinfo('Success', "Success")
@@ -957,9 +990,7 @@ def new_pass_menu():
     global w, h, user_login, code
     try:
         code = entry_code.get()
-        res = requests.post(f"{backend_url}recovery/validate", json={"code": entry_code.get(),
-                                                                     "login": entry_log.get()}).json()
-        if not res:
+        if not validate_recovery(entry_code.get(), entry_log.get()):
             messagebox.showerror('Input error', 'Incorrect code')
             return
         recovery_frame.pack_forget()
@@ -975,16 +1006,7 @@ def change_password():
     try:
         hashed_pass = bcrypt.hashpw(entry_new_pass.get().encode('utf-8'), bcrypt.gensalt())
         hashed_pass = str(hashed_pass)[2:-1]
-        res = requests.put(f"{backend_url}user/update_password", json={"old_password": entry_old_pass.get(),
-                                                                       "new_password": hashed_pass},
-                           headers={'Authorization': f'Bearer {auth_token}'})
-        if res.status_code == 401:
-            auth_token = check_password(user_login, user_password)
-            res = requests.put(f"{backend_url}user/update_password", json={"old_password": entry_old_pass.get(),
-                                                                           "new_password": hashed_pass},
-                               headers={'Authorization': f'Bearer {auth_token}'}).json()
-        else:
-            res = res.json()
+        res = update_password(entry_old_pass.get(), hashed_pass)
         if res:
             messagebox.showinfo("Success", "Password has been changed")
             fill_auto_login_file(user_login, entry_new_pass.get())
@@ -1007,9 +1029,7 @@ def set_new_pass():
             if entry_new_p.get() == entry_new_p2.get():
                 hashed_pass = bcrypt.hashpw(entry_new_p.get().encode('utf-8'), bcrypt.gensalt())
                 hashed_pass = str(hashed_pass)[2:-1]
-                res = requests.post(f"{backend_url}recovery/validate", json={"code": code,
-                                                                             "login": user_login,
-                                                                             "password": hashed_pass}).json()
+                res = validate_recovery(code, user_login, hashed_pass)
                 if res:
                     messagebox.showinfo("Success", "Password has been changed")
                     fill_auto_login_file(user_login, entry_new_p.get())
@@ -1026,7 +1046,7 @@ def set_new_pass():
 
 def pass_code():
     try:
-        res = requests.post(f"{backend_url}recovery/send?login={entry_log.get()}").json()
+        res = send_recovery(entry_log.get())
         if res:
             messagebox.showinfo('Recovery', 'Recovery code has been sent to your email')
             recovery_menu()
