@@ -141,9 +141,26 @@ def check_password(log, pas):
         exception_handler(er)
 
 
+def create_user(lgn, hashed_pass, mail):
+    try:
+        res = requests.post(f"{backend_url}user/create", json={'login': lgn, 'password': hashed_pass,
+                                                               'pubkey': keys_generation(), 'email': mail})
+        return response_handler(res).json()
+    except Exception as er:
+        exception_handler(er)
+
+
 def get_id(log):
     try:
         res = requests.get(f"{backend_url}user/get_id?login={log}")
+        return response_handler(res).json()
+    except Exception as er:
+        exception_handler(er)
+
+
+def find_user(user):
+    try:
+        res = requests.get(f'{backend_url}user/find?login={user}')
         return response_handler(res).json()
     except Exception as er:
         exception_handler(er)
@@ -168,6 +185,38 @@ def get_random_users():  # дописать
 def get_pubkey(user):
     try:
         res = requests.get(f"{backend_url}user/get_pubkey?id={user}")
+        return response_handler(res).json()
+    except Exception as er:
+        exception_handler(er)
+
+
+def message_send(chat_id, message, message1):
+    global user_id, auth_token
+    try:
+        date = datetime.utcnow().strftime('%d-%m-%Y %H:%M:%S')
+        res = requests.post(f"{backend_url}message/send", json={"date": date, "sender": user_id,
+                                                                "destination": chat_id, "message": message,
+                                                                "message1": message1},
+                            headers={'Authorization': f'Bearer {auth_token}'})
+        return response_handler(res).json()
+    except Exception as er:
+        exception_handler(er)
+
+
+def message_loop():
+    global auth_token
+    try:
+        res = requests.get(f"{backend_url}message/loop", headers={'Authorization': f'Bearer {auth_token}'})
+        return response_handler(res).json()
+    except Exception as er:
+        exception_handler(er)
+
+
+def doc_send(path, chat):
+    global auth_token
+    try:
+        res = requests.get(f"{backend_url}url/shorter?url={upload_file(path)}&destination={chat}",
+                           headers={'Authorization': f'Bearer {auth_token}'})
         return response_handler(res).json()
     except Exception as er:
         exception_handler(er)
@@ -220,6 +269,16 @@ def regenerate_keys():
         exception_handler(er)
 
 
+def chat_create(name):
+    global auth_token
+    try:
+        res = requests.post(f"{backend_url}chat/create", json={"name": name},
+                            headers={'Authorization': f'Bearer {auth_token}'})
+        return response_handler(res).json()
+    except Exception as er:
+        exception_handler(er)
+
+
 def get_chat_id(name: str):
     try:
         res = requests.get(f"{backend_url}chat/get_id?name={name}")
@@ -255,6 +314,14 @@ def get_chat_users(name: str):
 def upload_file(path: str):
     try:
         res = requests.post(f"{backend_url}file/upload", files={"file": open(path, "rb")})
+        return response_handler(res).json()
+    except Exception as er:
+        exception_handler(er)
+
+
+def send_recovery(user):
+    try:
+        res = requests.post(f"{backend_url}recovery/send?login={user}")
         return response_handler(res).json()
     except Exception as er:
         exception_handler(er)
@@ -389,8 +456,7 @@ def register():
             exception_handler(er)
         hashed_pass = bcrypt.hashpw(psw.encode('utf-8'), bcrypt.gensalt())
         hashed_pass = str(hashed_pass)[2:-1]
-        res = requests.post(f"{backend_url}user/create", json={'login': lgn, 'password': hashed_pass,
-                                                               'pubkey': keys_generation(), 'email': mail}).json()
+        res = create_user(lgn, hashed_pass, mail)
         if res:
             messagebox.showinfo("Success", "Register success!")
         else:
@@ -558,31 +624,20 @@ def change_group(gr_id: str, button):
 
 
 def send_message():
-    global user_id, current_chat, user_login, user_password, auth_token
+    global user_id, current_chat
     button_send.update()
     try:
-        if len(entry_msg.get()) == 0:
+        msg = entry_msg.get()
+        if len(msg) == 0:
             messagebox.showerror('Input error', 'Fill all input fields')
             return
-        for i in entry_msg.get():
+        for i in msg:
             if ord(i) < 32 or ord(i) > 1366:
                 messagebox.showerror('Input error', 'Unsupported symbols')
                 return
-        to_id = current_chat
-        msg = entry_msg.get()
-        encrypt_msg = encrypt(msg.encode('utf-8'), get_pubkey(to_id))
+        encrypt_msg = encrypt(msg.encode('utf-8'), get_pubkey(current_chat))
         encrypt_msg1 = encrypt(msg.encode('utf-8'), get_pubkey(user_id))
-        date = datetime.utcnow().strftime('%d-%m-%Y %H:%M:%S')
-        res = requests.post(f"{backend_url}message/send", json={"date": date, "sender": user_id,
-                                                                "destination": to_id, "message": encrypt_msg,
-                                                                "message1": encrypt_msg1},
-                            headers={'Authorization': f'Bearer {auth_token}'})
-        if res.status_code == 401:
-            auth_token = check_password(user_login, user_password)
-            requests.post(f"{backend_url}message/send", json={"date": date, "sender": user_id,
-                                                              "destination": to_id, "message": encrypt_msg,
-                                                              "message1": encrypt_msg1},
-                          headers={'Authorization': f'Bearer {auth_token}'})
+        message_send(current_chat, encrypt_msg, encrypt_msg1)
         entry_msg.delete(0, tk.END)
         get_message()
     except Exception as e:
@@ -591,17 +646,12 @@ def send_message():
 
 def send_doc():
     button_img.update()
-    global user_id, current_chat, auth_token, user_login, user_password
+    global current_chat
     try:
         path = filedialog.askopenfilename(filetypes=[("All files", "*.*")])
         if len(path) == 0:
             return
-        res = requests.get(f"{backend_url}url/shorter?url={upload_file(path)}&destination={current_chat}",
-                           headers={'Authorization': f'Bearer {auth_token}'})
-        if res.status_code == 401:
-            auth_token = check_password(user_login, user_password)
-            requests.get(f"{backend_url}url/shorter?url={upload_file(path)}&destination={current_chat}",
-                         headers={'Authorization': f'Bearer {auth_token}'})
+        doc_send(path, current_chat)
         get_message()
     except Exception as e:
         exception_handler(e)
@@ -736,14 +786,7 @@ def create_chat():
             if ord(i) < 45 or ord(i) > 122:
                 messagebox.showerror('Input error', 'Unsupported symbols')
                 return
-        res = requests.post(f"{backend_url}chat/create", json={"name": name},
-                            headers={'Authorization': f'Bearer {auth_token}'})
-        if res.status_code == 401:
-            auth_token = check_password(user_login, user_password)
-            res = requests.post(f"{backend_url}chat/create", json={"name": name},
-                                headers={'Authorization': f'Bearer {auth_token}'}).json()
-        else:
-            res = res.json()
+        res = chat_create(name)
         if res:
             messagebox.showinfo('Success', 'Chat created')
             return
@@ -1023,7 +1066,7 @@ def search_user():
     res = entry_user_search.get()
     if len(res) == 0:
         return
-    users_list = requests.get(f'{backend_url}user/find?login={res}').json()
+    users_list = find_user(res)
     canvas_users.configure(state='normal')
     canvas_users.delete(0.0, END)
     for i in range(20):
@@ -1168,14 +1211,7 @@ def loop_msg_func():
     global auth_token, user_login, user_password
     if auth_token == '':
         return
-    res = requests.get(f"{backend_url}message/loop",
-                       headers={'Authorization': f'Bearer {auth_token}'})
-    if res.status_code == 401:
-        auth_token = check_password(user_login, user_password)
-        res = requests.get(f"{backend_url}message/loop",
-                           headers={'Authorization': f'Bearer {auth_token}'}).json()
-    else:
-        res = res.json()
+    res = message_loop()
     if res is not None:
         messagebox.showinfo('New messages!', 'You have new messages in chats: ' + res)
     if current_chat != '-1':
