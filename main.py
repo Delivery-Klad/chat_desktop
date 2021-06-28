@@ -322,9 +322,9 @@ def get_user_groups(user: int):
         exception_handler(er)
 
 
-def get_chat_users(name: str):
+def get_chat_users(group_id: str):
     try:
-        res = requests.get(f"{backend_url}chat/get_users?name={name}")
+        res = requests.get(f"{backend_url}chat/get_users?name={group_id}")
         return response_handler(res).json()
     except Exception as er:
         exception_handler(er)
@@ -390,7 +390,6 @@ def user_kick(name, user):
 
 
 def auto_login():
-    global user_login, user_id
     try:
         lgn = keyring.get_password('datachat', 'login')
         psw = keyring.get_password('datachat', 'password')
@@ -496,8 +495,7 @@ def back_to_login():
 def register():
     button_reg.update()
     try:
-        psw = entry_pass.get()
-        lgn = entry_log.get()
+        lgn, psw = entry_log.get(), entry_pass.get()
         mail = entry_email.get()
         if len(lgn) == 0 or len(psw) == 0:
             messagebox.showerror('Input error', 'Fill all input fields')
@@ -672,9 +670,9 @@ def config(groups):  # потестить
 
 
 def change_group(gr_id: str, button):
+    global current_chat, chats
     button_send2.configure(state='normal')
     button_img2.configure(state='normal')
-    global current_chat, chats
     current_chat = gr_id
     for key in chats:
         chats[key].configure(bg=theme['button_bg'])
@@ -717,25 +715,25 @@ def send_doc():
 
 
 def get_message():
-    global user_id, current_chat
+    global user_id, user_login, current_chat
     try:
         button_refresh.update()
     except NotImplementedError:
         pass
-    chat_nick = 0
     res = get_messages(current_chat, 0)
     if res is None:
         return
     try:
         canvas.configure(state='normal')
         canvas.delete(0.0, END)
+        chat_nick = 0
         for i in range(2000):
             try:
                 message = res[f"item_{i}"]
-                if chat_nick == 0 and int(message["from_id"]) != user_id:
-                    chat_nick = get_user_nickname(message["from_id"])
-                nick = user_login if int(message["from_id"]) == user_id else chat_nick
-                if int(message['from_id']) == int(user_id):
+                if chat_nick == 0 and message["from_id"] != user_login:
+                    chat_nick = message["from_id"]
+                nick = user_login if message["from_id"] == user_login else chat_nick
+                if message['from_id'] == user_login:
                     decrypt_msg = decrypt(int2bytes(message["message1"]))
                 else:
                     decrypt_msg = decrypt(int2bytes(message["message"]))
@@ -784,13 +782,13 @@ def send_message_handler(*args):
     if str(root.focus_get()) == ".!labelframe2.!entry":
         if len(entry_msg.get()) != 0:
             send_message()
-        elif len(entry_msg.get()) == 0:
+        else:
             entry_msg.focus_set()
     elif str(root.focus_get()) == ".!labelframe2.!entry2":
-        if len(entry_msg.get()) != 0:
+        if len(entry_msg2.get()) != 0:
             send_message()
-        elif len(entry_msg.get()) == 0:
-            pass
+        else:
+            entry_msg2.focus_set()
 
 
 def change_pass_handler(*args):
@@ -829,8 +827,8 @@ def get_private_key():
     try:
         global private_key
         private_key = rsa.PrivateKey.load_pkcs1(keyring.get_password('datachat', 'private_key').encode('utf-8'))
-    except FileNotFoundError:
-        pass
+    except Exception as er:
+        exception_handler(er)
 
 
 def create_chat():
@@ -839,7 +837,7 @@ def create_chat():
     try:
         name = entry_chat.get()
         if len(name) < 5:
-            messagebox.showerror("Input error", "Name lenght must be more than 5 characters")
+            messagebox.showerror("Input error", "Name length must be more than 5 characters")
             return
         if name[-3:] != '_gr':
             messagebox.showerror("Input error", "Name must contain '_gr' in the end")
@@ -869,9 +867,7 @@ def send_chat_message():
         if len(message) == 0:
             messagebox.showerror('Input error', 'Fill all input fields')
             return
-        name = get_chat_name(current_chat)
-        users = get_chat_users(name)
-        for i in users:
+        for i in get_chat_users(current_chat):
             message_send_chat(current_chat, user_id, i[0], encrypt(message.encode('utf-8'), get_pubkey(i[0])))
             entry_msg2.delete(0, tk.END)
         get_chat_message()
@@ -886,9 +882,7 @@ def send_chat_doc():
         path = filedialog.askopenfilename(filetypes=[("All files", "*.*")])
         if len(path) == 0:
             return
-        name = get_chat_name(current_chat)
-        users = get_chat_users(name)
-        for i in users:
+        for i in get_chat_users(current_chat):
             chat_send_doc(path, current_chat, user_id, i[0])
         get_chat_message()
     except Exception as e:
@@ -912,8 +906,7 @@ def get_chat_message():
                 message = res[f"item_{i}"]
                 decrypt_msg = decrypt(int2bytes(message["message"]))
                 date = datetime.strptime(message["date"], "%Y-%m-%dT%H:%M:%S")
-                nickname = get_user_nickname(message["from_id"].split('_', 1)[1])
-                content = f'{str(date + utc_diff)[2:]} {nickname}: {decrypt_msg}\n'
+                content = f'{str(date + utc_diff)[2:]} {message["from_id"]}: {decrypt_msg}\n'
                 canvas_2.insert(END, content)
                 canvas_2.update()
             except KeyError:
