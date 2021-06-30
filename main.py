@@ -24,23 +24,20 @@ elif platform.uname().system == "Darwin":
     keyring.set_keyring(Keyring())
 
 backend_url = "https://chat-b4ckend.herokuapp.com/"
-code = None
-chats = {}
+chats, theme = {}, {}
 pin_chats = []
 current_chat = "-1"
 root = tk.Tk()
 spacing, spacing_2 = 0, 0
 w = root.winfo_screenwidth() // 2 - 140
 h = root.winfo_screenheight() // 2 - 100
-user_id, email, user_login, user_password, auth_token = '', '', '', '', ''
-var = IntVar()
-theme_var = IntVar()
+code, user_id, email, user_login, user_password, auth_token = '', '', '', '', '', ''
+var, theme_var = IntVar(), IntVar()
 private_key = rsa.PrivateKey(1, 2, 3, 4, 5)
 files_dir = 'files'
 time_to_check = 60.0
 dt = datetime.now(timezone.utc).astimezone()
 utc_diff = dt.utcoffset()
-theme = {}
 
 try:
     os.mkdir(files_dir)
@@ -324,7 +321,7 @@ def get_user_groups(user: int):
 
 def get_chat_users(group_id: str):
     try:
-        res = requests.get(f"{backend_url}chat/get_users?name={group_id}")
+        res = requests.get(f"{backend_url}chat/get_users?group_id={group_id}")
         return response_handler(res).json()
     except Exception as er:
         exception_handler(er)
@@ -338,7 +335,7 @@ def upload_file(path: str):
         exception_handler(er)
 
 
-def send_recovery(user):
+def send_recovery(user: str):
     try:
         res = requests.post(f"{backend_url}recovery/send?login={user}")
         return response_handler(res).json()
@@ -346,7 +343,7 @@ def send_recovery(user):
         exception_handler(er)
 
 
-def validate_recovery(local_code, lgn, hashed_pass=None):
+def validate_recovery(local_code: str, lgn: str, hashed_pass=None):
     try:
         res = requests.post(f"{backend_url}recovery/validate", json={"code": local_code, "login": lgn,
                                                                      "password": hashed_pass})
@@ -355,7 +352,7 @@ def validate_recovery(local_code, lgn, hashed_pass=None):
         exception_handler(er)
 
 
-def update_password(old_pass, new_pass):
+def update_password(old_pass: str, new_pass: str):
     global auth_token
     try:
         res = requests.put(f"{backend_url}user/update_password", json={"old_password": old_pass,
@@ -366,7 +363,7 @@ def update_password(old_pass, new_pass):
         exception_handler(er)
 
 
-def user_invite(name, user):
+def user_invite(name: str, user: int):
     global auth_token
     try:
         res = requests.post(f"{backend_url}chat/invite", json={"name": name, "user": user},
@@ -376,7 +373,7 @@ def user_invite(name, user):
         exception_handler(er)
 
 
-def user_kick(name, user):
+def user_kick(name: str, user: int):
     global auth_token
     try:
         res = requests.post(f"{backend_url}chat/kick", json={"name": name, "user": user},
@@ -384,8 +381,6 @@ def user_kick(name, user):
         return response_handler(res).json()
     except Exception as er:
         exception_handler(er)
-
-
 # endregion
 
 
@@ -412,7 +407,7 @@ def clear_auto_login():
         pass
 
 
-def fill_auto_login_file(lgn, psw):
+def fill_auto_login_file(lgn: str, psw: str):
     keyring.set_password('datachat', 'login', lgn)
     keyring.set_password('datachat', 'password', psw)
 
@@ -1122,7 +1117,7 @@ def pin_chat():
         exception_handler(e)
 
 
-def unpin_chat(l_frame, id):
+def unpin_chat(l_frame, id: int):
     try:
         pin_chats.remove(l_frame)
         l_frame.pack_forget()
@@ -1145,7 +1140,7 @@ def unpin_chat(l_frame, id):
         exception_handler(er)
 
 
-def pin_constructor(text, chat, id):
+def pin_constructor(text: str, chat: str, id: int):
     try:
         local_frame = tk.LabelFrame(menu_frame, width=150, height=50, relief=FLAT, bg=theme['bg'])
         button1 = tk.Button(local_frame, text=text, activebackground=theme['button_activebg'], bg=theme['button_bg'],
