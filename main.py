@@ -1580,6 +1580,6 @@ if time_to_check is not None:
 if __name__ == "__main__":
     root.title("Chat")
     root.geometry("200x165+{}+{}".format(w, h))
-    root.resizable(True, True)
+    root.resizable(False, False)
     root['bg'] = theme['bg']
     root.mainloop()

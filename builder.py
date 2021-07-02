@@ -20,7 +20,7 @@ options = {'build_exe': {
     'zip_include_packages': zip_include_packages, }
 }
 
-setup(name="main",
+setup(name="main",                              # bdist_msi
       options=options,
       version="1.6",
       description='description',
