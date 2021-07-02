@@ -381,6 +381,8 @@ def user_kick(name: str, user: int):
         return response_handler(res).json()
     except Exception as er:
         exception_handler(er)
+
+
 # endregion
 
 
@@ -592,9 +594,12 @@ def menu_navigation(menu: str):
             try:
                 user = users_list[f'user_{i}']
                 content = f"{user['id']}"
-                while len(content) < 10:
+                while len(content) < 15:
                     content += " "
-                content += f"{user['login']}\n"
+                content += f"{user['login']}"
+                while len(content) < 50:
+                    content += " "
+                content += "\n"
                 canvas_users.insert(END, content)
                 canvas_users.update()
             except KeyError:
@@ -620,48 +625,17 @@ def menu_navigation(menu: str):
         for i in groups:
             counter += 1
             chats[i] = tk.Button(menu_frame, text=i, bg=theme['button_bg'], width=17, relief=theme['relief'],
-                                 font=theme['button_font'])
+                                 font=theme['button_font'], command=lambda: change_group(
+                    get_chat_id(groups[counter - 1]), chats[groups[counter - 1]]))
             if counter % 2 == 0:
-                chats[i].pack(side=TOP, anchor=N)
-            else:
                 chats[i].pack(side=TOP, pady=5, anchor=N)
-        config(groups)
+            else:
+                chats[i].pack(side=TOP, anchor=N)
         group_frame.pack(side=LEFT, anchor=CENTER)
         if counter % 2 == 0:
-            button_back.pack(side=TOP, pady=5, anchor=N)
-        else:
             button_back.pack(side=TOP, anchor=N)
-
-
-def config(groups):  # потестить
-    global chats
-    """for i in range(len(chats)):
-        try:
-            print(i)
-            chats[groups[i]].configure(command=lambda: change_group(get_chat_id(groups[i]), chats[groups[i]]))
-        except IndexError:
-            pass
-    return"""
-    try:
-        chats[groups[0]].configure(command=lambda: change_group(get_chat_id(groups[0]), chats[groups[0]]))
-    except IndexError:
-        pass
-    try:
-        chats[groups[1]].configure(command=lambda: change_group(get_chat_id(groups[1]), chats[groups[1]]))
-    except IndexError:
-        pass
-    try:
-        chats[groups[2]].configure(command=lambda: change_group(get_chat_id(groups[2]), chats[groups[2]]))
-    except IndexError:
-        pass
-    try:
-        chats[groups[3]].configure(command=lambda: change_group(get_chat_id(groups[3]), chats[groups[3]]))
-    except IndexError:
-        pass
-    try:
-        chats[groups[4]].configure(command=lambda: change_group(get_chat_id(groups[4]), chats[groups[4]]))
-    except IndexError:
-        pass
+        else:
+            button_back.pack(side=TOP, pady=5, anchor=N)
 
 
 def change_group(gr_id: str, button):
@@ -710,7 +684,7 @@ def send_doc():
 
 
 def get_message():
-    global user_id, user_login, current_chat
+    global user_login, current_chat
     try:
         button_refresh.update()
     except NotImplementedError:
@@ -722,7 +696,7 @@ def get_message():
         canvas.configure(state='normal')
         canvas.delete(0.0, END)
         chat_nick = 0
-        for i in range(2000):
+        for i in range(res['count']):
             try:
                 message = res[f"item_{i}"]
                 if chat_nick == 0 and message["from_id"] != user_login:
@@ -885,7 +859,7 @@ def send_chat_doc():
 
 
 def get_chat_message():
-    global user_id, current_chat
+    global current_chat
     try:
         button_refresh2.update()
     except NotImplementedError:
@@ -896,7 +870,7 @@ def get_chat_message():
     try:
         canvas_2.configure(state='normal')
         canvas_2.delete(0.0, END)
-        for i in range(2000):
+        for i in range(res['count']):
             try:
                 message = res[f"item_{i}"]
                 decrypt_msg = decrypt(int2bytes(message["message"]))
