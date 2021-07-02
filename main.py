@@ -5,6 +5,7 @@ import sched
 import time
 import json5
 import tkinter as tk
+import tkinter.ttk as ttk
 from datetime import datetime, timezone
 from tkinter import *
 from tkinter import messagebox, filedialog
@@ -604,23 +605,14 @@ def menu_navigation(menu: str):
         group_frame.pack_forget()
         main1_frame.pack(side=LEFT, anchor=NW)
         users_list = get_random_users()
-        canvas_users.configure(state='normal')
-        canvas_users.delete(0.0, END)
+        for i in canvas_users.get_children():
+            canvas_users.delete(i)
         for i in range(20):
             try:
                 user = users_list[f'user_{i}']
-                content = f"{user['id']}"
-                while len(content) < 15:
-                    content += " "
-                content += f"{user['login']}"
-                while len(content) < 50:
-                    content += " "
-                content += "\n"
-                canvas_users.insert(END, content)
-                canvas_users.update()
+                canvas_users.insert(parent='', index=END, values=(user['id'], user['login'], ""), tags=('bb',))
             except KeyError:
                 break
-        canvas_users.configure(state='disabled')
     elif menu == "group":
         button_groups.update()
         button_chat.pack_forget()
@@ -1066,20 +1058,14 @@ def search_user():
     if len(res) == 0:
         return
     users_list = find_user(res)
-    canvas_users.configure(state='normal')
-    canvas_users.delete(0.0, END)
+    for i in canvas_users.get_children():
+        canvas_users.delete(i)
     for i in range(20):
         try:
             user = users_list[f'user_{i}']
-            content = f"{user['id']}"
-            while len(content) < 10:
-                content += " "
-            content += f"{user['login']}\n"
-            canvas_users.insert(END, content)
-            canvas_users.update()
+            canvas_users.insert(parent='', index=END, values=(user['id'], user['login'], ""), tags=('bb',))
         except KeyError:
             break
-    canvas_users.configure(state='disabled')
 
 
 def pin_chat():
@@ -1170,19 +1156,22 @@ def save_theme():
     if theme_var.get() == 2:
         if not os.path.exists(files_dir + "/theme.json"):
             with open(f"{files_dir}/theme.json", "w") as file:
-                file.write('{\n  "text_color": "#ffffff",          //Text color\n'
+                file.write('//Relief types: flat, raised, sunken, groove, ridge\n'
+                           '//Cursor types: arrow, circle, clock, cross, dotbox, exchange, fleur, heart, man, mouse, '
+                           'pirate, plus, shuttle, sizing, spider, spraycan, star, target, tcross, trek, watch\n'
+                           '{\n  "text_color": "#ffffff",          //Text color\n'
                            '  "entry": "#808080",               //Input fields color\n'
-                           '  "relief": "flat",                 //Widgets relief\n'
-                           '  "frame_relief": "flat",           //Users frame relief\n'
+                           '  "relief": "flat",                 //Widgets relief (Relief types)\n'
+                           '  "frame_relief": "flat",           //Users frame relief (Relief types)\n'
                            '  "bg": "#48494f",                  //App background\n'
-                           '  "font_main": "Candara 13",        //Main font\n'
-                           '  "font_users": "Candara 15",       //Users frame font\n'
-                           '  "button_font": "Candara 10",      //Buttons font\n'
+                           '  "font_main": "Candara 13",        //Main font (Name size)\n'
+                           '  "font_users": "Candara 15",       //Users frame font (Name size)\n'
+                           '  "button_font": "Candara 10",      //Buttons font (Name size)\n'
                            '  "button_bg": "#757575",           //Buttons background\n'
                            '  "button_bg_positive": "#006891",  //Positive buttons background\n'
                            '  "button_bg_negative": "#B22222",  //Negative buttons background\n'
                            '  "button_activebg": "#757575",     //Pressed button background\n'
-                           '  "cursor": "pencil"                //Input fields cursor\n}')
+                           '  "cursor": "pencil"                //Input fields cursor (Cursor types)\n}')
         messagebox.showinfo("Success!", f"Theme will be changed on next launch!\nOpen {files_dir}/theme.json to edit "
                                         f"custom theme")
     else:
@@ -1559,13 +1548,24 @@ button_search = tk.Button(info_frame_2, text="SEARCH", activebackground=theme['b
 button_search.pack(side=LEFT, anchor=E, padx=3)
 frame_users = Frame(info_frame, width=800, height=400)
 frame_users.pack()
-canvas_users = Text(frame_users, fg=theme['text_color'], bg=theme['entry'], font=theme['font_users'], width=90,
-                    height=29, cursor='arrow')
+
+style = ttk.Style()
+style.theme_use("clam")
+style.configure("mystyle.Heading", background=theme['entry'], relief=theme['relief'], font=theme['font_users'])
+style.configure("mystyle", highlightthickness=0, background=theme['entry'], bd=0, font=theme['font_users'])
+style.layout("mystyle", [('mystyle.treearea', {})])
+canvas_users = ttk.Treeview(frame_users, height=29, cursor='arrow', columns=(0, 1, 2), show='headings', style="mystyle")
 scroll_users = Scrollbar(frame_users, command=canvas_users.yview, bg=theme['bg'])
 scroll_users.pack(side=RIGHT, fill=Y)
 canvas_users.pack(side=RIGHT, expand=True, fill=BOTH)
 canvas_users.config(yscrollcommand=scroll_users.set)
-canvas_users.configure(state='disabled')
+canvas_users.heading(0, text="ID", anchor=W)
+canvas_users.heading(1, text="Username", anchor=W)
+canvas_users.heading(2, text="Last activity", anchor=W)
+canvas_users.column(0, width=60, stretch=NO)
+canvas_users.column(1, width=567)
+canvas_users.column(2, width=200, stretch=NO)
+canvas_users.tag_configure('bb', background=theme['entry'], foreground=theme['text_color'])
 
 label_loading = Label(root, font=10, text="LOADING", fg=theme['text_color'], bg=theme['bg'])
 # endregion
