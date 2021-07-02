@@ -398,8 +398,6 @@ def user_kick(name: str, user: int):
         return response_handler(res).json()
     except Exception as er:
         exception_handler(er)
-
-
 # endregion
 
 
@@ -1236,7 +1234,9 @@ set_theme()
 """m = Menu(root)
 root.config(menu=m)
 fm = Menu(m)
-m.add_cascade(label="Файл", menu=fm)"""
+m.add_cascade(label="File", menu=fm)
+fmm = Menu(fm)
+fm.add_cascade(label="Export", menu=fmm)"""
 
 # region auth
 auth_frame = LabelFrame(root, width=200, height=130, relief=FLAT, bg=theme['bg'])
@@ -1580,6 +1580,6 @@ if time_to_check is not None:
 if __name__ == "__main__":
     root.title("Chat")
     root.geometry("200x165+{}+{}".format(w, h))
-    root.resizable(False, False)
+    root.resizable(True, True)
     root['bg'] = theme['bg']
     root.mainloop()
