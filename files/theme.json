@@ -1,11 +1,11 @@
 //Relief types: flat, raised, sunken, groove, ridge
 //Cursor types: arrow, circle, clock, cross, dotbox, exchange, fleur, heart, man, mouse, pirate, plus, shuttle, sizing, spider, spraycan, star, target, tcross, trek, watch
 {
-  "text_color": "#ffffff",          //Text color
+  "text_color": "#FFFFFF",          //Text color
   "entry": "#808080",               //Input fields color
   "relief": "flat",                 //Widgets relief (Relief types)
   "frame_relief": "flat",           //Users frame relief (Relief types)
-  "bg": "#48494f",                  //App background
+  "bg": "#48494F",                  //App background
   "font_main": "Candara 13",        //Main font (Name size)
   "font_users": "Candara 15",       //Users frame font (Name size)
   "button_font": "Candara 10",      //Buttons font (Name size)
