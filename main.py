@@ -156,7 +156,7 @@ def create_user(lgn, hashed_pass, mail):
     try:
         res = requests.post(f"{backend_url}user/create", json={'login': lgn, 'password': hashed_pass,
                                                                'pubkey': keys_generation(), 'email': mail})
-        return response_handler(res).json()
+        return response_handler(res).json()  # вынести keys_generation
     except Exception as er:
         exception_handler(er)
 
@@ -268,14 +268,6 @@ def get_messages(cur_chat, is_chat):
             return response_handler(res).json()
         except AttributeError:
             return None
-    except Exception as er:
-        exception_handler(er)
-
-
-def can_use_login(log):
-    try:
-        res = requests.get(f"{backend_url}user/can_use_login?login={log}")
-        return response_handler(res).json()
     except Exception as er:
         exception_handler(er)
 
@@ -517,19 +509,13 @@ def register():
             return
         if not check_input(psw, lgn):
             return
-        try:
-            if not can_use_login(lgn):
-                messagebox.showerror('Input error', 'User already register')
-                return
-        except Exception as er:
-            exception_handler(er)
         hashed_pass = bcrypt.hashpw(psw.encode('utf-8'), bcrypt.gensalt())
         hashed_pass = str(hashed_pass)[2:-1]
         res = create_user(lgn, hashed_pass, mail)
         if res:
             messagebox.showinfo("Success", "Register success!")
         else:
-            messagebox.showerror("Failed", "Register failed!")
+            messagebox.showerror('Input error', 'User already register')
     except Exception as e:
         exception_handler(e)
 
