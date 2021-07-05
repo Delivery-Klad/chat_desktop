@@ -34,7 +34,7 @@ root = tk.Tk()
 spacing, spacing_2 = 0, 0
 w = root.winfo_screenwidth() // 2 - 140
 h = root.winfo_screenheight() // 2 - 100
-code, user_id, email, user_login, user_password, auth_token = '', '', '', '', '', ''
+code, user_id, email, user_login, user_password, access_token = '', '', '', '', '', ''
 remember_var, theme_var = IntVar(), IntVar()
 relief, frames_refief, cursors = StringVar(), StringVar(), StringVar()
 private_key = rsa.PrivateKey(1, 2, 3, 4, 5)
@@ -106,10 +106,12 @@ def exception_handler(e):
 
 
 def response_handler(res: requests.models.Response):
+    global access_token, user_login, user_password
     try:
         if res.status_code == 200:
             return res
         elif res.status_code == 401:
+            access_token = check_password(user_login, user_password)
             print("Not authorized")
             return "retry"
         else:
@@ -203,68 +205,68 @@ def get_pubkey(user):
 
 
 def message_send(chat_id, message, message1):
-    global user_id, auth_token
+    global user_id, access_token
     try:
         date = datetime.utcnow().strftime('%d-%m-%Y %H:%M:%S')
         res = requests.post(f"{backend_url}message/send", json={"date": date, "sender": user_id,
                                                                 "destination": chat_id, "message": message,
                                                                 "message1": message1},
-                            headers={'Authorization': f'Bearer {auth_token}'})
+                            headers={'Authorization': f'Bearer {access_token}'})
         return response_handler(res).json()
     except Exception as er:
         exception_handler(er)
 
 
 def message_loop():
-    global auth_token
+    global access_token
     try:
-        res = requests.get(f"{backend_url}message/loop", headers={'Authorization': f'Bearer {auth_token}'})
+        res = requests.get(f"{backend_url}message/loop", headers={'Authorization': f'Bearer {access_token}'})
         return response_handler(res).json()
     except Exception as er:
         exception_handler(er)
 
 
 def message_send_chat(chat, user, target, message):
-    global auth_token
+    global access_token
     try:
         date = datetime.utcnow().strftime('%d-%m-%Y %H:%M:%S')
         res = requests.post(f"{backend_url}message/send/chat",
                             json={"date": date, "sender": f"{chat}_{user}", "destination": target,
-                                  "message": message}, headers={'Authorization': f'Bearer {auth_token}'})
+                                  "message": message}, headers={'Authorization': f'Bearer {access_token}'})
         return response_handler(res).json()
     except Exception as er:
         exception_handler(er)
 
 
 def doc_send(path, chat):
-    global auth_token
+    global access_token
     try:
         res = requests.get(f"{backend_url}url/shorter?url={upload_file(path)}&destination={chat}",
-                           headers={'Authorization': f'Bearer {auth_token}'})
+                           headers={'Authorization': f'Bearer {access_token}'})
         return response_handler(res).json()
     except Exception as er:
         exception_handler(er)
 
 
 def chat_send_doc(path, chat, user, target):
-    global auth_token
+    global access_token
     try:
         res = requests.get(f"{backend_url}url/shorter/chat?url={upload_file(path)}&sender={chat}_{user}&"
-                           f"destination={target}", headers={'Authorization': f'Bearer {auth_token}'})
+                           f"destination={target}", headers={'Authorization': f'Bearer {access_token}'})
         return response_handler(res).json()
     except Exception as er:
         exception_handler(er)
 
 
 def get_messages(cur_chat, is_chat):
-    global user_login, user_password, auth_token
+    global user_login, user_password, access_token
     try:
         res = requests.get(f"{backend_url}message/get?chat_id={cur_chat}&is_chat={is_chat}",
-                           headers={'Authorization': f'Bearer {auth_token}'})
+                           headers={'Authorization': f'Bearer {access_token}'})
         if response_handler(res) == "retry":
-            auth_token = check_password(user_login, user_password)
+            access_token = check_password(user_login, user_password)
         res = requests.get(f"{backend_url}message/get?chat_id={cur_chat}&is_chat={is_chat}",
-                           headers={'Authorization': f'Bearer {auth_token}'})
+                           headers={'Authorization': f'Bearer {access_token}'})
         try:
             return response_handler(res).json()
         except AttributeError:
@@ -275,14 +277,14 @@ def get_messages(cur_chat, is_chat):
 
 def regenerate_keys():
     button_regenerate.update()
-    global user_login, user_password, auth_token
+    global user_login, user_password, access_token
     try:
         res = requests.put(f"{backend_url}user/update_pubkey", json={'pubkey': keys_generation()},
-                           headers={'Authorization': f'Bearer {auth_token}'})
+                           headers={'Authorization': f'Bearer {access_token}'})
         if res.status_code == 401:
-            auth_token = check_password(user_login, user_password)
+            access_token = check_password(user_login, user_password)
             if requests.put(f"{backend_url}user/update_pubkey", json={'pubkey': keys_generation()},
-                            headers={'Authorization': f'Bearer {auth_token}'}).json:
+                            headers={'Authorization': f'Bearer {access_token}'}).json:
                 messagebox.showinfo("Success", "Regeneration successful!")
             else:
                 messagebox.showerror("Failed", "Regeneration failed!")
@@ -296,10 +298,10 @@ def regenerate_keys():
 
 
 def chat_create(name):
-    global auth_token
+    global access_token
     try:
         res = requests.post(f"{backend_url}chat/create", json={"name": name},
-                            headers={'Authorization': f'Bearer {auth_token}'})
+                            headers={'Authorization': f'Bearer {access_token}'})
         return response_handler(res).json()
     except Exception as er:
         exception_handler(er)
@@ -363,39 +365,37 @@ def validate_recovery(local_code: str, lgn: str, hashed_pass=None):
 
 
 def update_password(old_pass: str, new_pass: str):
-    global auth_token
+    global access_token
     try:
         res = requests.put(f"{backend_url}user/update_password", json={"old_password": old_pass,
                                                                        "new_password": new_pass},
-                           headers={'Authorization': f'Bearer {auth_token}'})
+                           headers={'Authorization': f'Bearer {access_token}'})
         return response_handler(res).json()
     except Exception as er:
         exception_handler(er)
 
 
 def user_invite(name: str, user: int):
-    global auth_token
+    global access_token
     try:
         res = requests.post(f"{backend_url}chat/invite", json={"name": name, "user": user},
-                            headers={'Authorization': f'Bearer {auth_token}'})
+                            headers={'Authorization': f'Bearer {access_token}'})
         return response_handler(res).json()
     except Exception as er:
         exception_handler(er)
 
 
 def user_kick(name: str, user: int):
-    global auth_token
+    global access_token
     try:
         res = requests.post(f"{backend_url}chat/kick", json={"name": name, "user": user},
-                            headers={'Authorization': f'Bearer {auth_token}'})
+                            headers={'Authorization': f'Bearer {access_token}'})
         return response_handler(res).json()
     except Exception as er:
         exception_handler(er)
 
 
 # endregion
-
-
 def auto_login():
     try:
         lgn = keyring.get_password('datachat', 'login')
@@ -425,7 +425,7 @@ def fill_auto_login_file(lgn: str, psw: str):
 
 
 def login(*args):
-    global user_login, user_id, user_password, auth_token
+    global user_login, user_id, user_password, access_token
     label_loading.place(x=60, y=60)
     button_login.update()
     awake_thread.join()
@@ -446,7 +446,7 @@ def login(*args):
                 pass_code()
             label_loading.place_forget()
             return
-        auth_token = res
+        access_token = res
         if remember_var.get() == 0:
             clear_auto_login()
         else:
@@ -597,7 +597,11 @@ def menu_navigation(menu: str):
         for i in range(users_list['count']):
             try:
                 user = users_list[f'user_{i}']
-                canvas_users.insert(parent='', index=END, values=(user['id'], user['login'], ""), tags=('bb',))
+                try:
+                    date = str(datetime.strptime(user["last_activity"], "%Y-%m-%dT%H:%M:%S") + utc_diff)[2:]
+                except TypeError:
+                    date = ""
+                canvas_users.insert(parent='', index=END, values=(user['id'], user['login'], date), tags=('bb',))
             except KeyError:
                 break
     elif menu == "group":
@@ -1051,7 +1055,11 @@ def search_user():
         for i in range(users_list['count']):
             try:
                 user = users_list[f'user_{i}']
-                canvas_users.insert(parent='', index=END, values=(user['id'], user['login'], ""), tags=('bb',))
+                try:
+                    date = str(datetime.strptime(user["last_activity"], "%Y-%m-%dT%H:%M:%S") + utc_diff)[2:]
+                except TypeError:
+                    date = ""
+                canvas_users.insert(parent='', index=END, values=(user['id'], user['login'], date), tags=('bb',))
             except KeyError:
                 break
     except Exception as e:
@@ -1350,7 +1358,7 @@ def loop_msg_func():
     global time_to_check
     print('check')
     try:
-        if auth_token == '':
+        if access_token == '':
             return
         res = message_loop()
         if res is not None:
