@@ -1,4 +1,4 @@
-# import requests
+import requests
 
 # dbx = dropbox.Dropbox('eCp2HTOUrNUAAAAAAAAAASLGV_nwg-uK-KcCXkZTWnT66l2rg9-W6CAGKZnMTiLI')
 
@@ -11,33 +11,42 @@
 # print(y.get_download_link('/destination.txt'))
 # print(y.get_disk_info())
 
-from tkinter import *
-from tkinter import ttk
-
-ws = Tk()
-style = ttk.Style()
-style.configure("mystyle", highlightthickness=0, background='grey', bd=0, font=('Calibri', 11))
-style.theme_use("clam")
-style.configure("mystyle.Heading", background='grey', relief='flat', font=('Calibri', 13, 'bold'))
-style.layout("mystyle", [('mystyle.treearea', {'sticky': 'nswe'})])
-canvas_users = ttk.Treeview(ws, columns=(1, 2, 3), show='headings', height=8, style="mystyle")
-canvas_users.pack()
-canvas_users.heading(1, text="ID", anchor=W)
-canvas_users.heading(2, text="Username", anchor=W)
-canvas_users.heading(3, text="Last activity", anchor=W)
-canvas_users.column(1, width=50, stretch=NO)
-canvas_users.column(2, width=350)
-canvas_users.column(3, width=110, stretch=NO)
-canvas_users.tag_configure('bb', background='grey', foreground='white')
+"""class Userbb(BaseModel):
+    log: str
+    passw: str
 
 
-def update_item():
-    for i in canvas_users.get_children():
-        canvas_users.delete(i)
+class Settings(BaseModel):
+    authjwt_secret_key: str = "secret"
 
 
-canvas_users.insert(parent='', index=END, values=("0", "ggdfgdgd", 1000000.00), tags=('bb',))
-canvas_users.insert(parent='', index=END, values=("1", "dfgdgdgdgfd", 120000.00), tags=('bb',))
-canvas_users.insert(parent='', index=END, values=("2", "dgdfgdgfdgfd", 41000.00), tags=('bb',))
-canvas_users.insert(parent='', index=END, values=("3", "edgfdfgdfgdgdgf14", 22000.00), tags=('bb',))
-ws.mainloop()
+@AuthJWT.load_config
+def get_config():
+    return Settings()
+
+
+@app.post('/login')
+def login(user: Userbb, Authorize: AuthJWT = Depends()):
+    access_token = Authorize.create_access_token(subject=user.log)
+    refresh_token = Authorize.create_refresh_token(subject=user.log)
+    return {"access_token": access_token, "refresh_token": refresh_token}
+
+
+@app.post('/refresh')
+def refresh(Authorize: AuthJWT = Depends()):
+    Authorize.jwt_refresh_token_required()
+    current_user = Authorize.get_jwt_subject()
+    new_access_token = Authorize.create_access_token(subject=current_user)
+    return {"access_token": new_access_token}
+
+
+@app.get('/hello')
+def refresh(Authorize: AuthJWT = Depends()):
+    Authorize.jwt_required()
+    return {"hello": "world"}"""
+
+rez = requests.post("http://127.0.0.1:8000/login", json={"log": "aboba", "passw": "123"})
+print(rez.json())
+
+res = requests.get("http://127.0.0.1:8000/hello", headers={'Authorization': f"Bearer {rez.json()['access_token']}"})
+print(res.json())

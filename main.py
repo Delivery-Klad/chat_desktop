@@ -105,15 +105,22 @@ def exception_handler(e):
         print(er)
 
 
-def response_handler(res: requests.models.Response):
+def request(method, url, json=None, files=None, headers=None):
+    try:
+        return requests.request(method=method, url=url, json=json, files=files, headers=headers)
+    except Exception as er:
+        exception_handler(er)
+
+
+def response_handler(method, url, json=None, files=None, headers=None):
     global access_token, user_login, user_password
     try:
+        res = request(method, url, json, files, headers)
         if res.status_code == 200:
             return res
         elif res.status_code == 401:
             access_token = check_password(user_login, user_password)
-            print("Not authorized")
-            return "retry"
+            return request(method, url, json, headers={'Authorization': f'Bearer {access_token}'})
         else:
             messagebox.showerror("Something went wrong!", f"Response {res.status_code}")
             return None
@@ -149,57 +156,52 @@ def check_input(password: str, log: str):
 # region API
 def check_password(log, pas):
     try:
-        res = requests.post(f"{backend_url}auth", json={"login": log, "password": pas})
-        return response_handler(res).json()
+        return response_handler(method="post", url=f"{backend_url}auth", json={"login": log, "password": pas}).json()
     except Exception as er:
         exception_handler(er)
 
 
 def create_user(lgn, hashed_pass, mail):
     try:
-        res = requests.post(f"{backend_url}user/create", json={'login': lgn, 'password': hashed_pass,
-                                                               'pubkey': keys_generation(), 'email': mail})
-        return response_handler(res).json()  # вынести keys_generation
+        return response_handler(method="post", url=f"{backend_url}user/create", json={'login': lgn,
+                                                                                      'password': hashed_pass,
+                                                                                      'pubkey': keys_generation(),
+                                                                                      'email': mail}).json()
     except Exception as er:
         exception_handler(er)
 
 
 def get_id(log):
     try:
-        res = requests.get(f"{backend_url}user/get_id?login={log}")
-        return response_handler(res).json()
+        return response_handler(method="get", url=f"{backend_url}user/get_id?login={log}").json()
     except Exception as er:
         exception_handler(er)
 
 
 def find_user(user):
     try:
-        res = requests.get(f'{backend_url}user/find?login={user}')
-        return response_handler(res).json()
+        return response_handler(method="get", url=f"{backend_url}user/find?login={user}").json()
     except Exception as er:
         exception_handler(er)
 
 
 def get_user_nickname(user):
     try:
-        res = requests.get(f"{backend_url}user/get_nickname?id={user}")
-        return response_handler(res).json()
+        return response_handler(method="get", url=f"{backend_url}user/get_nickname?id={user}").json()
     except Exception as er:
         exception_handler(er)
 
 
 def get_random_users():  # дописать
     try:
-        res = requests.get(f"{backend_url}user/get_random")
-        return response_handler(res).json()
+        return response_handler(method="get", url=f"{backend_url}user/get_random").json()
     except Exception as er:
         exception_handler(er)
 
 
 def get_pubkey(user):
     try:
-        res = requests.get(f"{backend_url}user/get_pubkey?id={user}")
-        return response_handler(res).json()
+        return response_handler(method="get", url=f"{backend_url}user/get_pubkey?id={user}").json()
     except Exception as er:
         exception_handler(er)
 
@@ -207,12 +209,10 @@ def get_pubkey(user):
 def message_send(chat_id, message, message1):
     global user_id, access_token
     try:
-        date = datetime.utcnow().strftime('%d-%m-%Y %H:%M:%S')
-        res = requests.post(f"{backend_url}message/send", json={"date": date, "sender": user_id,
-                                                                "destination": chat_id, "message": message,
-                                                                "message1": message1},
-                            headers={'Authorization': f'Bearer {access_token}'})
-        return response_handler(res).json()
+        return response_handler(method="post", url=f"{backend_url}message/send",
+                                json={"sender": user_id, "destination": chat_id,
+                                      "message": message, "message1": message1},
+                                headers={'Authorization': f'Bearer {access_token}'}).json()
     except Exception as er:
         exception_handler(er)
 
@@ -220,8 +220,8 @@ def message_send(chat_id, message, message1):
 def message_loop():
     global access_token
     try:
-        res = requests.get(f"{backend_url}message/loop", headers={'Authorization': f'Bearer {access_token}'})
-        return response_handler(res).json()
+        return response_handler(method="get", url=f"{backend_url}message/loop",
+                                headers={'Authorization': f'Bearer {access_token}'}).json()
     except Exception as er:
         exception_handler(er)
 
@@ -229,11 +229,9 @@ def message_loop():
 def message_send_chat(chat, user, target, message):
     global access_token
     try:
-        date = datetime.utcnow().strftime('%d-%m-%Y %H:%M:%S')
-        res = requests.post(f"{backend_url}message/send/chat",
-                            json={"date": date, "sender": f"{chat}_{user}", "destination": target,
-                                  "message": message}, headers={'Authorization': f'Bearer {access_token}'})
-        return response_handler(res).json()
+        return response_handler(method="post", url=f"{backend_url}message/send/chat",
+                                json={"sender": f"{chat}_{user}", "destination": target, "message": message},
+                                headers={'Authorization': f'Bearer {access_token}'}).json()
     except Exception as er:
         exception_handler(er)
 
@@ -241,9 +239,9 @@ def message_send_chat(chat, user, target, message):
 def doc_send(path, chat):
     global access_token
     try:
-        res = requests.get(f"{backend_url}url/shorter?url={upload_file(path)}&destination={chat}",
-                           headers={'Authorization': f'Bearer {access_token}'})
-        return response_handler(res).json()
+        return response_handler(method="get",
+                                url=f"{backend_url}url/shorter?url={upload_file(path)}&destination={chat}",
+                                headers={'Authorization': f'Bearer {access_token}'}).json()
     except Exception as er:
         exception_handler(er)
 
@@ -251,24 +249,20 @@ def doc_send(path, chat):
 def chat_send_doc(path, chat, user, target):
     global access_token
     try:
-        res = requests.get(f"{backend_url}url/shorter/chat?url={upload_file(path)}&sender={chat}_{user}&"
-                           f"destination={target}", headers={'Authorization': f'Bearer {access_token}'})
-        return response_handler(res).json()
+        return response_handler(method="get",
+                                url=f"{backend_url}url/shorter/chat?url={upload_file(path)}&sender={chat}_{user}&"
+                                    f"destination={target}", headers={'Authorization': f'Bearer {access_token}'}).json()
     except Exception as er:
         exception_handler(er)
 
 
 def get_messages(cur_chat, is_chat):
-    global user_login, user_password, access_token
+    global access_token
     try:
-        res = requests.get(f"{backend_url}message/get?chat_id={cur_chat}&is_chat={is_chat}",
-                           headers={'Authorization': f'Bearer {access_token}'})
-        if response_handler(res) == "retry":
-            access_token = check_password(user_login, user_password)
-        res = requests.get(f"{backend_url}message/get?chat_id={cur_chat}&is_chat={is_chat}",
-                           headers={'Authorization': f'Bearer {access_token}'})
         try:
-            return response_handler(res).json()
+            print("get")
+            return response_handler(method="get", url=f"{backend_url}message/get?chat_id={cur_chat}&is_chat={is_chat}",
+                                    headers={'Authorization': f'Bearer {access_token}'}).json()
         except AttributeError:
             return None
     except Exception as er:
@@ -279,20 +273,12 @@ def regenerate_keys():
     button_regenerate.update()
     global user_login, user_password, access_token
     try:
-        res = requests.put(f"{backend_url}user/update_pubkey", json={'pubkey': keys_generation()},
-                           headers={'Authorization': f'Bearer {access_token}'})
-        if res.status_code == 401:
-            access_token = check_password(user_login, user_password)
-            if requests.put(f"{backend_url}user/update_pubkey", json={'pubkey': keys_generation()},
-                            headers={'Authorization': f'Bearer {access_token}'}).json:
-                messagebox.showinfo("Success", "Regeneration successful!")
-            else:
-                messagebox.showerror("Failed", "Regeneration failed!")
+        res = response_handler(method="put", url=f"{backend_url}user/update_pubkey", json={'pubkey': keys_generation()},
+                               headers={'Authorization': f'Bearer {access_token}'}).json()
+        if res:
+            messagebox.showinfo("Success", "Regeneration successful!")
         else:
-            if res.json:
-                messagebox.showinfo("Success", "Regeneration successful!")
-            else:
-                messagebox.showerror("Failed", "Regeneration failed!")
+            messagebox.showerror("Failed", "Regeneration failed!")
     except Exception as er:
         exception_handler(er)
 
@@ -300,66 +286,58 @@ def regenerate_keys():
 def chat_create(name):
     global access_token
     try:
-        res = requests.post(f"{backend_url}chat/create", json={"name": name},
-                            headers={'Authorization': f'Bearer {access_token}'})
-        return response_handler(res).json()
+        return response_handler(method="post", url=f"{backend_url}chat/create", json={"name": name},
+                                headers={'Authorization': f'Bearer {access_token}'}).json()
     except Exception as er:
         exception_handler(er)
 
 
 def get_chat_id(name: str):
     try:
-        res = requests.get(f"{backend_url}chat/get_id?name={name}")
-        return response_handler(res).json()
+        return response_handler(method="get", url=f"{backend_url}chat/get_id?name={name}").json()
     except Exception as er:
         exception_handler(er)
 
 
 def get_chat_name(group_id: str):
     try:
-        res = requests.get(f"{backend_url}chat/get_name?group_id={group_id}")
-        return response_handler(res).json()
+        return response_handler(method="get", url=f"{backend_url}chat/get_name?group_id={group_id}").json()
     except Exception as er:
         exception_handler(er)
 
 
 def get_user_groups(user: int):
     try:
-        res = requests.get(f"{backend_url}user/get_groups?user_id={user}")
-        return response_handler(res).json()
+        return response_handler(method="get", url=f"{backend_url}user/get_groups?user_id={user}").json()
     except Exception as er:
         exception_handler(er)
 
 
 def get_chat_users(group_id: str):
     try:
-        res = requests.get(f"{backend_url}chat/get_users?group_id={group_id}")
-        return response_handler(res).json()
+        return response_handler(method="get", url=f"{backend_url}chat/get_users?group_id={group_id}").json()
     except Exception as er:
         exception_handler(er)
 
 
 def upload_file(path: str):
     try:
-        res = requests.post(f"{backend_url}file/upload", files={"file": open(path, "rb")})
-        return response_handler(res).json()
+        return response_handler(method="post", url=f"{backend_url}file/upload", files={"file": open(path, "rb")}).json()
     except Exception as er:
         exception_handler(er)
 
 
 def send_recovery(user: str):
     try:
-        res = requests.post(f"{backend_url}recovery/send?login={user}")
-        return response_handler(res).json()
+        return response_handler(method="post", url=f"{backend_url}recovery/send?login={user}").json()
     except Exception as er:
         exception_handler(er)
 
 
 def validate_recovery(local_code: str, lgn: str, hashed_pass=None):
     try:
-        res = requests.post(f"{backend_url}recovery/validate", json={"code": local_code, "login": lgn,
-                                                                     "password": hashed_pass})
-        return response_handler(res).json()
+        return response_handler(method="post", url=f"{backend_url}recovery/validate",
+                                json={"code": local_code, "login": lgn, "password": hashed_pass}).json()
     except Exception as er:
         exception_handler(er)
 
@@ -367,10 +345,9 @@ def validate_recovery(local_code: str, lgn: str, hashed_pass=None):
 def update_password(old_pass: str, new_pass: str):
     global access_token
     try:
-        res = requests.put(f"{backend_url}user/update_password", json={"old_password": old_pass,
-                                                                       "new_password": new_pass},
-                           headers={'Authorization': f'Bearer {access_token}'})
-        return response_handler(res).json()
+        return response_handler(method="put", url=f"{backend_url}user/update_password", json={"old_password": old_pass,
+                                                                                              "new_password": new_pass},
+                                headers={'Authorization': f'Bearer {access_token}'}).json()
     except Exception as er:
         exception_handler(er)
 
@@ -378,9 +355,8 @@ def update_password(old_pass: str, new_pass: str):
 def user_invite(name: str, user: int):
     global access_token
     try:
-        res = requests.post(f"{backend_url}chat/invite", json={"name": name, "user": user},
-                            headers={'Authorization': f'Bearer {access_token}'})
-        return response_handler(res).json()
+        return response_handler(method="post", url=f"{backend_url}chat/invite", json={"name": name, "user": user},
+                                headers={'Authorization': f'Bearer {access_token}'}).json()
     except Exception as er:
         exception_handler(er)
 
@@ -388,9 +364,8 @@ def user_invite(name: str, user: int):
 def user_kick(name: str, user: int):
     global access_token
     try:
-        res = requests.post(f"{backend_url}chat/kick", json={"name": name, "user": user},
-                            headers={'Authorization': f'Bearer {access_token}'})
-        return response_handler(res).json()
+        return response_handler(method="post", url=f"{backend_url}chat/kick", json={"name": name, "user": user},
+                                headers={'Authorization': f'Bearer {access_token}'}).json()
     except Exception as er:
         exception_handler(er)
 
