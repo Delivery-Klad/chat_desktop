@@ -1,9 +1,9 @@
+import json
 import os
 import platform
 import threading
 import sched
 import time
-import json5
 import tkinter as tk
 import tkinter.ttk as ttk
 from datetime import datetime, timezone
@@ -36,7 +36,7 @@ w = root.winfo_screenwidth() // 2 - 140
 h = root.winfo_screenheight() // 2 - 100
 code, user_id, email, user_login, user_password, access_token = '', '', '', '', '', ''
 remember_var, theme_var = IntVar(), IntVar()
-relief, frames_refief, cursors = StringVar(), StringVar(), StringVar()
+relief, frames_relief, cursors = StringVar(), StringVar(), StringVar()
 private_key = rsa.PrivateKey(1, 2, 3, 4, 5)
 files_dir = 'files'
 time_to_check = 60.0
@@ -59,11 +59,11 @@ def set_theme(flag=None):
         keyring.set_password('datachat', 'theme', flag)
     if temp == "1":
         theme_var.set(1)
-        theme = {"text_color": "#ffffff",
+        theme = {"text_color": "#FFFFFF",
                  "entry": "#808080",
                  "relief": "flat",
                  "frame_relief": "flat",  # RIDGE
-                 "bg": "#48494f",
+                 "bg": "#48494F",
                  "font_main": Font(family="Candara", size=13),
                  "font_users": Font(family="Candara", size=15),
                  "button_font": Font(family="Candara", size=10),
@@ -76,7 +76,7 @@ def set_theme(flag=None):
         theme_var.set(2)
         try:
             with open(files_dir + "/theme.json", "r") as file:
-                theme = json5.load(file)
+                theme = json.load(file)
         except Exception as er:
             messagebox.showerror("Custom theme error", str(er))
             exception_handler(er)
@@ -84,7 +84,7 @@ def set_theme(flag=None):
     else:
         theme_var.set(0)
         theme = {"text_color": "#000000",
-                 "entry": "#ffffff",
+                 "entry": "#FFFFFF",
                  "relief": "flat",
                  "frame_relief": None,
                  "bg": None,
@@ -105,22 +105,22 @@ def exception_handler(e):
         print(er)
 
 
-def request(method, url, json=None, files=None, headers=None):
+def request(method, url, req_json=None, files=None, headers=None):
     try:
-        return requests.request(method=method, url=url, json=json, files=files, headers=headers)
+        return requests.request(method=method, url=url, json=req_json, files=files, headers=headers)
     except Exception as er:
         exception_handler(er)
 
 
-def response_handler(method, url, json=None, files=None, headers=None):
+def response_handler(method, url, req_json=None, files=None, headers=None):
     global access_token, user_login, user_password
     try:
-        res = request(method, url, json, files, headers)
+        res = request(method, url, req_json, files, headers)
         if res.status_code == 200:
             return res
         elif res.status_code == 401:
             access_token = check_password(user_login, user_password)
-            return request(method, url, json, headers={'Authorization': f'Bearer {access_token}'})
+            return request(method, url, req_json, headers={'Authorization': f'Bearer {access_token}'})
         else:
             messagebox.showerror("Something went wrong!", f"Response {res.status_code}")
             return None
@@ -156,17 +156,18 @@ def check_input(password: str, log: str):
 # region API
 def check_password(log, pas):
     try:
-        return response_handler(method="post", url=f"{backend_url}auth", json={"login": log, "password": pas}).json()
+        return response_handler(method="post", url=f"{backend_url}auth",
+                                req_json={"login": log, "password": pas}).json()
     except Exception as er:
         exception_handler(er)
 
 
 def create_user(lgn, hashed_pass, mail):
     try:
-        return response_handler(method="post", url=f"{backend_url}user/create", json={'login': lgn,
-                                                                                      'password': hashed_pass,
-                                                                                      'pubkey': keys_generation(),
-                                                                                      'email': mail}).json()
+        return response_handler(method="post", url=f"{backend_url}user/create", req_json={'login': lgn,
+                                                                                          'password': hashed_pass,
+                                                                                          'pubkey': keys_generation(),
+                                                                                          'email': mail}).json()
     except Exception as er:
         exception_handler(er)
 
@@ -210,8 +211,8 @@ def message_send(chat_id, message, message1):
     global user_id, access_token
     try:
         return response_handler(method="post", url=f"{backend_url}message/send",
-                                json={"sender": user_id, "destination": chat_id,
-                                      "message": message, "message1": message1},
+                                req_json={"sender": user_id, "destination": chat_id,
+                                          "message": message, "message1": message1},
                                 headers={'Authorization': f'Bearer {access_token}'}).json()
     except Exception as er:
         exception_handler(er)
@@ -230,7 +231,7 @@ def message_send_chat(chat, user, target, message):
     global access_token
     try:
         return response_handler(method="post", url=f"{backend_url}message/send/chat",
-                                json={"sender": f"{chat}_{user}", "destination": target, "message": message},
+                                req_json={"sender": f"{chat}_{user}", "destination": target, "message": message},
                                 headers={'Authorization': f'Bearer {access_token}'}).json()
     except Exception as er:
         exception_handler(er)
@@ -260,7 +261,6 @@ def get_messages(cur_chat, is_chat):
     global access_token
     try:
         try:
-            print("get")
             return response_handler(method="get", url=f"{backend_url}message/get?chat_id={cur_chat}&is_chat={is_chat}",
                                     headers={'Authorization': f'Bearer {access_token}'}).json()
         except AttributeError:
@@ -273,7 +273,8 @@ def regenerate_keys():
     button_regenerate.update()
     global user_login, user_password, access_token
     try:
-        res = response_handler(method="put", url=f"{backend_url}user/update_pubkey", json={'pubkey': keys_generation()},
+        res = response_handler(method="put", url=f"{backend_url}user/update_pubkey",
+                               req_json={'pubkey': keys_generation()},
                                headers={'Authorization': f'Bearer {access_token}'}).json()
         if res:
             messagebox.showinfo("Success", "Regeneration successful!")
@@ -286,7 +287,7 @@ def regenerate_keys():
 def chat_create(name):
     global access_token
     try:
-        return response_handler(method="post", url=f"{backend_url}chat/create", json={"name": name},
+        return response_handler(method="post", url=f"{backend_url}chat/create", req_json={"name": name},
                                 headers={'Authorization': f'Bearer {access_token}'}).json()
     except Exception as er:
         exception_handler(er)
@@ -337,7 +338,7 @@ def send_recovery(user: str):
 def validate_recovery(local_code: str, lgn: str, hashed_pass=None):
     try:
         return response_handler(method="post", url=f"{backend_url}recovery/validate",
-                                json={"code": local_code, "login": lgn, "password": hashed_pass}).json()
+                                req_json={"code": local_code, "login": lgn, "password": hashed_pass}).json()
     except Exception as er:
         exception_handler(er)
 
@@ -345,8 +346,8 @@ def validate_recovery(local_code: str, lgn: str, hashed_pass=None):
 def update_password(old_pass: str, new_pass: str):
     global access_token
     try:
-        return response_handler(method="put", url=f"{backend_url}user/update_password", json={"old_password": old_pass,
-                                                                                              "new_password": new_pass},
+        return response_handler(method="put", url=f"{backend_url}user/update_password",
+                                req_json={"old_password": old_pass, "new_password": new_pass},
                                 headers={'Authorization': f'Bearer {access_token}'}).json()
     except Exception as er:
         exception_handler(er)
@@ -355,7 +356,7 @@ def update_password(old_pass: str, new_pass: str):
 def user_invite(name: str, user: int):
     global access_token
     try:
-        return response_handler(method="post", url=f"{backend_url}chat/invite", json={"name": name, "user": user},
+        return response_handler(method="post", url=f"{backend_url}chat/invite", req_json={"name": name, "user": user},
                                 headers={'Authorization': f'Bearer {access_token}'}).json()
     except Exception as er:
         exception_handler(er)
@@ -364,7 +365,7 @@ def user_invite(name: str, user: int):
 def user_kick(name: str, user: int):
     global access_token
     try:
-        return response_handler(method="post", url=f"{backend_url}chat/kick", json={"name": name, "user": user},
+        return response_handler(method="post", url=f"{backend_url}chat/kick", req_json={"name": name, "user": user},
                                 headers={'Authorization': f'Bearer {access_token}'}).json()
     except Exception as er:
         exception_handler(er)
@@ -1130,178 +1131,66 @@ def save_theme():
     global theme_var
     keyring.set_password('datachat', 'theme', theme_var.get())
     if theme_var.get() == 2:
+        theme_json = {}
         if not os.path.exists(files_dir + "/theme.json"):
+            theme_json.update({"text_color": "#FFFFFF",
+                               "entry": "#808080",
+                               "relief": "flat",
+                               "frame_relief": "flat",
+                               "bg": "#48494F",
+                               "font_main": "Candara 13",
+                               "font_users": "Candara 15",
+                               "button_font": "Candara 10",
+                               "button_bg": "#757575",
+                               "button_bg_positive": "#006891",
+                               "button_bg_negative": "#B22222",
+                               "button_activebg": "#757575",
+                               "cursor": "pencil"})
             with open(f"{files_dir}/theme.json", "w") as file:
-                file.write('//Relief types: flat, raised, sunken, groove, ridge\n'
-                           '//Cursor types: arrow, circle, clock, cross, dotbox, exchange, fleur, heart, man, mouse, '
-                           'pirate, plus, shuttle, sizing, spider, spraycan, star, target, tcross, trek, watch\n'
-                           '{\n  "text_color": "#ffffff",          //Text color\n'
-                           '  "entry": "#808080",               //Input fields color\n'
-                           '  "relief": "flat",                 //Widgets relief (Relief types)\n'
-                           '  "frame_relief": "flat",           //Users frame relief (Relief types)\n'
-                           '  "bg": "#48494f",                  //App background\n'
-                           '  "font_main": "Candara 13",        //Main font (Name size)\n'
-                           '  "font_users": "Candara 15",       //Users frame font (Name size)\n'
-                           '  "button_font": "Candara 10",      //Buttons font (Name size)\n'
-                           '  "button_bg": "#757575",           //Buttons background\n'
-                           '  "button_bg_positive": "#006891",  //Positive buttons background\n'
-                           '  "button_bg_negative": "#B22222",  //Negative buttons background\n'
-                           '  "button_activebg": "#757575",     //Pressed button background\n'
-                           '  "cursor": "pencil"                //Input fields cursor (Cursor types)\n}')
-        messagebox.showinfo("Success!", f"Theme will be changed on next launch!\nOpen {files_dir}/theme.json to edit "
-                                        f"custom theme")
+                json.dump(theme_json, file)
         theme_editor()
     else:
         messagebox.showinfo("Success!", "Theme will be changed on next launch!")
 
 
 def theme_editor():
-    global relief, frames_refief, cursors
-    choices = {'flat', 'raised', 'sunken', 'groove', 'ridge'}
-    choices2 = {'arrow', 'circle', 'clock', 'cross', 'dotbox', 'exchange', 'fleur', 'heart', 'man', 'mouse', 'pirate',
-                'plus', 'shuttle', 'sizing', 'spider', 'spraycan', 'star', 'target', 'tcross', 'trek', 'watch'}
+    global relief, frames_relief, cursors
     with open(files_dir + "/theme.json", "r") as file:
-        temp = json5.load(file)
+        temp = json.load(file)
     relief.set(temp['relief'])
-    frames_refief.set(temp['frame_relief'])
+    frames_relief.set(temp['frame_relief'])
     cursors.set(temp['cursor'])
-    theme_editor_window = Toplevel(root)
-    theme_editor_window.title("Theme editor")
-    theme_editor_window.geometry("500x500+{}+{}".format(w, h))
-    theme_editor_window.resizable(False, False)
-    theme_editor_window['bg'] = theme['bg']
-    test_color = LabelFrame(theme_editor_window, width=500, relief=FLAT, bg=theme['bg'])
-    test_color.pack(side=TOP)
-    label_text = tk.Label(test_color, font=theme['font_main'], text="Text color", fg=theme['text_color'],
-                          bg=theme['bg'], width=25, anchor=W)
-    label_text.pack(side=LEFT)
-    entry_text = tk.Entry(test_color, font=12, width=25, fg=theme['text_color'], bg=theme['entry'],
-                          relief=theme['relief'], cursor=theme['cursor'])
-    entry_text.pack(side=LEFT)
+    theme_editor_window.deiconify()
     entry_text.insert(0, temp['text_color'])
-    entry_color = LabelFrame(theme_editor_window, width=500, relief=FLAT, bg=theme['bg'])
-    entry_color.pack(side=TOP, pady=5)
-    label_entry = tk.Label(entry_color, font=theme['font_main'], text="Entry color", fg=theme['text_color'],
-                           bg=theme['bg'], width=25, anchor=W)
-    label_entry.pack(side=LEFT)
-    entry_entry = tk.Entry(entry_color, font=12, width=25, fg=theme['text_color'], bg=theme['entry'],
-                           relief=theme['relief'], cursor=theme['cursor'])
-    entry_entry.pack(side=LEFT)
     entry_entry.insert(0, temp['entry'])
-    widgets_relief = LabelFrame(theme_editor_window, width=500, relief=FLAT, bg=theme['bg'])
-    widgets_relief.pack(side=TOP)
-    label_relief = tk.Label(widgets_relief, font=theme['font_main'], text="Widgets relief", fg=theme['text_color'],
-                            bg=theme['bg'], width=25, anchor=W)
-    label_relief.pack(side=LEFT)
-    popup_main = OptionMenu(widgets_relief, relief, *choices)
-    popup_main.pack(side=TOP)
-    popup_main.configure(width=31, relief=theme['relief'], fg=theme['text_color'], bg=theme['entry'],
-                         activebackground=theme['entry'], highlightthickness=0)
-    popup_main["menu"].configure(bg=theme['entry'], fg=theme['text_color'], relief=theme['relief'],
-                                 activebackground=theme['button_activebg'], borderwidth=0)
-    frame_relief = LabelFrame(theme_editor_window, width=500, relief=FLAT, bg=theme['bg'])
-    frame_relief.pack(side=TOP, pady=5)
-    label_frame_r = tk.Label(frame_relief, font=theme['font_main'], text="Frame relief", fg=theme['text_color'],
-                             bg=theme['bg'], width=25, anchor=W)
-    label_frame_r.pack(side=LEFT)
-    popup_frames = OptionMenu(frame_relief, frames_refief, *choices)
-    popup_frames.pack(side=TOP)
-    popup_frames.configure(width=31, relief=theme['relief'], fg=theme['text_color'], bg=theme['entry'],
-                           activebackground=theme['entry'], highlightthickness=0)
-    popup_frames["menu"].configure(bg=theme['entry'], fg=theme['text_color'], relief=theme['relief'],
-                                   activebackground=theme['button_activebg'], borderwidth=0)
-    bg_frame = LabelFrame(theme_editor_window, width=500, relief=FLAT, bg=theme['bg'])
-    bg_frame.pack(side=TOP)
-    label_bg = tk.Label(bg_frame, font=theme['font_main'], text="Background color", fg=theme['text_color'],
-                        bg=theme['bg'], width=25, anchor=W)
-    label_bg.pack(side=LEFT)
-    entry_bg = tk.Entry(bg_frame, font=12, width=25, fg=theme['text_color'], bg=theme['entry'],
-                        relief=theme['relief'], cursor=theme['cursor'])
-    entry_bg.pack(side=LEFT)
     entry_bg.insert(0, temp['bg'])
-    font_frame = LabelFrame(theme_editor_window, width=500, relief=FLAT, bg=theme['bg'])
-    font_frame.pack(side=TOP, pady=5)
-    label_font = tk.Label(font_frame, font=theme['font_main'], text="Main font", fg=theme['text_color'],
-                          bg=theme['bg'], width=25, anchor=W)
-    label_font.pack(side=LEFT)
-    entry_font = tk.Entry(font_frame, font=12, width=25, fg=theme['text_color'], bg=theme['entry'],
-                          relief=theme['relief'], cursor=theme['cursor'])
-    entry_font.pack(side=LEFT)
     entry_font.insert(0, temp['font_main'])
-    font_users_frame = LabelFrame(theme_editor_window, width=500, relief=FLAT, bg=theme['bg'])
-    font_users_frame.pack(side=TOP)
-    label_font_u = tk.Label(font_users_frame, font=theme['font_main'], text="Users frame font", fg=theme['text_color'],
-                            bg=theme['bg'], width=25, anchor=W)
-    label_font_u.pack(side=LEFT)
-    entry_font_u = tk.Entry(font_users_frame, font=12, width=25, fg=theme['text_color'], bg=theme['entry'],
-                            relief=theme['relief'], cursor=theme['cursor'])
-    entry_font_u.pack(side=LEFT)
     entry_font_u.insert(0, temp['font_users'])
-    font_b_frame = LabelFrame(theme_editor_window, width=500, relief=FLAT, bg=theme['bg'])
-    font_b_frame.pack(side=TOP, pady=5)
-    label_font_b = tk.Label(font_b_frame, font=theme['font_main'], text="Buttons font", fg=theme['text_color'],
-                            bg=theme['bg'], width=25, anchor=W)
-    label_font_b.pack(side=LEFT)
-    entry_font_b = tk.Entry(font_b_frame, font=12, width=25, fg=theme['text_color'], bg=theme['entry'],
-                            relief=theme['relief'], cursor=theme['cursor'])
-    entry_font_b.pack(side=LEFT)
     entry_font_b.insert(0, temp['button_font'])
-    frame_bg_b = LabelFrame(theme_editor_window, width=500, relief=FLAT, bg=theme['bg'])
-    frame_bg_b.pack(side=TOP)
-    label_bg_b = tk.Label(frame_bg_b, font=theme['font_main'], text="Buttons background", fg=theme['text_color'],
-                          bg=theme['bg'], width=25, anchor=W)
-    label_bg_b.pack(side=LEFT)
-    entry_bg_b = tk.Entry(frame_bg_b, font=12, width=25, fg=theme['text_color'], bg=theme['entry'],
-                          relief=theme['relief'], cursor=theme['cursor'])
-    entry_bg_b.pack(side=LEFT)
     entry_bg_b.insert(0, temp['button_bg'])
-    frame_bg_b_pos = LabelFrame(theme_editor_window, width=500, relief=FLAT, bg=theme['bg'])
-    frame_bg_b_pos.pack(side=TOP, pady=5)
-    label_bg_b_pos = tk.Label(frame_bg_b_pos, font=theme['font_main'], text="Buttons background positive",
-                              fg=theme['text_color'], bg=theme['bg'], width=25, anchor=W)
-    label_bg_b_pos.pack(side=LEFT)
-    entry_bg_b_pos = tk.Entry(frame_bg_b_pos, font=12, width=25, fg=theme['text_color'], bg=theme['entry'],
-                              relief=theme['relief'], cursor=theme['cursor'])
-    entry_bg_b_pos.pack(side=LEFT)
     entry_bg_b_pos.insert(0, temp['button_bg_positive'])
-    frame_bg_b_neg = LabelFrame(theme_editor_window, width=500, relief=FLAT, bg=theme['bg'])
-    frame_bg_b_neg.pack(side=TOP)
-    label_bg_b_neg = tk.Label(frame_bg_b_neg, font=theme['font_main'], text="Buttons background negative",
-                              fg=theme['text_color'], bg=theme['bg'], width=25, anchor=W)
-    label_bg_b_neg.pack(side=LEFT)
-    entry_bg_b_neg = tk.Entry(frame_bg_b_neg, font=12, width=25, fg=theme['text_color'], bg=theme['entry'],
-                              relief=theme['relief'], cursor=theme['cursor'])
-    entry_bg_b_neg.pack(side=LEFT)
     entry_bg_b_neg.insert(0, temp['button_bg_negative'])
-    frame_b_act = LabelFrame(theme_editor_window, width=500, relief=FLAT, bg=theme['bg'])
-    frame_b_act.pack(side=TOP, pady=5)
-    label_b_act = tk.Label(frame_b_act, font=theme['font_main'], text="Buttons active background",
-                           fg=theme['text_color'], bg=theme['bg'], width=25, anchor=W)
-    label_b_act.pack(side=LEFT)
-    entry_b_act = tk.Entry(frame_b_act, font=12, width=25, fg=theme['text_color'], bg=theme['entry'],
-                           relief=theme['relief'], cursor=theme['cursor'])
-    entry_b_act.pack(side=LEFT)
     entry_b_act.insert(0, temp['button_activebg'])
-    frame_cursor = LabelFrame(theme_editor_window, width=500, relief=FLAT, bg=theme['bg'])
-    frame_cursor.pack(side=TOP)
-    label_cursor = tk.Label(frame_cursor, font=theme['font_main'], text="Input fields cursor",
-                            fg=theme['text_color'], bg=theme['bg'], width=25, anchor=W)
-    label_cursor.pack(side=LEFT)
-    popup_cur = OptionMenu(frame_cursor, cursors, *choices2)
-    popup_cur.pack(side=TOP)
-    popup_cur.configure(width=31, relief=theme['relief'], fg=theme['text_color'], bg=theme['entry'],
-                        activebackground=theme['entry'], highlightthickness=0, height=1)
-    popup_cur["menu"].configure(bg=theme['entry'], fg=theme['text_color'], relief=theme['relief'],
-                                activebackground=theme['button_activebg'], borderwidth=0)
-    # print(popup_cur.keys())
-    button_save = tk.Button(theme_editor_window, text="SAVE", bg=theme['button_bg_positive'],
-                            activebackground=theme['button_activebg'], width=64, relief=theme['relief'],
-                            command=lambda: theme_editor_save())
-    button_save.pack(side=TOP, pady=5)
 
 
 def theme_editor_save():
-    pass
+    theme_dict = {}
+    theme_dict.update({"text_color": entry_text.get(),
+                       "entry": entry_entry.get(),
+                       "relief": relief.get(),
+                       "frame_relief": frames_relief.get(),
+                       "bg": entry_bg.get(),
+                       "font_main": entry_font.get(),
+                       "font_users": entry_font_u.get(),
+                       "button_font": entry_font_b.get(),
+                       "button_bg": entry_bg_b.get(),
+                       "button_bg_positive": entry_bg_b_pos.get(),
+                       "button_bg_negative": entry_bg_b_neg.get(),
+                       "button_activebg": entry_b_act.get(),
+                       "cursor": cursors.get()})
+    with open(files_dir + "/theme.json", "w") as file:
+        json.dump(theme_dict, file)
+    messagebox.showinfo("Success!", "Theme will be changed on next launch!")
 
 
 def get_update_time():
@@ -1661,6 +1550,134 @@ button_regenerate = tk.Button(settings_frame, text="REGENERATE ENCRYPTION KEYS",
                               activebackground=theme['button_activebg'], width=113, relief=theme['relief'],
                               command=lambda: regenerate_keys())
 button_regenerate.pack(side=TOP, anchor=CENTER)
+# endregion
+# region json
+choices = {'flat', 'raised', 'sunken', 'groove', 'ridge'}
+choices2 = {'arrow', 'circle', 'clock', 'cross', 'dotbox', 'exchange', 'fleur', 'heart', 'man', 'mouse', 'pirate',
+            'plus', 'shuttle', 'sizing', 'spider', 'spraycan', 'star', 'target', 'tcross', 'trek', 'watch'}
+theme_editor_window = Toplevel(root)
+theme_editor_window.withdraw()
+theme_editor_window.title("Theme editor")
+theme_editor_window.geometry("500x500+{}+{}".format(w, h))
+theme_editor_window.resizable(False, False)
+theme_editor_window['bg'] = theme['bg']
+test_color = LabelFrame(theme_editor_window, width=500, relief=FLAT, bg=theme['bg'])
+test_color.pack(side=TOP)
+label_text = tk.Label(test_color, font=theme['font_main'], text="Text color", fg=theme['text_color'],
+                      bg=theme['bg'], width=25, anchor=W)
+label_text.pack(side=LEFT)
+entry_text = tk.Entry(test_color, font=12, width=25, fg=theme['text_color'], bg=theme['entry'],
+                      relief=theme['relief'], cursor=theme['cursor'])
+entry_text.pack(side=LEFT)
+entry_color = LabelFrame(theme_editor_window, width=500, relief=FLAT, bg=theme['bg'])
+entry_color.pack(side=TOP, pady=5)
+label_entry = tk.Label(entry_color, font=theme['font_main'], text="Entry color", fg=theme['text_color'],
+                       bg=theme['bg'], width=25, anchor=W)
+label_entry.pack(side=LEFT)
+entry_entry = tk.Entry(entry_color, font=12, width=25, fg=theme['text_color'], bg=theme['entry'],
+                       relief=theme['relief'], cursor=theme['cursor'])
+entry_entry.pack(side=LEFT)
+widgets_relief = LabelFrame(theme_editor_window, width=500, relief=FLAT, bg=theme['bg'])
+widgets_relief.pack(side=TOP)
+label_relief = tk.Label(widgets_relief, font=theme['font_main'], text="Widgets relief", fg=theme['text_color'],
+                        bg=theme['bg'], width=25, anchor=W)
+label_relief.pack(side=LEFT)
+popup_main = OptionMenu(widgets_relief, relief, *choices)
+popup_main.pack(side=TOP)
+popup_main.configure(width=31, relief=theme['relief'], fg=theme['text_color'], bg=theme['entry'],
+                     activebackground=theme['entry'], highlightthickness=0)
+popup_main["menu"].configure(bg=theme['entry'], fg=theme['text_color'], relief=theme['relief'],
+                             activebackground=theme['button_activebg'], borderwidth=0)
+frame_relief = LabelFrame(theme_editor_window, width=500, relief=FLAT, bg=theme['bg'])
+frame_relief.pack(side=TOP, pady=5)
+label_frame_r = tk.Label(frame_relief, font=theme['font_main'], text="Frame relief", fg=theme['text_color'],
+                         bg=theme['bg'], width=25, anchor=W)
+label_frame_r.pack(side=LEFT)
+popup_frames = OptionMenu(frame_relief, frames_relief, *choices)
+popup_frames.pack(side=TOP)
+popup_frames.configure(width=31, relief=theme['relief'], fg=theme['text_color'], bg=theme['entry'],
+                       activebackground=theme['entry'], highlightthickness=0)
+popup_frames["menu"].configure(bg=theme['entry'], fg=theme['text_color'], relief=theme['relief'],
+                               activebackground=theme['button_activebg'], borderwidth=0)
+bg_frame = LabelFrame(theme_editor_window, width=500, relief=FLAT, bg=theme['bg'])
+bg_frame.pack(side=TOP)
+label_bg = tk.Label(bg_frame, font=theme['font_main'], text="Background color", fg=theme['text_color'],
+                    bg=theme['bg'], width=25, anchor=W)
+label_bg.pack(side=LEFT)
+entry_bg = tk.Entry(bg_frame, font=12, width=25, fg=theme['text_color'], bg=theme['entry'],
+                    relief=theme['relief'], cursor=theme['cursor'])
+entry_bg.pack(side=LEFT)
+font_frame = LabelFrame(theme_editor_window, width=500, relief=FLAT, bg=theme['bg'])
+font_frame.pack(side=TOP, pady=5)
+label_font = tk.Label(font_frame, font=theme['font_main'], text="Main font", fg=theme['text_color'],
+                      bg=theme['bg'], width=25, anchor=W)
+label_font.pack(side=LEFT)
+entry_font = tk.Entry(font_frame, font=12, width=25, fg=theme['text_color'], bg=theme['entry'],
+                      relief=theme['relief'], cursor=theme['cursor'])
+entry_font.pack(side=LEFT)
+font_users_frame = LabelFrame(theme_editor_window, width=500, relief=FLAT, bg=theme['bg'])
+font_users_frame.pack(side=TOP)
+label_font_u = tk.Label(font_users_frame, font=theme['font_main'], text="Users frame font", fg=theme['text_color'],
+                        bg=theme['bg'], width=25, anchor=W)
+label_font_u.pack(side=LEFT)
+entry_font_u = tk.Entry(font_users_frame, font=12, width=25, fg=theme['text_color'], bg=theme['entry'],
+                        relief=theme['relief'], cursor=theme['cursor'])
+entry_font_u.pack(side=LEFT)
+font_b_frame = LabelFrame(theme_editor_window, width=500, relief=FLAT, bg=theme['bg'])
+font_b_frame.pack(side=TOP, pady=5)
+label_font_b = tk.Label(font_b_frame, font=theme['font_main'], text="Buttons font", fg=theme['text_color'],
+                        bg=theme['bg'], width=25, anchor=W)
+label_font_b.pack(side=LEFT)
+entry_font_b = tk.Entry(font_b_frame, font=12, width=25, fg=theme['text_color'], bg=theme['entry'],
+                        relief=theme['relief'], cursor=theme['cursor'])
+entry_font_b.pack(side=LEFT)
+frame_bg_b = LabelFrame(theme_editor_window, width=500, relief=FLAT, bg=theme['bg'])
+frame_bg_b.pack(side=TOP)
+label_bg_b = tk.Label(frame_bg_b, font=theme['font_main'], text="Buttons background", fg=theme['text_color'],
+                      bg=theme['bg'], width=25, anchor=W)
+label_bg_b.pack(side=LEFT)
+entry_bg_b = tk.Entry(frame_bg_b, font=12, width=25, fg=theme['text_color'], bg=theme['entry'],
+                      relief=theme['relief'], cursor=theme['cursor'])
+entry_bg_b.pack(side=LEFT)
+frame_bg_b_pos = LabelFrame(theme_editor_window, width=500, relief=FLAT, bg=theme['bg'])
+frame_bg_b_pos.pack(side=TOP, pady=5)
+label_bg_b_pos = tk.Label(frame_bg_b_pos, font=theme['font_main'], text="Buttons background positive",
+                          fg=theme['text_color'], bg=theme['bg'], width=25, anchor=W)
+label_bg_b_pos.pack(side=LEFT)
+entry_bg_b_pos = tk.Entry(frame_bg_b_pos, font=12, width=25, fg=theme['text_color'], bg=theme['entry'],
+                          relief=theme['relief'], cursor=theme['cursor'])
+entry_bg_b_pos.pack(side=LEFT)
+frame_bg_b_neg = LabelFrame(theme_editor_window, width=500, relief=FLAT, bg=theme['bg'])
+frame_bg_b_neg.pack(side=TOP)
+label_bg_b_neg = tk.Label(frame_bg_b_neg, font=theme['font_main'], text="Buttons background negative",
+                          fg=theme['text_color'], bg=theme['bg'], width=25, anchor=W)
+label_bg_b_neg.pack(side=LEFT)
+entry_bg_b_neg = tk.Entry(frame_bg_b_neg, font=12, width=25, fg=theme['text_color'], bg=theme['entry'],
+                          relief=theme['relief'], cursor=theme['cursor'])
+entry_bg_b_neg.pack(side=LEFT)
+frame_b_act = LabelFrame(theme_editor_window, width=500, relief=FLAT, bg=theme['bg'])
+frame_b_act.pack(side=TOP, pady=5)
+label_b_act = tk.Label(frame_b_act, font=theme['font_main'], text="Buttons active background",
+                       fg=theme['text_color'], bg=theme['bg'], width=25, anchor=W)
+label_b_act.pack(side=LEFT)
+entry_b_act = tk.Entry(frame_b_act, font=12, width=25, fg=theme['text_color'], bg=theme['entry'],
+                       relief=theme['relief'], cursor=theme['cursor'])
+entry_b_act.pack(side=LEFT)
+frame_cursor = LabelFrame(theme_editor_window, width=500, relief=FLAT, bg=theme['bg'])
+frame_cursor.pack(side=TOP)
+label_cursor = tk.Label(frame_cursor, font=theme['font_main'], text="Input fields cursor",
+                        fg=theme['text_color'], bg=theme['bg'], width=25, anchor=W)
+label_cursor.pack(side=LEFT)
+popup_cur = OptionMenu(frame_cursor, cursors, *choices2)
+popup_cur.pack(side=TOP)
+popup_cur.configure(width=31, relief=theme['relief'], fg=theme['text_color'], bg=theme['entry'],
+                    activebackground=theme['entry'], highlightthickness=0, height=1)
+popup_cur["menu"].configure(bg=theme['entry'], fg=theme['text_color'], relief=theme['relief'],
+                            activebackground=theme['button_activebg'], borderwidth=0)
+# print(popup_cur.keys())
+button_save = tk.Button(theme_editor_window, text="SAVE", bg=theme['button_bg_positive'], relief=theme['relief'],
+                        activebackground=theme['button_activebg'], width=64, command=lambda: theme_editor_save())
+button_save.pack(side=TOP, pady=5)
 # endregion
 # region info
 main1_frame = LabelFrame(root, width=850, height=500, relief=theme['relief'], bg=theme['bg'])
