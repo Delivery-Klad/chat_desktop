@@ -23,8 +23,10 @@ from rsa.transform import int2bytes, bytes2int
 
 if platform.uname().system == "Windows":
     keyring.set_keyring(WinVaultKeyring())
+    files_dir = os.getenv('APPDATA') + "\\PojiloiChat"
 elif platform.uname().system == "Darwin":
     keyring.set_keyring(Keyring())
+    files_dir = os.path.join(os.environ['HOME'], "PojiloiChat")
 
 backend_url = "https://chat-b4ckend.herokuapp.com/"
 chats, theme = {}, {}
@@ -38,26 +40,72 @@ code, user_id, email, user_login, user_password, access_token = '', '', '', '', 
 remember_var, theme_var = IntVar(), IntVar()
 relief, frames_relief, cursors = StringVar(), StringVar(), StringVar()
 private_key = rsa.PrivateKey(1, 2, 3, 4, 5)
-files_dir = 'files'
 time_to_check = 60.0
 dt = datetime.now(timezone.utc).astimezone()
 utc_diff = dt.utcoffset()
 sch = sched.scheduler(time.time, time.sleep)
 
-try:
-    os.mkdir(files_dir)
-except FileExistsError:
-    pass
+
+def create_theme_file():
+    theme_dict = {}
+    theme_dict.update({"text_color": "#FFFFFF",
+                       "entry": "#808080",
+                       "relief": "flat",
+                       "frame_relief": "flat",  # RIDGE
+                       "bg": "#48494F",
+                       "font_main": "Candara 13",
+                       "font_users": "Candara 15",
+                       "button_font": "Candara 10",
+                       "button_bg": "#757575",
+                       "button_bg_positive": "#006891",
+                       "button_bg_negative": "#B22222",
+                       "button_activebg": "#757575",
+                       "cursor": "pencil"})
+    with open(files_dir + "/settings/theme.json", "w") as file:
+        json.dump(theme_dict, file, indent=2)
+
+
+def create_config_file():
+    theme_dict = {}
+    theme_dict.update({"theme": "0",
+                       "pin1": None,
+                       "pin2": None,
+                       "pin3": None,
+                       "update": 60})
+    with open(files_dir + "/settings/config.json", "w") as file:
+        json.dump(theme_dict, file, indent=2)
+
+
+def folders():
+    try:
+        os.mkdir(files_dir)
+    except FileExistsError:
+        pass
+    try:
+        os.mkdir(files_dir + "\\temp")
+    except FileExistsError:
+        pass
+    try:
+        os.mkdir(files_dir + "\\settings")
+        create_theme_file()
+        create_config_file()
+    except FileExistsError:
+        pass
 
 
 def set_theme(flag=None):
     global theme
     if flag is None:
-        temp = keyring.get_password('datachat', 'theme')
+        with open(files_dir + "/settings/config.json", "r") as file:
+            temp = json.load(file)['theme']
     else:
         temp = flag
-        keyring.set_password('datachat', 'theme', flag)
-    if temp == "1":
+        with open(files_dir + "/settings/config.json", "r") as file:
+            tmp = json.load(file)
+        tmp['file'] = temp
+        with open(files_dir + "/settings/config.json", "w") as file:
+            json.dump(tmp, file, indent=2)
+    if temp == 1:
         theme_var.set(1)
         theme = {"text_color": "#FFFFFF",
                  "entry": "#808080",
@@ -72,21 +120,21 @@ def set_theme(flag=None):
                  "button_bg_negative": "#B22222",
                  "button_activebg": "#757575",
                  "cursor": "pencil"}
-    elif temp == "2":
+    elif temp == 2:
         theme_var.set(2)
         try:
-            with open(files_dir + "/theme.json", "r") as file:
+            with open(files_dir + "/settings/theme.json", "r") as file:
                 theme = json.load(file)
         except Exception as er:
             messagebox.showerror("Custom theme error", str(er))
             exception_handler(er)
-            set_theme("0")
+            set_theme(0)
     else:
         theme_var.set(0)
         theme = {"text_color": "#000000",
                  "entry": "#FFFFFF",
-                 "relief": "flat",
-                 "frame_relief": None,
+                 "relief": "raised",
+                 "frame_relief": "flat",
                  "bg": None,
                  "font_main": Font(family="Ubuntu", size=13),
                  "font_users": Font(family="Ubuntu", size=15),
@@ -437,17 +485,17 @@ def login(*args):
         except NameError:
             pass
         qr = qrcode.make(private_key)
-        qr.save(files_dir + '/QR.png')
-        qr = Image.open(files_dir + '/QR.png')
+        qr.save(files_dir + '/temp/QR.png')
+        qr = Image.open(files_dir + '/temp/QR.png')
         width = int(qr.size[0] / 2)
         height = int(qr.size[1] / 2)
         img = qr.resize((width, height), Image.ANTIALIAS)
-        img.save(files_dir + '/QR.png')
-        _qr = PhotoImage(file=files_dir + "/QR.png")
+        img.save(files_dir + '/temp/QR.png')
+        _qr = PhotoImage(file=files_dir + "/temp/QR.png")
         label_qr = Label(main1_frame, image=_qr)
         label_qr.image = _qr
         # label_qr.pack(side=RIGHT, anchor=SE) # задумка на будущее
-        os.remove(files_dir + '/QR.png')
+        os.remove(files_dir + '/temp/QR.png')
     except Exception as e:
         label_loading.place_forget()
         exception_handler(e)
@@ -1053,17 +1101,25 @@ def pin_chat():
             messagebox.showerror('Input error', 'User not found')
             return
         info = user + ' ' + name
-        pin1 = keyring.get_password('datachat', 'pin1')
+        with open(files_dir + "/settings/config.json", "r") as file:
+            json_file = json.load(file)
+        pin1 = json_file['pin1']
         if pin1 is None:
-            keyring.set_password('datachat', 'pin1', info)
+            json_file['pin1'] = info
+            with open(files_dir + "/settings/config.json", "w") as file:
+                json.dump(json_file, file, indent=2)
             return
-        pin2 = keyring.get_password('datachat', 'pin2')
+        pin2 = json_file['pin2']
         if pin2 is None:
-            keyring.set_password('datachat', 'pin2', info)
+            json_file['pin2'] = info
+            with open(files_dir + "/settings/config.json", "w") as file:
+                json.dump(json_file, file, indent=2)
             return
-        pin3 = keyring.get_password('datachat', 'pin3')
+        pin3 = json_file['pin3']
         if pin3 is None:
-            keyring.set_password('datachat', 'pin3', info)
+            json_file['pin3'] = info
+            with open(files_dir + "/settings/config.json", "w") as file:
+                json.dump(json_file, file, indent=2)
             return
         messagebox.showerror('Pin error', 'Pin limit')
     except Exception as e:
@@ -1074,21 +1130,19 @@ def unpin_chat(l_frame, id: int):
     try:
         pin_chats.remove(l_frame)
         l_frame.pack_forget()
+        with open(files_dir + "/settings/config.json", "r") as file:
+            json_file = json.load(file)
         if id == 1:
-            chat = keyring.get_password('datachat', 'pin2')
-            if chat is not None:
-                keyring.set_password('datachat', 'pin1', chat)
-            chat = keyring.get_password('datachat', 'pin3')
-            if chat is not None:
-                keyring.set_password('datachat', 'pin2', chat)
-            keyring.delete_password('datachat', 'pin3')
+            json_file['pin1'] = json_file['pin2']
+            json_file['pin2'] = json_file['pin3']
+            json_file['pin3'] = None
         elif id == 2:
-            chat = keyring.get_password('datachat', 'pin3')
-            if chat is not None:
-                keyring.set_password('datachat', 'pin2', chat)
-            keyring.delete_password('datachat', 'pin3')
+            json_file['pin2'] = json_file['pin3']
+            json_file['pin3'] = None
         else:
-            keyring.delete_password('datachat', 'pin3')
+            json_file['pin3'] = None
+        with open(files_dir + "/settings/config.json", "w") as file:
+            json.dump(json_file, file, indent=2)
     except Exception as er:
         exception_handler(er)
 
@@ -1113,8 +1167,10 @@ def pin_constructor(text: str, chat: str, id: int):
 def get_pin_chats():
     global pin_chats
     try:
+        with open(files_dir + "/settings/config.json", "r") as file:
+            json_file = json.load(file)
         for i in range(3):
-            pin = keyring.get_password('datachat', f'pin{i + 1}')
+            pin = json_file[f'pin{i + 1}']
             if pin is None:
                 if i == 0:
                     label_fixed.pack_forget()
@@ -1129,25 +1185,14 @@ def get_pin_chats():
 
 def save_theme():
     global theme_var
-    keyring.set_password('datachat', 'theme', theme_var.get())
+    with open(files_dir + "/settings/config.json", "r") as file:
+        json_file = json.load(file)
+    json_file['theme'] = theme_var.get()
+    with open(files_dir + "/settings/config.json", "w") as file:
+        json.dump(json_file, file, indent=2)
     if theme_var.get() == 2:
-        theme_json = {}
-        if not os.path.exists(files_dir + "/theme.json"):
-            theme_json.update({"text_color": "#FFFFFF",
-                               "entry": "#808080",
-                               "relief": "flat",
-                               "frame_relief": "flat",
-                               "bg": "#48494F",
-                               "font_main": "Candara 13",
-                               "font_users": "Candara 15",
-                               "button_font": "Candara 10",
-                               "button_bg": "#757575",
-                               "button_bg_positive": "#006891",
-                               "button_bg_negative": "#B22222",
-                               "button_activebg": "#757575",
-                               "cursor": "pencil"})
-            with open(f"{files_dir}/theme.json", "w") as file:
-                json.dump(theme_json, file)
+        if not os.path.exists(files_dir + "/settings/theme.json"):
+            create_theme_file()
         theme_editor()
     else:
         messagebox.showinfo("Success!", "Theme will be changed on next launch!")
@@ -1155,7 +1200,7 @@ def save_theme():
 
 def theme_editor():
     global relief, frames_relief, cursors
-    with open(files_dir + "/theme.json", "r") as file:
+    with open(files_dir + "/settings/theme.json", "r") as file:
         temp = json.load(file)
     relief.set(temp['relief'])
     frames_relief.set(temp['frame_relief'])
@@ -1188,13 +1233,15 @@ def theme_editor_save():
                        "button_bg_negative": entry_bg_b_neg.get(),
                        "button_activebg": entry_b_act.get(),
                        "cursor": cursors.get()})
-    with open(files_dir + "/theme.json", "w") as file:
-        json.dump(theme_dict, file)
+    with open(files_dir + "/settings/theme.json", "w") as file:
+        json.dump(theme_dict, file, indent=2)
     messagebox.showinfo("Success!", "Theme will be changed on next launch!")
 
 
 def get_update_time():
     global time_to_check
+    with open(files_dir + "/settings/config.json", "r") as file:
+        time_to_check = json.load(file)['update']
     if int(time_to_check) == -1:
         label_check2.configure(text="Never")
     else:
@@ -1215,7 +1262,11 @@ def auto_check():
         label_check2.configure(text=f"{time_to_check} Sec")
     label_check2.update()
     messagebox.showinfo('Success!', 'Notifications will be changed on next launch!')
-    keyring.set_password('datachat', 'update', str(time_to_check))
+    with open(files_dir + "/settings/config.json", "r") as file:
+        json_file = json.load(file)
+    json_file['update'] = str(time_to_check)
+    with open(files_dir + "/settings/config.json", "w") as file:
+        json.dump(json_file, file, indent=2)
 
 
 def loop_msg_func():
@@ -1245,6 +1296,7 @@ def api_awake():
     requests.head(f"{backend_url}api/awake")
 
 
+folders()
 awake_thread = threading.Thread(target=api_awake, daemon=True)
 awake_thread.start()
 set_theme()
@@ -1254,7 +1306,6 @@ fm = Menu(m)
 m.add_cascade(label="File", menu=fm)
 fmm = Menu(fm)
 fm.add_cascade(label="Export", menu=fmm)"""
-
 # region auth
 auth_frame = LabelFrame(root, width=200, height=130, relief=FLAT, bg=theme['bg'])
 auth_frame.pack(side=TOP, anchor=CENTER)
@@ -1716,7 +1767,6 @@ canvas_users.tag_configure('bb', background=theme['entry'], foreground=theme['te
 label_loading = Label(root, font=10, text="LOADING", fg=theme['text_color'], bg=theme['bg'])
 # endregion
 auto_login()
-time_to_check = keyring.get_password('datachat', 'update')
 get_update_time()
 if time_to_check is not None:
     if int(time_to_check) != -1:

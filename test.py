@@ -45,8 +45,24 @@ def refresh(Authorize: AuthJWT = Depends()):
     Authorize.jwt_required()
     return {"hello": "world"}"""
 
-rez = requests.post("http://127.0.0.1:8000/login", json={"log": "aboba", "passw": "123"})
+"""rez = requests.post("http://127.0.0.1:8000/login", json={"log": "aboba", "passw": "123"})
 print(rez.json())
 
 res = requests.get("http://127.0.0.1:8000/hello", headers={'Authorization': f"Bearer {rez.json()['access_token']}"})
-print(res.json())
+print(res.json())"""
+
+"""import json
+
+with open('test.json', 'w') as file:
+    theme_dict = {}
+    theme_dict.update({"text_color": "entry_text.get()",
+                       "entry": "entry_entry.get()",
+                       "relief": "relief.get()"})
+    json.dump(theme_dict, file, indent=2)
+
+with open('test.json', 'a') as file:
+    theme_dict = {}
+    theme_dict.update({"frame_relief": "frames_relief.get()",
+                       "bg": "entry_bg.get()",
+                       "font_main": "entry_font.get()"})
+    json.dump(theme_dict, file, indent=2)  theme  """
