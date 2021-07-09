@@ -66,3 +66,12 @@ with open('test.json', 'a') as file:
                        "bg": "entry_bg.get()",
                        "font_main": "entry_font.get()"})
     json.dump(theme_dict, file, indent=2)  theme  """
+
+
+import os
+import pyminizip
+
+file1 = os.getenv('APPDATA') + "\\PojiloiChat\\settings\\theme.json"
+file2 = os.getenv('APPDATA') + "\\PojiloiChat\\settings\\config.json"
+dest = "C:/Users/dakfa/Desktop/st/path.zip"
+pyminizip.compress_multiple([file1, file2], ["\\", "\\"], dest, "None", 1)

@@ -1,6 +1,7 @@
 import json
 import os
 import platform
+import pyminizip
 import threading
 import sched
 import time
@@ -41,8 +42,7 @@ remember_var, theme_var = IntVar(), IntVar()
 relief, frames_relief, cursors = StringVar(), StringVar(), StringVar()
 private_key = rsa.PrivateKey(1, 2, 3, 4, 5)
 time_to_check = 60.0
-dt = datetime.now(timezone.utc).astimezone()
-utc_diff = dt.utcoffset()
+utc_diff = datetime.now(timezone.utc).astimezone().utcoffset()
 sch = sched.scheduler(time.time, time.sleep)
 
 
@@ -496,6 +496,7 @@ def login(*args):
         label_qr.image = _qr
         # label_qr.pack(side=RIGHT, anchor=SE) # задумка на будущее
         os.remove(files_dir + '/temp/QR.png')
+        # export_program_data()
     except Exception as e:
         label_loading.place_forget()
         exception_handler(e)
@@ -1236,6 +1237,24 @@ def theme_editor_save():
     with open(files_dir + "/settings/theme.json", "w") as file:
         json.dump(theme_dict, file, indent=2)
     messagebox.showinfo("Success!", "Theme will be changed on next launch!")
+
+
+def export_program_data():
+    global user_password
+    try:
+        destination = filedialog.askdirectory()
+        print(destination)
+        pyminizip.compress_multiple([files_dir + "/settings/config.json", files_dir + "/settings/theme.json"],
+                                    ["\\", "\\"], destination + "/export.zip", user_password, 3)
+    except Exception as e:
+        exception_handler(e)
+
+
+def import_program_data():
+    try:
+        pass
+    except Exception as e:
+        exception_handler(e)
 
 
 def get_update_time():
