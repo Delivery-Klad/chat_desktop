@@ -59,7 +59,7 @@ def create_theme_file():
                        "button_bg": "#757575",
                        "button_bg_positive": "#006891",
                        "button_bg_negative": "#B22222",
-                       "button_activebg": "#757575",
+                       "button_bg_active": "#757575",
                        "cursor": "pencil"})
     with open(files_dir + "/settings/theme.json", "w") as file:
         json.dump(theme_dict, file, indent=2)
@@ -83,6 +83,10 @@ def folders():
         pass
     try:
         os.mkdir(files_dir + "\\temp")
+    except FileExistsError:
+        pass
+    try:
+        os.mkdir(files_dir + "\\cache")
     except FileExistsError:
         pass
     try:
@@ -118,7 +122,7 @@ def set_theme(flag=None):
                  "button_bg": "#757575",
                  "button_bg_positive": "#006891",
                  "button_bg_negative": "#B22222",
-                 "button_activebg": "#757575",
+                 "button_bg_active": "#757575",
                  "cursor": "pencil"}
     elif temp == 2:
         theme_var.set(2)
@@ -142,7 +146,7 @@ def set_theme(flag=None):
                  "button_bg": "#A9A9A9",
                  "button_bg_positive": "#2E8B57",
                  "button_bg_negative": "#B22222",
-                 "button_activebg": None,
+                 "button_bg_active": None,
                  "cursor": None}
 
 
@@ -497,6 +501,8 @@ def login(*args):
         # label_qr.pack(side=RIGHT, anchor=SE) # задумка на будущее
         os.remove(files_dir + '/temp/QR.png')
         # export_program_data()
+        export_program_data()
+        import_program_data()
     except Exception as e:
         label_loading.place_forget()
         exception_handler(e)
@@ -1151,10 +1157,10 @@ def unpin_chat(l_frame, id: int):
 def pin_constructor(text: str, chat: str, id: int):
     try:
         local_frame = tk.LabelFrame(menu_frame, width=150, height=50, relief=FLAT, bg=theme['bg'])
-        button1 = tk.Button(local_frame, text=text, activebackground=theme['button_activebg'], bg=theme['button_bg'],
+        button1 = tk.Button(local_frame, text=text, activebackground=theme['button_bg_active'], bg=theme['button_bg'],
                             width=13, relief=theme['relief'], font=theme['button_font'],
                             command=lambda: (menu_navigation("chat"), open_chat(chat)))
-        button2 = tk.Button(local_frame, text='-', activebackground=theme['button_activebg'], font=theme['button_font'],
+        button2 = tk.Button(local_frame, text='-', activebackground=theme['button_bg_active'], font=theme['button_font'],
                             bg=theme['button_bg_negative'], width=2, relief=theme['relief'],
                             command=lambda: unpin_chat(local_frame, id))
         button1.pack(side=LEFT, anchor=N)
@@ -1216,7 +1222,7 @@ def theme_editor():
     entry_bg_b.insert(0, temp['button_bg'])
     entry_bg_b_pos.insert(0, temp['button_bg_positive'])
     entry_bg_b_neg.insert(0, temp['button_bg_negative'])
-    entry_b_act.insert(0, temp['button_activebg'])
+    entry_b_act.insert(0, temp['button_bg_active'])
 
 
 def theme_editor_save():
@@ -1232,7 +1238,7 @@ def theme_editor_save():
                        "button_bg": entry_bg_b.get(),
                        "button_bg_positive": entry_bg_b_pos.get(),
                        "button_bg_negative": entry_bg_b_neg.get(),
-                       "button_activebg": entry_b_act.get(),
+                       "button_bg_active": entry_b_act.get(),
                        "cursor": cursors.get()})
     with open(files_dir + "/settings/theme.json", "w") as file:
         json.dump(theme_dict, file, indent=2)
@@ -1242,17 +1248,31 @@ def theme_editor_save():
 def export_program_data():
     global user_password
     try:
+        files, paths = [], []
         destination = filedialog.askdirectory()
-        print(destination)
-        pyminizip.compress_multiple([files_dir + "/settings/config.json", files_dir + "/settings/theme.json"],
-                                    ["\\", "\\"], destination + "/export.zip", user_password, 3)
+        with open(files_dir + "\\settings\\key.json", "w") as file:
+            json.dump({"key": keyring.get_password("datachat", "private_key")}, file)
+        for i in os.listdir(files_dir + "\\settings"):
+            files.append(files_dir + "\\settings\\" + i)
+        for i in os.listdir(files_dir + "\\cache"):
+            files.append(files_dir + "\\cache\\" + i)
+        for i in range(len(files)):
+            paths.append("\\")
+        pyminizip.compress_multiple(files, paths, destination + "\\export.zip", user_password, 3)
+        os.remove(files_dir + "\\settings\\key.json")
     except Exception as e:
         exception_handler(e)
 
 
 def import_program_data():
     try:
-        pass
+        path = filedialog.askopenfilename(filetypes=[("Zip files", "*.zip")])
+        print(path)
+        pyminizip.uncompress(path, user_password, files_dir + "/temp", 0)
+        with open(files_dir + "/temp/key.json", "r") as file:
+            key = json.load(file)["key"]
+        keyring.set_password("datachat", "private_key", key)
+        os.remove(files_dir + "\\temp\\key.json")
     except Exception as e:
         exception_handler(e)
 
@@ -1346,16 +1366,16 @@ check_remember = tk.Checkbutton(auth_frame, font=theme['font_main'], fg=theme['t
                                 text='Remember me', activebackground=theme['bg'], selectcolor=theme['bg'],
                                 variable=remember_var)
 check_remember.pack(side=TOP, anchor=S)
-button_login = tk.Button(auth_frame, text="LOGIN", activebackground=theme['button_activebg'], relief=theme['relief'],
+button_login = tk.Button(auth_frame, text="LOGIN", activebackground=theme['button_bg_active'], relief=theme['relief'],
                          bg=theme['button_bg_positive'], width=11, command=lambda: login(), font=theme['button_font'])
 button_login.pack(side=LEFT, pady=3, anchor=CENTER)
-button_reg_m = tk.Button(auth_frame, text="REGISTER", activebackground=theme['button_activebg'], relief=theme['relief'],
+button_reg_m = tk.Button(auth_frame, text="REGISTER", activebackground=theme['button_bg_active'], relief=theme['relief'],
                          bg=theme['button_bg_positive'], width=11, command=lambda: show_reg_frame(),
                          font=theme['button_font'])
 button_reg_m.pack(side=RIGHT, pady=3, anchor=CENTER)
-button_reg = tk.Button(auth_frame, text="REGISTER", activebackground=theme['button_activebg'], relief=theme['relief'],
+button_reg = tk.Button(auth_frame, text="REGISTER", activebackground=theme['button_bg_active'], relief=theme['relief'],
                        bg=theme['button_bg_positive'], width=11, command=lambda: register(), font=theme['button_font'])
-button_login_b = tk.Button(auth_frame, text="BACK", activebackground=theme['button_activebg'], relief=theme['relief'],
+button_login_b = tk.Button(auth_frame, text="BACK", activebackground=theme['button_bg_active'], relief=theme['relief'],
                            bg=theme['button_bg_positive'], width=11, command=lambda: back_to_login(),
                            font=theme['button_font'])
 # endregion
@@ -1367,7 +1387,7 @@ label_code.pack(side=TOP, anchor=S)
 entry_code = tk.Entry(recovery_frame, font=12, width=20, fg=theme['text_color'], bg=theme['entry'],
                       relief=theme['relief'], cursor=theme['cursor'])
 entry_code.pack(side=TOP)
-button_code = tk.Button(recovery_frame, text="SEND", activebackground=theme['button_activebg'], relief=theme['relief'],
+button_code = tk.Button(recovery_frame, text="SEND", activebackground=theme['button_bg_active'], relief=theme['relief'],
                         bg=theme['button_bg_positive'], width=11, command=lambda: new_pass_menu(),
                         font=theme['button_font'])
 button_code.pack(side=RIGHT, pady=3, anchor=CENTER)
@@ -1386,7 +1406,7 @@ label_code2.pack(side=TOP, anchor=S)
 entry_new_p2 = tk.Entry(new_pass_frame, font=12, width=20, fg=theme['text_color'], bg=theme['entry'],
                         cursor=theme['cursor'], show='•')
 entry_new_p2.pack(side=TOP)
-button_code = tk.Button(new_pass_frame, text="SET", activebackground=theme['button_activebg'], relief=theme['relief'],
+button_code = tk.Button(new_pass_frame, text="SET", activebackground=theme['button_bg_active'], relief=theme['relief'],
                         bg=theme['button_bg_positive'], width=11, command=lambda: set_new_pass(),
                         font=theme['button_font'])
 button_code.pack(side=RIGHT, pady=3, anchor=CENTER)
@@ -1402,19 +1422,19 @@ main_frame = LabelFrame(root, width=850, height=500, bg=theme['bg'], relief=them
 group_frame = LabelFrame(root, width=850, height=500, bg=theme['bg'], relief=theme['relief'])
 settings_frame = LabelFrame(root, width=600, height=500, bg=theme['bg'], relief=theme['frame_relief'])
 menu_frame = LabelFrame(root, width=150, height=500, relief=FLAT, bg=theme['bg'])
-button_chat = tk.Button(menu_frame, text="CHAT", activebackground=theme['button_activebg'], relief=theme['relief'],
+button_chat = tk.Button(menu_frame, text="CHAT", activebackground=theme['button_bg_active'], relief=theme['relief'],
                         bg=theme['button_bg_positive'], width=17, command=lambda: menu_navigation("chat"),
                         font=theme['button_font'])
 button_chat.pack(side=TOP, anchor=N)
-button_info = tk.Button(menu_frame, text="INFO", activebackground=theme['button_activebg'], bg=theme['button_bg'],
+button_info = tk.Button(menu_frame, text="INFO", activebackground=theme['button_bg_active'], bg=theme['button_bg'],
                         width=17, relief=theme['relief'], command=lambda: menu_navigation("info"),
                         font=theme['button_font'])
 button_info.pack(side=TOP, pady=5, anchor=N)
-button_settings = tk.Button(menu_frame, text="SETTINGS", activebackground=theme['button_activebg'], width=17,
+button_settings = tk.Button(menu_frame, text="SETTINGS", activebackground=theme['button_bg_active'], width=17,
                             bg=theme['button_bg'], relief=theme['relief'],
                             command=lambda: menu_navigation("set"), font=theme['button_font'])
 button_settings.pack(side=TOP, anchor=N)
-button_groups = tk.Button(menu_frame, text="GROUPS", activebackground=theme['button_activebg'], bg=theme['button_bg'],
+button_groups = tk.Button(menu_frame, text="GROUPS", activebackground=theme['button_bg_active'], bg=theme['button_bg'],
                           width=17, relief=theme['relief'], command=lambda: menu_navigation("group"),
                           font=theme['button_font'])
 button_groups.pack(side=TOP, pady=5, anchor=N)
@@ -1425,11 +1445,11 @@ label_fixed.pack(side=TOP, anchor=N)
 get_pin_chats()
 label_line2 = tk.Label(menu_frame, font=theme['font_main'], text="-" * 20, fg=theme['text_color'], bg=theme['bg'])
 label_line2.pack(side=TOP, anchor=N)
-button_logout = tk.Button(menu_frame, text="LOGOUT", activebackground=theme['button_activebg'],
+button_logout = tk.Button(menu_frame, text="LOGOUT", activebackground=theme['button_bg_active'],
                           bg=theme['button_bg_negative'], width=17, relief=theme['relief'], font=theme['button_font'],
                           command=lambda: logout())
 button_logout.pack(side=BOTTOM, pady=5, anchor=N)
-button_back = tk.Button(menu_frame, text="BACK", activebackground=theme['button_activebg'],
+button_back = tk.Button(menu_frame, text="BACK", activebackground=theme['button_bg_active'],
                         bg=theme['button_bg_negative'], width=17, relief=theme['relief'], font=theme['button_font'],
                         command=lambda: menu_navigation("chat"))
 main2_frame = LabelFrame(main_frame, width=600, height=350, relief=FLAT, bg=theme['bg'])
@@ -1446,7 +1466,7 @@ label_chat_id.pack(side=LEFT, anchor=W)
 entry_chat_id = tk.Entry(chat_frame, font=12, width=20, fg=theme['text_color'], bg=theme['entry'],
                          relief=theme['relief'], cursor=theme['cursor'])
 entry_chat_id.pack(side=LEFT, padx=165, anchor=CENTER)
-button_chat_id = tk.Button(chat_frame, text="OPEN", activebackground=theme['button_activebg'], relief=theme['relief'],
+button_chat_id = tk.Button(chat_frame, text="OPEN", activebackground=theme['button_bg_active'], relief=theme['relief'],
                            bg=theme['button_bg_positive'], width=15, command=lambda: open_chat(entry_chat_id.get()))
 button_chat_id.pack(side=RIGHT, anchor=E)
 
@@ -1468,31 +1488,31 @@ canvas_2.pack(side=RIGHT, expand=True, fill=BOTH)
 canvas_2.config(yscrollcommand=scroll_2.set)
 canvas_2.configure(state='disabled')
 
-button_refresh = tk.Button(main_frame, text="REFRESH", activebackground=theme['button_activebg'], width=120,
+button_refresh = tk.Button(main_frame, text="REFRESH", activebackground=theme['button_bg_active'], width=120,
                            bg=theme['button_bg_positive'], relief=theme['relief'], command=lambda: get_message())
 button_refresh.pack(side=TOP, pady=3, anchor=CENTER)
 entry_msg = tk.Entry(main_frame, font=10, width=85, relief=theme['relief'], fg=theme['text_color'], bg=theme['entry'],
                      cursor=theme['cursor'])
 entry_msg.bind("<Return>", send_message_handler)
 entry_msg.pack(side=LEFT, padx=3)
-button_img = tk.Button(main_frame, text="➕", activebackground=theme['button_activebg'], bg=theme['button_bg_positive'],
+button_img = tk.Button(main_frame, text="➕", activebackground=theme['button_bg_active'], bg=theme['button_bg_positive'],
                        width=3, relief=theme['relief'], command=lambda: send_doc(), state='disabled')
 button_img.pack(side=LEFT, anchor=E)
-button_send = tk.Button(main_frame, text="SEND", activebackground=theme['button_activebg'], relief=theme['relief'],
+button_send = tk.Button(main_frame, text="SEND", activebackground=theme['button_bg_active'], relief=theme['relief'],
                         bg=theme['button_bg_positive'], width=8, command=lambda: send_message(), state='disabled')
 button_send.pack(side=LEFT, anchor=E, padx=3)
 
-button_refresh2 = tk.Button(group_frame, text="REFRESH", activebackground=theme['button_activebg'], width=121,
+button_refresh2 = tk.Button(group_frame, text="REFRESH", activebackground=theme['button_bg_active'], width=121,
                             bg=theme['button_bg_positive'], relief=theme['relief'], command=lambda: get_chat_message())
 button_refresh2.pack(side=TOP, pady=3, anchor=CENTER)
 entry_msg2 = tk.Entry(group_frame, font=10, width=85, relief=theme['relief'], fg=theme['text_color'], bg=theme['entry'],
                       cursor=theme['cursor'])
 # entry_msg2.bind("<Return>", send_chat_message())
 entry_msg2.pack(side=LEFT, padx=3)
-button_img2 = tk.Button(group_frame, text="➕", activebackground=theme['button_activebg'], relief=theme['relief'],
+button_img2 = tk.Button(group_frame, text="➕", activebackground=theme['button_bg_active'], relief=theme['relief'],
                         bg=theme['button_bg_positive'], width=3, state='disabled', command=lambda: send_chat_doc())
 button_img2.pack(side=LEFT, anchor=E)
-button_send2 = tk.Button(group_frame, text="SEND", activebackground=theme['button_activebg'], relief=theme['relief'],
+button_send2 = tk.Button(group_frame, text="SEND", activebackground=theme['button_bg_active'], relief=theme['relief'],
                          bg=theme['button_bg_positive'], width=8, state='disabled', command=lambda: send_chat_message())
 button_send2.pack(side=LEFT, anchor=E, padx=3)
 entry_log.focus_set()
@@ -1506,7 +1526,7 @@ label_check = tk.Label(settings_frame_2, font=10, text="  Update frequency:", fg
 label_check.pack(side=LEFT, anchor=W)
 label_check2 = tk.Label(settings_frame_2, font=12, text='1 min', width=20, fg=theme['text_color'], bg=theme['bg'])
 label_check2.pack(side=LEFT, padx=170, anchor=CENTER)
-button_check_msg = tk.Button(settings_frame_2, text="UPDATE", activebackground=theme['button_activebg'], width=15,
+button_check_msg = tk.Button(settings_frame_2, text="UPDATE", activebackground=theme['button_bg_active'], width=15,
                              bg=theme['button_bg_positive'], relief=theme['relief'], command=lambda: auto_check())
 button_check_msg.pack(side=RIGHT, anchor=E)
 
@@ -1518,7 +1538,7 @@ label_chat.pack(side=LEFT, anchor=W)
 entry_chat = tk.Entry(settings_frame7, font=12, width=20, fg=theme['text_color'], bg=theme['entry'],
                       cursor=theme['cursor'], relief=theme['relief'])
 entry_chat.pack(side=LEFT, padx=170, anchor=CENTER)
-button_c_chat = tk.Button(settings_frame7, text="CREATE", activebackground=theme['button_activebg'], width=15,
+button_c_chat = tk.Button(settings_frame7, text="CREATE", activebackground=theme['button_bg_active'], width=15,
                           bg=theme['button_bg_positive'], relief=theme['relief'], command=lambda: create_chat())
 button_c_chat.pack(side=RIGHT, anchor=E)
 
@@ -1530,7 +1550,7 @@ label_pin.pack(side=LEFT, anchor=W)
 entry_pin = tk.Entry(settings_frame11, font=12, width=20, fg=theme['text_color'], bg=theme['entry'],
                      cursor=theme['cursor'], relief=theme['relief'])
 entry_pin.pack(side=LEFT, padx=170, anchor=CENTER)
-button_pin = tk.Button(settings_frame11, text="PIN", activebackground=theme['button_activebg'], width=15,
+button_pin = tk.Button(settings_frame11, text="PIN", activebackground=theme['button_bg_active'], width=15,
                        bg=theme['button_bg_positive'], relief=theme['relief'], command=lambda: pin_chat())
 button_pin.pack(side=RIGHT, anchor=E)
 
@@ -1552,7 +1572,7 @@ label_gr_toinv.pack(side=TOP, anchor=W)
 entry_gr_toinv = tk.Entry(settings_frame10, font=12, width=20, fg=theme['text_color'], bg=theme['entry'],
                           cursor=theme['cursor'], relief=theme['relief'])
 entry_gr_toinv.pack(side=TOP, anchor=CENTER)
-button_invite = tk.Button(settings_frame8, text="INVITE", activebackground=theme['button_activebg'], width=15,
+button_invite = tk.Button(settings_frame8, text="INVITE", activebackground=theme['button_bg_active'], width=15,
                           bg=theme['button_bg_positive'], relief=theme['relief'], command=lambda: invite_to_group())
 button_invite.pack(side=RIGHT, anchor=S)
 
@@ -1574,7 +1594,7 @@ label_gr_tokick.pack(side=TOP, anchor=W)
 entry_gr_tokick = tk.Entry(settings_frame10, font=12, width=20, fg=theme['text_color'], bg=theme['entry'],
                            cursor=theme['cursor'], relief=theme['relief'])
 entry_gr_tokick.pack(side=TOP, anchor=CENTER)
-button_kick = tk.Button(settings_frame20, text="KICK", activebackground=theme['button_activebg'], width=15,
+button_kick = tk.Button(settings_frame20, text="KICK", activebackground=theme['button_bg_active'], width=15,
                         bg=theme['button_bg_positive'], relief=theme['relief'], command=lambda: kick_from_group())
 button_kick.pack(side=RIGHT, anchor=S)
 
@@ -1598,7 +1618,7 @@ entry_new_pass = tk.Entry(settings_frame6, font=12, width=20, fg=theme['text_col
                           cursor=theme['cursor'], relief=theme['relief'], show='•')
 entry_new_pass.bind("<Return>", change_pass_handler)
 entry_new_pass.pack(side=TOP, anchor=CENTER)
-button_pass_font = tk.Button(settings_frame3, text="CHANGE", activebackground=theme['button_activebg'], width=15,
+button_pass_font = tk.Button(settings_frame3, text="CHANGE", activebackground=theme['button_bg_active'], width=15,
                              bg=theme['button_bg_positive'], relief=theme['relief'], command=lambda: change_password())
 button_pass_font.pack(side=RIGHT, anchor=S)
 
@@ -1617,7 +1637,7 @@ theme2 = Radiobutton(settings_frame4, text="Custom theme", activebackground=them
                      command=lambda: save_theme(), selectcolor=theme['bg'])
 theme2.pack(side=LEFT)
 button_regenerate = tk.Button(settings_frame, text="REGENERATE ENCRYPTION KEYS", bg=theme['button_bg_positive'],
-                              activebackground=theme['button_activebg'], width=113, relief=theme['relief'],
+                              activebackground=theme['button_bg_active'], width=113, relief=theme['relief'],
                               command=lambda: regenerate_keys())
 button_regenerate.pack(side=TOP, anchor=CENTER)
 # endregion
@@ -1657,7 +1677,7 @@ popup_main.pack(side=TOP)
 popup_main.configure(width=31, relief=theme['relief'], fg=theme['text_color'], bg=theme['entry'],
                      activebackground=theme['entry'], highlightthickness=0)
 popup_main["menu"].configure(bg=theme['entry'], fg=theme['text_color'], relief=theme['relief'],
-                             activebackground=theme['button_activebg'], borderwidth=0)
+                             activebackground=theme['button_bg_active'], borderwidth=0)
 frame_relief = LabelFrame(theme_editor_window, width=500, relief=FLAT, bg=theme['bg'])
 frame_relief.pack(side=TOP, pady=5)
 label_frame_r = tk.Label(frame_relief, font=theme['font_main'], text="Frame relief", fg=theme['text_color'],
@@ -1668,7 +1688,7 @@ popup_frames.pack(side=TOP)
 popup_frames.configure(width=31, relief=theme['relief'], fg=theme['text_color'], bg=theme['entry'],
                        activebackground=theme['entry'], highlightthickness=0)
 popup_frames["menu"].configure(bg=theme['entry'], fg=theme['text_color'], relief=theme['relief'],
-                               activebackground=theme['button_activebg'], borderwidth=0)
+                               activebackground=theme['button_bg_active'], borderwidth=0)
 bg_frame = LabelFrame(theme_editor_window, width=500, relief=FLAT, bg=theme['bg'])
 bg_frame.pack(side=TOP)
 label_bg = tk.Label(bg_frame, font=theme['font_main'], text="Background color", fg=theme['text_color'],
@@ -1743,10 +1763,10 @@ popup_cur.pack(side=TOP)
 popup_cur.configure(width=31, relief=theme['relief'], fg=theme['text_color'], bg=theme['entry'],
                     activebackground=theme['entry'], highlightthickness=0, height=1)
 popup_cur["menu"].configure(bg=theme['entry'], fg=theme['text_color'], relief=theme['relief'],
-                            activebackground=theme['button_activebg'], borderwidth=0)
+                            activebackground=theme['button_bg_active'], borderwidth=0)
 # print(popup_cur.keys())
 button_save = tk.Button(theme_editor_window, text="SAVE", bg=theme['button_bg_positive'], relief=theme['relief'],
-                        activebackground=theme['button_activebg'], width=64, command=lambda: theme_editor_save())
+                        activebackground=theme['button_bg_active'], width=64, command=lambda: theme_editor_save())
 button_save.pack(side=TOP, pady=5)
 # endregion
 # region info
@@ -1759,7 +1779,7 @@ info_frame_2.pack(side=TOP, anchor=NW)
 entry_user_search = tk.Entry(info_frame_2, font=10, width=87, relief=theme['relief'], fg=theme['text_color'],
                              bg=theme['entry'], cursor=theme['cursor'])
 entry_user_search.pack(side=LEFT, padx=3)
-button_search = tk.Button(info_frame_2, text="SEARCH", activebackground=theme['button_activebg'], width=8,
+button_search = tk.Button(info_frame_2, text="SEARCH", activebackground=theme['button_bg_active'], width=8,
                           bg=theme['button_bg_positive'], relief=theme['relief'], command=lambda: search_user())
 button_search.pack(side=LEFT, anchor=E, padx=3)
 frame_users = Frame(info_frame, width=800, height=400)
