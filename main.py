@@ -72,7 +72,8 @@ def create_config_file():
                        "pin1": None,
                        "pin2": None,
                        "pin3": None,
-                       "update": 60})
+                       "update": 60,
+                       "browser_path": None})
     with open(files_dir + "/settings/config.json", "w") as file:
         json.dump(theme_dict, file, indent=2)
 
@@ -656,8 +657,9 @@ def menu_navigation(menu: str):
         for i in groups:
             counter += 1
             chats[i] = tk.Button(menu_frame, text=i, bg=theme['button_bg'], width=17, relief=theme['relief'],
-                                 font=theme['button_font'], command=lambda: change_group(
-                    get_chat_id(groups[counter - 1]), chats[groups[counter - 1]]))
+                                 font=theme['button_font'], activebackground=theme['button_bg_active'],
+                                 command=lambda: change_group(get_chat_id(groups[counter - 1]),
+                                                              chats[groups[counter - 1]]))
             if counter % 2 == 0:
                 chats[i].pack(side=TOP, pady=5, anchor=N)
             else:
@@ -1204,6 +1206,35 @@ def get_pin_chats():
         exception_handler(er)
 
 
+def get_browser_path():
+    try:
+        with open(files_dir + "/settings/config.json", "r") as file:
+            res = json.load(file)['browser_path']
+        if res is None:
+            res = ""
+        return res
+    except Exception as e:
+        exception_handler(e)
+
+
+def save_browser_path():
+    try:
+        if len(entry_path.get()) == 0:
+            messagebox.showerror("Input error!", "Empty path")
+            return
+        if entry_path.get()[-4:] != ".exe":
+            messagebox.showerror("Input error!", "Not .exe file")
+            return
+        with open(files_dir + "/settings/config.json", "r") as file:
+            json_file = json.load(file)
+        json_file['browser_path'] = entry_path.get()
+        with open(files_dir + "/settings/config.json", "w") as file:
+            json.dump(json_file, file, indent=2)
+        messagebox.showinfo("Success!", "Browser path saved")
+    except Exception as e:
+        exception_handler(e)
+
+
 def save_theme():
     global theme_var
     with open(files_dir + "/settings/config.json", "r") as file:
@@ -1297,10 +1328,22 @@ def import_program_data():
 
 
 def open_link(*args):
+    global backend_url
     try:
-        print(canvas.selection_get())
+        if "chat-b4ckend.herokuapp.com/file/get/file_" in canvas.selection_get():
+            import webbrowser
+            print(canvas.selection_get())
+            with open(files_dir + "/settings/config.json", "r") as file:
+                tmp = json.load(file)['browser_path']
+            if tmp is not None:
+                webbrowser.register('browser', None, webbrowser.BackgroundBrowser(tmp))
+                webbrowser.get(using='browser').open_new_tab(canvas.selection_get())
+            else:
+                webbrowser.open(canvas.selection_get(), new=0)
     except tk.TclError:
         pass
+    except Exception as e:
+        exception_handler(e)
 
 
 def get_update_time():
@@ -1648,7 +1691,18 @@ entry_new_pass.pack(side=TOP, anchor=CENTER)
 button_pass_font = tk.Button(settings_frame3, text="CHANGE", activebackground=theme['button_bg_active'], width=15,
                              bg=theme['button_bg_positive'], relief=theme['relief'], command=lambda: change_password())
 button_pass_font.pack(side=RIGHT, anchor=S)
-
+settings_frame16 = LabelFrame(settings_frame, width=600, height=25, relief=FLAT, bg=theme['bg'])
+settings_frame16.pack(side=TOP, pady=2, anchor=W)
+entry_path = tk.Entry(settings_frame16, font=12, width=72, fg=theme['text_color'], bg=theme['entry'],
+                      cursor=theme['cursor'], relief=theme['relief'])
+entry_path.pack(side=LEFT, padx=3)
+entry_path.insert(0, get_browser_path())
+empty = tk.Label(settings_frame16, font=10, text="", fg=theme['text_color'], bg=theme['bg'],
+                 width=2, anchor=W)
+empty.pack(side=LEFT, padx=5)
+button_path = tk.Button(settings_frame16, text="SAVE", activebackground=theme['button_bg_active'], width=15,
+                        bg=theme['button_bg_positive'], relief=theme['relief'], command=lambda: save_browser_path())
+button_path.pack(side=RIGHT, anchor=S)
 settings_frame4 = LabelFrame(settings_frame, width=600, height=25, relief=FLAT, bg=theme['bg'])
 settings_frame4.pack(side=TOP, pady=2, anchor=W)
 theme0 = Radiobutton(settings_frame4, text="Light theme", activebackground=theme['bg'], bg=theme['bg'],
@@ -1678,7 +1732,7 @@ button_regenerate = tk.Button(settings_frame12, text="REGENERATE ENCRYPTION KEYS
                               command=lambda: regenerate_keys())
 button_regenerate.pack(side=TOP, anchor=CENTER)
 # endregion
-# region json
+# region json editor
 choices = {'flat', 'raised', 'sunken', 'groove', 'ridge'}
 choices2 = {'arrow', 'circle', 'clock', 'cross', 'dotbox', 'exchange', 'fleur', 'heart', 'man', 'mouse', 'pirate',
             'plus', 'shuttle', 'sizing', 'spider', 'spraycan', 'star', 'target', 'tcross', 'trek', 'watch'}
