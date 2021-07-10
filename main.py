@@ -53,6 +53,7 @@ def create_theme_file():
                        "relief": "flat",
                        "frame_relief": "flat",  # RIDGE
                        "bg": "#48494F",
+                       "select_bg": "#000000",
                        "font_main": "Candara 13",
                        "font_users": "Candara 15",
                        "button_font": "Candara 10",
@@ -116,6 +117,7 @@ def set_theme(flag=None):
                  "relief": "flat",
                  "frame_relief": "flat",  # RIDGE
                  "bg": "#48494F",
+                 "select_bg": "#000000",
                  "font_main": Font(family="Candara", size=13),
                  "font_users": Font(family="Candara", size=15),
                  "button_font": Font(family="Candara", size=10),
@@ -140,6 +142,7 @@ def set_theme(flag=None):
                  "relief": "raised",
                  "frame_relief": "flat",
                  "bg": None,
+                 "select_bg": None,
                  "font_main": Font(family="Ubuntu", size=13),
                  "font_users": Font(family="Ubuntu", size=15),
                  "button_font": None,
@@ -500,9 +503,7 @@ def login(*args):
         label_qr.image = _qr
         # label_qr.pack(side=RIGHT, anchor=SE) # задумка на будущее
         os.remove(files_dir + '/temp/QR.png')
-        # export_program_data()
-        export_program_data()
-        import_program_data()
+        menu_navigation("chat")
     except Exception as e:
         label_loading.place_forget()
         exception_handler(e)
@@ -1100,8 +1101,12 @@ def search_user():
 
 
 def cache_messages(messages):
+    global current_chat
     try:
-        return
+        with open(files_dir + "\\cache\\" + current_chat) as file:
+            json.load(file)
+    except FileNotFoundError:
+        pass
     except Exception as e:
         exception_handler(e)
 
@@ -1169,12 +1174,12 @@ def pin_constructor(text: str, chat: str, id: int):
         button1 = tk.Button(local_frame, text=text, activebackground=theme['button_bg_active'], bg=theme['button_bg'],
                             width=13, relief=theme['relief'], font=theme['button_font'],
                             command=lambda: (menu_navigation("chat"), open_chat(chat)))
-        button2 = tk.Button(local_frame, text='-', activebackground=theme['button_bg_active'], font=theme['button_font'],
-                            bg=theme['button_bg_negative'], width=2, relief=theme['relief'],
+        button2 = tk.Button(local_frame, text='-', activebackground=theme['button_bg_active'], width=2,
+                            font=theme['button_font'], bg=theme['button_bg_negative'], relief=theme['relief'],
                             command=lambda: unpin_chat(local_frame, id))
         button1.pack(side=LEFT, anchor=N)
         button2.pack(side=LEFT, anchor=N, padx=3)
-        local_frame.pack(side=TOP, pady=1, anchor=N)
+        local_frame.pack(side=TOP, anchor=N)
         pin_chats.append(local_frame)
     except Exception as er:
         exception_handler(er)
@@ -1225,6 +1230,7 @@ def theme_editor():
     entry_text.insert(0, temp['text_color'])
     entry_entry.insert(0, temp['entry'])
     entry_bg.insert(0, temp['bg'])
+    entry_sel_bg.insert(0, temp['select_bg'])
     entry_font.insert(0, temp['font_main'])
     entry_font_u.insert(0, temp['font_users'])
     entry_font_b.insert(0, temp['button_font'])
@@ -1241,6 +1247,7 @@ def theme_editor_save():
                        "relief": relief.get(),
                        "frame_relief": frames_relief.get(),
                        "bg": entry_bg.get(),
+                       "select_bg": entry_sel_bg.get(),
                        "font_main": entry_font.get(),
                        "font_users": entry_font_u.get(),
                        "button_font": entry_font_b.get(),
@@ -1287,6 +1294,13 @@ def import_program_data():
             os.replace(files_dir + "\\temp\\" + i, files_dir + "\\cache\\" + i)
     except Exception as e:
         exception_handler(e)
+
+
+def open_link(*args):
+    try:
+        print(canvas.selection_get())
+    except tk.TclError:
+        pass
 
 
 def get_update_time():
@@ -1381,7 +1395,8 @@ check_remember.pack(side=TOP, anchor=S)
 button_login = tk.Button(auth_frame, text="LOGIN", activebackground=theme['button_bg_active'], relief=theme['relief'],
                          bg=theme['button_bg_positive'], width=11, command=lambda: login(), font=theme['button_font'])
 button_login.pack(side=LEFT, pady=3, anchor=CENTER)
-button_reg_m = tk.Button(auth_frame, text="REGISTER", activebackground=theme['button_bg_active'], relief=theme['relief'],
+button_reg_m = tk.Button(auth_frame, text="REGISTER", activebackground=theme['button_bg_active'],
+                         relief=theme['relief'],
                          bg=theme['button_bg_positive'], width=11, command=lambda: show_reg_frame(),
                          font=theme['button_font'])
 button_reg_m.pack(side=RIGHT, pady=3, anchor=CENTER)
@@ -1490,7 +1505,7 @@ scroll.pack(side=RIGHT, fill=Y)
 canvas.pack(side=RIGHT, expand=True, fill=BOTH)
 canvas.config(yscrollcommand=scroll.set)
 canvas.configure(state='disabled')
-
+canvas.bind("<ButtonRelease>", open_link)
 frame_2 = Frame(main2_frame2, width=850, height=500)
 frame_2.pack()
 canvas_2 = Text(frame_2, fg=theme['text_color'], bg=theme['entry'], width=105, height=27, cursor='arrow')
@@ -1648,7 +1663,17 @@ theme2 = Radiobutton(settings_frame4, text="Custom theme", activebackground=them
                      fg=theme['text_color'], font=theme['font_main'], variable=theme_var, value=2,
                      command=lambda: save_theme(), selectcolor=theme['bg'])
 theme2.pack(side=LEFT)
-button_regenerate = tk.Button(settings_frame, text="REGENERATE ENCRYPTION KEYS", bg=theme['button_bg_positive'],
+settings_frame12 = LabelFrame(settings_frame, width=600, height=25, relief=FLAT, bg=theme['bg'])
+settings_frame12.pack(side=TOP, pady=2, anchor=CENTER)
+button_export = tk.Button(settings_frame12, text="EXPORT DATA", bg=theme['button_bg_positive'],
+                          activebackground=theme['button_bg_active'], width=113, relief=theme['relief'],
+                          command=lambda: export_program_data())
+button_import = tk.Button(settings_frame12, text="IMPORT DATA", bg=theme['button_bg_positive'],
+                          activebackground=theme['button_bg_active'], width=113, relief=theme['relief'],
+                          command=lambda: import_program_data())
+button_export.pack(side=TOP, anchor=CENTER)
+button_import.pack(side=TOP, pady=5, anchor=CENTER)
+button_regenerate = tk.Button(settings_frame12, text="REGENERATE ENCRYPTION KEYS", bg=theme['button_bg_positive'],
                               activebackground=theme['button_bg_active'], width=113, relief=theme['relief'],
                               command=lambda: regenerate_keys())
 button_regenerate.pack(side=TOP, anchor=CENTER)
@@ -1660,7 +1685,7 @@ choices2 = {'arrow', 'circle', 'clock', 'cross', 'dotbox', 'exchange', 'fleur', 
 theme_editor_window = Toplevel(root)
 theme_editor_window.withdraw()
 theme_editor_window.title("Theme editor")
-theme_editor_window.geometry("500x500+{}+{}".format(w, h))
+theme_editor_window.geometry("500x550+{}+{}".format(w, h))
 theme_editor_window.resizable(False, False)
 theme_editor_window['bg'] = theme['bg']
 test_color = LabelFrame(theme_editor_window, width=500, relief=FLAT, bg=theme['bg'])
@@ -1709,6 +1734,14 @@ label_bg.pack(side=LEFT)
 entry_bg = tk.Entry(bg_frame, font=12, width=25, fg=theme['text_color'], bg=theme['entry'],
                     relief=theme['relief'], cursor=theme['cursor'])
 entry_bg.pack(side=LEFT)
+sel_bg_frame = LabelFrame(theme_editor_window, width=500, relief=FLAT, bg=theme['bg'])
+sel_bg_frame.pack(side=TOP)
+label_sel_bg = tk.Label(sel_bg_frame, font=theme['font_main'], text="Select background", fg=theme['text_color'],
+                        bg=theme['bg'], width=25, anchor=W)
+label_sel_bg.pack(side=LEFT)
+entry_sel_bg = tk.Entry(sel_bg_frame, font=12, width=25, fg=theme['text_color'], bg=theme['entry'],
+                        relief=theme['relief'], cursor=theme['cursor'])
+entry_sel_bg.pack(side=LEFT)
 font_frame = LabelFrame(theme_editor_window, width=500, relief=FLAT, bg=theme['bg'])
 font_frame.pack(side=TOP, pady=5)
 label_font = tk.Label(font_frame, font=theme['font_main'], text="Main font", fg=theme['text_color'],
