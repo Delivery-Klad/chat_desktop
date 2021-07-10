@@ -722,6 +722,7 @@ def get_message():
     res = get_messages(current_chat, 0)
     if res is None:
         return
+    cache_messages(res)
     try:
         canvas.configure(state='normal')
         canvas.delete(0.0, END)
@@ -897,6 +898,7 @@ def get_chat_message():
     res = get_messages(current_chat, 1)
     if res is None:
         return
+    cache_messages(res)
     try:
         canvas_2.configure(state='normal')
         canvas_2.delete(0.0, END)
@@ -1097,6 +1099,13 @@ def search_user():
         exception_handler(e)
 
 
+def cache_messages(messages):
+    try:
+        return
+    except Exception as e:
+        exception_handler(e)
+
+
 def pin_chat():
     try:
         user = entry_pin.get()
@@ -1267,12 +1276,15 @@ def export_program_data():
 def import_program_data():
     try:
         path = filedialog.askopenfilename(filetypes=[("Zip files", "*.zip")])
-        print(path)
-        pyminizip.uncompress(path, user_password, files_dir + "/temp", 0)
-        with open(files_dir + "/temp/key.json", "r") as file:
+        pyminizip.uncompress(path, user_password, files_dir + "\\temp", 0)
+        with open(files_dir + "\\temp\\key.json", "r") as file:
             key = json.load(file)["key"]
         keyring.set_password("datachat", "private_key", key)
+        os.replace(files_dir + "\\temp\\theme.json", files_dir + "\\settings\\theme.json")
+        os.replace(files_dir + "\\temp\\config.json", files_dir + "\\settings\\config.json")
         os.remove(files_dir + "\\temp\\key.json")
+        for i in os.listdir(files_dir + "\\temp"):
+            os.replace(files_dir + "\\temp\\" + i, files_dir + "\\cache\\" + i)
     except Exception as e:
         exception_handler(e)
 
