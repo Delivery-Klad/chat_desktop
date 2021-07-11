@@ -1939,4 +1939,5 @@ if __name__ == "__main__":
     root.geometry("200x165+{}+{}".format(w, h))
     root.resizable(False, False)
     root['bg'] = theme['bg']
+    # root.overrideredirect(1)  # remove title bar
     root.mainloop()
