@@ -1,4 +1,7 @@
 import requests
+import os
+import pyminizip
+import json
 
 # dbx = dropbox.Dropbox('eCp2HTOUrNUAAAAAAAAAASLGV_nwg-uK-KcCXkZTWnT66l2rg9-W6CAGKZnMTiLI')
 
@@ -40,20 +43,18 @@ def refresh(Authorize: AuthJWT = Depends()):
     return {"access_token": new_access_token}
 
 
-@app.get('/hello')
+@app.get('/test')
 def refresh(Authorize: AuthJWT = Depends()):
     Authorize.jwt_required()
-    return {"hello": "world"}"""
+    return {1: "test"}"""
 
-"""rez = requests.post("http://127.0.0.1:8000/login", json={"log": "aboba", "passw": "123"})
-print(rez.json())
+# rez = requests.post("http://127.0.0.1:8000/login", json={"log": "aboba", "passw": "123"})
+# print(rez.json())
 
-res = requests.get("http://127.0.0.1:8000/hello", headers={'Authorization': f"Bearer {rez.json()['access_token']}"})
-print(res.json())"""
+# res = requests.get("http://127.0.0.1:8000/test", headers={'Authorization': f"Bearer {rez.json()['access_token']}"})
+# print(res.json())
 
-"""import json
-
-with open('test.json', 'w') as file:
+"""with open('test.json', 'w') as file:
     theme_dict = {}
     theme_dict.update({"text_color": "entry_text.get()",
                        "entry": "entry_entry.get()",
@@ -67,11 +68,16 @@ with open('test.json', 'a') as file:
                        "font_main": "entry_font.get()"})
     json.dump(theme_dict, file, indent=2)  theme  """
 
-
-import os
-import pyminizip
-
+"""
 file1 = os.getenv('APPDATA') + "\\PojiloiChat\\settings\\theme.json"
 file2 = os.getenv('APPDATA') + "\\PojiloiChat\\settings\\config.json"
 dest = "C:/Users/dakfa/Desktop/st/path.zip"
-pyminizip.compress_multiple([file1, file2], ["\\", "\\"], dest, "None", 1)
+pyminizip.compress_multiple([file1, file2], ["\\", "\\"], dest, "None", 1)"""
+
+res = requests.get("https://github.com/Delivery-Klad/chat_desktop/releases")
+# print(res.text)
+
+from bs4 import BeautifulSoup
+
+soup = BeautifulSoup(res.text, 'html.parser')
+print(soup.find_all("span", {"class": "css-truncate-target"})[0].string)

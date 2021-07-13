@@ -10,9 +10,9 @@ elif sys.platform == "win64":
 excludes = ['PyQt5', 'colorama']
 
 packages = ["idna", "_cffi_backend", "bcrypt", "rsa", "os", "keyring", "keyring.backends",
-            "win32ctypes", "shutil", "PIL", "qrcode", "pyminizip"]
+            "win32ctypes", "shutil", "PIL", "qrcode", "pyminizip", "bs4"]
 
-zip_include_packages = ['collections', 'encodings', 'importlib', 'json']
+zip_include_packages = ['collections', 'encodings', 'importlib']
 
 options = {'build_exe': {
     'packages': packages,
@@ -22,6 +22,6 @@ options = {'build_exe': {
 
 setup(name="main",                              # bdist_msi
       options=options,
-      version="1.6",
+      version="1.8",
       description='description',
       executables=[Executable("main.py", base=base)])

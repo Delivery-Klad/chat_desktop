@@ -1,7 +1,6 @@
 import json
 import os
 import platform
-import pyminizip
 import threading
 import sched
 import time
@@ -11,6 +10,7 @@ from datetime import datetime, timezone
 from tkinter import *
 from tkinter import messagebox, filedialog
 from tkinter.font import Font
+from bs4 import BeautifulSoup
 import bcrypt
 import keyring
 import qrcode
@@ -29,6 +29,7 @@ elif platform.uname().system == "Darwin":
     keyring.set_keyring(Keyring())
     files_dir = os.path.join(os.environ['HOME'], "PojiloiChat")
 
+app_ver = 1.8
 backend_url = "https://chat-b4ckend.herokuapp.com/"
 chats, theme = {}, {}
 pin_chats = []
@@ -75,38 +76,6 @@ class CustomBox:
         self.text.configure(text=text)
 
 
-def create_theme_file():
-    theme_dict = {}
-    theme_dict.update({"text_color": "#FFFFFF",
-                       "entry": "#808080",
-                       "relief": "flat",
-                       "frame_relief": "flat",  # RIDGE
-                       "bg": "#48494F",
-                       "select_bg": "#000000",
-                       "font_main": "Candara 13",
-                       "font_users": "Candara 15",
-                       "button_font": "Candara 10",
-                       "button_bg": "#757575",
-                       "button_bg_positive": "#006891",
-                       "button_bg_negative": "#B22222",
-                       "button_bg_active": "#757575",
-                       "cursor": "pencil"})
-    with open(files_dir + "/settings/theme.json", "w") as file:
-        json.dump(theme_dict, file, indent=2)
-
-
-def create_config_file():
-    theme_dict = {}
-    theme_dict.update({"theme": "0",
-                       "pin1": None,
-                       "pin2": None,
-                       "pin3": None,
-                       "update": 60,
-                       "browser_path": None})
-    with open(files_dir + "/settings/config.json", "w") as file:
-        json.dump(theme_dict, file, indent=2)
-
-
 def folders():
     try:
         os.mkdir(files_dir)
@@ -128,17 +97,49 @@ def folders():
         pass
 
 
+def create_theme_file():
+    theme_dict = {}
+    theme_dict.update({"text_color": "#FFFFFF",
+                       "entry": "#808080",
+                       "relief": "flat",
+                       "frame_relief": "flat",  # RIDGE
+                       "bg": "#48494F",
+                       "select_bg": "#000000",
+                       "font_main": "Candara 13",
+                       "font_users": "Candara 15",
+                       "button_font": "Candara 10",
+                       "button_bg": "#757575",
+                       "button_bg_positive": "#006891",
+                       "button_bg_negative": "#B22222",
+                       "button_bg_active": "#757575",
+                       "cursor": "pencil"})
+    with open(files_dir + "\\settings\\theme.json", "w") as file:
+        json.dump(theme_dict, file, indent=2)
+
+
+def create_config_file():
+    theme_dict = {}
+    theme_dict.update({"theme": "0",
+                       "pin1": None,
+                       "pin2": None,
+                       "pin3": None,
+                       "update": 60,
+                       "browser_path": None})
+    with open(files_dir + "\\settings\\config.json", "w") as file:
+        json.dump(theme_dict, file, indent=2)
+
+
 def set_theme(flag=None):
     global theme
     if flag is None:
-        with open(files_dir + "/settings/config.json", "r") as file:
+        with open(files_dir + "\\settings\\config.json", "r") as file:
             temp = json.load(file)['theme']
     else:
         temp = flag
-        with open(files_dir + "/settings/config.json", "r") as file:
+        with open(files_dir + "\\settings\\config.json", "r") as file:
             tmp = json.load(file)
         tmp['file'] = temp
-        with open(files_dir + "/settings/config.json", "w") as file:
+        with open(files_dir + "\\settings\\config.json", "w") as file:
             json.dump(tmp, file, indent=2)
     if temp == 1:
         theme_var.set(1)
@@ -159,7 +160,7 @@ def set_theme(flag=None):
     elif temp == 2:
         theme_var.set(2)
         try:
-            with open(files_dir + "/settings/theme.json", "r") as file:
+            with open(files_dir + "\\settings\\theme.json", "r") as file:
                 theme = json.load(file)
         except Exception as er:
             messagebox.showerror("Custom theme error", str(er))
@@ -211,6 +212,10 @@ def response_handler(method, url, req_json=None, files=None, headers=None):
             return None
     except Exception as er:
         exception_handler(er)
+
+
+def api_awake():
+    requests.head(f"{backend_url}api/awake")
 
 
 def auto_check_message():
@@ -345,8 +350,14 @@ def chat_send_doc(path, chat, user, target):
 def get_messages(cur_chat, is_chat):
     global access_token
     try:
+        with open(files_dir + f"\\cache\\chat_{current_chat}_cache.json", "r") as file:
+            max_id = json.load(file)['max_id']
+    except FileNotFoundError:
+        max_id = 0
+    try:
         try:
-            return response_handler(method="get", url=f"{backend_url}message/get?chat_id={cur_chat}&is_chat={is_chat}",
+            return response_handler(method="get", url=f"{backend_url}message/get?chat_id={cur_chat}&is_chat={is_chat}&"
+                                                      f"max_id={max_id}",
                                     headers={'Authorization': f'Bearer {access_token}'}).json()
         except AttributeError:
             return None
@@ -522,17 +533,17 @@ def login(*args):
         except NameError:
             pass
         qr = qrcode.make(private_key)
-        qr.save(files_dir + '/temp/QR.png')
-        qr = Image.open(files_dir + '/temp/QR.png')
+        qr.save(files_dir + '\\temp\\QR.png')
+        qr = Image.open(files_dir + '\\temp\\QR.png')
         width = int(qr.size[0] / 2)
         height = int(qr.size[1] / 2)
         img = qr.resize((width, height), Image.ANTIALIAS)
-        img.save(files_dir + '/temp/QR.png')
-        _qr = PhotoImage(file=files_dir + "/temp/QR.png")
+        img.save(files_dir + '\\temp\\QR.png')
+        _qr = PhotoImage(file=files_dir + "\\temp\\QR.png")
         label_qr = Label(main1_frame, image=_qr)
         label_qr.image = _qr
         # label_qr.pack(side=RIGHT, anchor=SE) # задумка на будущее
-        os.remove(files_dir + '/temp/QR.png')
+        os.remove(files_dir + '\\temp\\QR.png')
         menu_navigation("chat")
     except Exception as e:
         label_loading.place_forget()
@@ -624,15 +635,14 @@ def menu_navigation(menu: str):
         settings_frame.pack_forget()
         group_frame.pack_forget()
         main_frame.pack(side=LEFT, anchor=CENTER)
-        canvas.configure(state='normal')
         canvas.delete(0.0, END)
-        canvas.configure(state='disable')
         current_chat = "-1"
         label_chat_id.configure(text='Current chat with: ')
         entry_chat_id.delete(0, tk.END)
         spacing, spacing_2 = 0, 0
         button_send2.configure(state='disabled')
         button_img2.configure(state='disabled')
+        canvas_2.delete(0.0, END)
     elif menu == "set":
         button_settings.update()
         button_chat.configure(bg=theme['button_bg'])
@@ -752,11 +762,12 @@ def get_message():
     except NotImplementedError:
         pass
     res = get_messages(current_chat, 0)
+    print(res)
     if res is None:
         return
     cache_messages(res)
+    res = get_cache_messages()
     try:
-        canvas.configure(state='normal')
         canvas.delete(0.0, END)
         chat_nick = 0
         for i in range(res['count']):
@@ -775,7 +786,6 @@ def get_message():
                 canvas.update()
             except KeyError:
                 break
-        canvas.configure(state='disabled')
     except Exception as er:
         exception_handler(er)
 
@@ -931,8 +941,8 @@ def get_chat_message():
     if res is None:
         return
     cache_messages(res)
+    res = get_cache_messages()
     try:
-        canvas_2.configure(state='normal')
         canvas_2.delete(0.0, END)
         for i in range(res['count']):
             try:
@@ -944,7 +954,6 @@ def get_chat_message():
                 canvas_2.update()
             except KeyError:
                 break
-        canvas_2.configure(state='disabled')
     except Exception as e:
         exception_handler(e)
 
@@ -1106,9 +1115,7 @@ def open_chat(chat_id):
     current_chat = chat_id
     button_send.configure(state='normal')
     button_img.configure(state='normal')
-    canvas.configure(state='normal')
     canvas.delete(0.0, END)
-    canvas.configure(state='disable')
     get_message()
 
 
@@ -1137,8 +1144,35 @@ def search_user():
 def cache_messages(messages):
     global current_chat
     try:
-        with open(files_dir + "\\cache\\" + current_chat) as file:
-            json.load(file)
+        try:
+            with open(files_dir + f"\\cache\\chat_{current_chat}_cache.json", "r") as file:
+                json_dict = json.load(file)
+            count = json_dict["count"]
+            for i in range(messages['count']):
+                try:
+                    message = messages[f"item_{i}"]
+                    json_dict.update({f"item_{i + count}": message})
+                except KeyError:
+                    break
+            json_dict.update({"count": count + messages["count"]})
+            if messages['max_id'] != 0:
+                json_dict.update({"max_id": messages["max_id"]})
+        except FileNotFoundError:
+            json_dict = messages
+        with open(files_dir + f"\\cache\\chat_{current_chat}_cache.json", "w") as file:
+            json.dump(json_dict, file, indent=2)
+    except FileNotFoundError:
+        pass
+    except Exception as e:
+        exception_handler(e)
+
+
+def get_cache_messages():
+    global current_chat
+    try:
+        with open(files_dir + f"\\cache\\chat_{current_chat}_cache.json", "r") as file:
+            res = json.load(file)
+        return res
     except FileNotFoundError:
         pass
     except Exception as e:
@@ -1156,24 +1190,24 @@ def pin_chat():
             messagebox.showerror('Input error', 'User not found')
             return
         info = user + ' ' + name
-        with open(files_dir + "/settings/config.json", "r") as file:
+        with open(files_dir + "\\settings\\config.json", "r") as file:
             json_file = json.load(file)
         pin1 = json_file['pin1']
         if pin1 is None:
             json_file['pin1'] = info
-            with open(files_dir + "/settings/config.json", "w") as file:
+            with open(files_dir + "\\settings\\config.json", "w") as file:
                 json.dump(json_file, file, indent=2)
             return
         pin2 = json_file['pin2']
         if pin2 is None:
             json_file['pin2'] = info
-            with open(files_dir + "/settings/config.json", "w") as file:
+            with open(files_dir + "\\settings\\config.json", "w") as file:
                 json.dump(json_file, file, indent=2)
             return
         pin3 = json_file['pin3']
         if pin3 is None:
             json_file['pin3'] = info
-            with open(files_dir + "/settings/config.json", "w") as file:
+            with open(files_dir + "\\settings\\config.json", "w") as file:
                 json.dump(json_file, file, indent=2)
             return
         messagebox.showerror('Pin error', 'Pin limit')
@@ -1185,7 +1219,7 @@ def unpin_chat(l_frame, id: int):
     try:
         pin_chats.remove(l_frame)
         l_frame.pack_forget()
-        with open(files_dir + "/settings/config.json", "r") as file:
+        with open(files_dir + "\\settings\\config.json", "r") as file:
             json_file = json.load(file)
         if id == 1:
             json_file['pin1'] = json_file['pin2']
@@ -1196,7 +1230,7 @@ def unpin_chat(l_frame, id: int):
             json_file['pin3'] = None
         else:
             json_file['pin3'] = None
-        with open(files_dir + "/settings/config.json", "w") as file:
+        with open(files_dir + "\\settings\\config.json", "w") as file:
             json.dump(json_file, file, indent=2)
     except Exception as er:
         exception_handler(er)
@@ -1222,7 +1256,7 @@ def pin_constructor(text: str, chat: str, id: int):
 def get_pin_chats():
     global pin_chats
     try:
-        with open(files_dir + "/settings/config.json", "r") as file:
+        with open(files_dir + "\\settings\\config.json", "r") as file:
             json_file = json.load(file)
         for i in range(3):
             pin = json_file[f'pin{i + 1}']
@@ -1240,7 +1274,7 @@ def get_pin_chats():
 
 def get_browser_path():
     try:
-        with open(files_dir + "/settings/config.json", "r") as file:
+        with open(files_dir + "\\settings\\config.json", "r") as file:
             res = json.load(file)['browser_path']
         if res is None:
             res = ""
@@ -1257,10 +1291,10 @@ def save_browser_path():
         if entry_path.get()[-4:] != ".exe":
             messagebox.showerror("Input error!", "Not .exe file")
             return
-        with open(files_dir + "/settings/config.json", "r") as file:
+        with open(files_dir + "\\settings\\config.json", "r") as file:
             json_file = json.load(file)
         json_file['browser_path'] = entry_path.get()
-        with open(files_dir + "/settings/config.json", "w") as file:
+        with open(files_dir + "\\settings\\config.json", "w") as file:
             json.dump(json_file, file, indent=2)
         messagebox.showinfo("Success!", "Browser path saved")
     except Exception as e:
@@ -1269,13 +1303,13 @@ def save_browser_path():
 
 def save_theme():
     global theme_var
-    with open(files_dir + "/settings/config.json", "r") as file:
+    with open(files_dir + "\\settings\\config.json", "r") as file:
         json_file = json.load(file)
     json_file['theme'] = theme_var.get()
-    with open(files_dir + "/settings/config.json", "w") as file:
+    with open(files_dir + "\\settings\\config.json", "w") as file:
         json.dump(json_file, file, indent=2)
     if theme_var.get() == 2:
-        if not os.path.exists(files_dir + "/settings/theme.json"):
+        if not os.path.exists(files_dir + "\\settings\\theme.json"):
             create_theme_file()
         theme_editor()
     else:
@@ -1284,24 +1318,58 @@ def save_theme():
 
 def theme_editor():
     global relief, frames_relief, cursors
-    with open(files_dir + "/settings/theme.json", "r") as file:
+    with open(files_dir + "\\settings\\theme.json", "r") as file:
         temp = json.load(file)
     relief.set(temp['relief'])
+    label_wid_box.configure(relief=temp['relief'])
     frames_relief.set(temp['frame_relief'])
+    label_frame_box.configure(relief=temp['frame_relief'])
     cursors.set(temp['cursor'])
     theme_editor_window.deiconify()
     theme_editor_window.grab_set()
     entry_text.insert(0, temp['text_color'])
+    label_text_box.configure(bg=temp['text_color'])
     entry_entry.insert(0, temp['entry'])
+    label_entry_box.configure(bg=temp['entry'])
     entry_bg.insert(0, temp['bg'])
+    label_bg_box.configure(bg=temp['bg'], relief=GROOVE)
     entry_sel_bg.insert(0, temp['select_bg'])
+    label_sel_box.configure(bg=temp['select_bg'])
     entry_font.insert(0, temp['font_main'])
+    try:
+        font = temp['font_main'].split()
+        font.pop(len(font) - 1)
+        font = Font(family=" ".join(font), size=10)
+    except Exception as e:
+        exception_handler(e)
+        font = Font(size=10)
+    label_font_box.configure(text="Aa", font=font)
     entry_font_u.insert(0, temp['font_users'])
+    try:
+        font = temp['font_main'].split()
+        font.pop(len(font) - 1)
+        font = Font(family=" ".join(font), size=10)
+    except Exception as e:
+        exception_handler(e)
+        font = Font(size=10)
+    label_users_box.configure(text="Aa", font=font)
     entry_font_b.insert(0, temp['button_font'])
+    try:
+        font = temp['font_main'].split()
+        font.pop(len(font) - 1)
+        font = Font(family=" ".join(font), size=10)
+    except Exception as e:
+        exception_handler(e)
+        font = Font(size=10)
+    label_font_b_box.configure(text="Aa", font=font)
     entry_bg_b.insert(0, temp['button_bg'])
+    label_bg_b_box.configure(bg=temp['button_bg'])
     entry_bg_b_pos.insert(0, temp['button_bg_positive'])
+    label_pos_box.configure(bg=temp['button_bg_positive'])
     entry_bg_b_neg.insert(0, temp['button_bg_negative'])
+    label_neg_box.configure(bg=temp['button_bg_negative'])
     entry_b_act.insert(0, temp['button_bg_active'])
+    label_act_box.configure(bg=temp['button_bg_active'])
 
 
 def theme_editor_save():
@@ -1320,13 +1388,15 @@ def theme_editor_save():
                        "button_bg_negative": entry_bg_b_neg.get(),
                        "button_bg_active": entry_b_act.get(),
                        "cursor": cursors.get()})
-    with open(files_dir + "/settings/theme.json", "w") as file:
+    with open(files_dir + "\\settings\\theme.json", "w") as file:
         json.dump(theme_dict, file, indent=2)
+    theme_editor_window.destroy()
     messagebox.showinfo("Success!", "Theme will be changed on next launch!")
 
 
 def export_program_data():
     global user_password
+    import pyminizip
     try:
         files, paths = [], []
         destination = filedialog.askdirectory()
@@ -1345,6 +1415,7 @@ def export_program_data():
 
 
 def import_program_data():
+    import pyminizip
     try:
         path = filedialog.askopenfilename(filetypes=[("Zip files", "*.zip")])
         pyminizip.uncompress(path, user_password, files_dir + "\\temp", 0)
@@ -1364,24 +1435,41 @@ def open_link(*args):
     global backend_url
     try:
         if "chat-b4ckend.herokuapp.com/file/get/file_" in canvas.selection_get():
-            import webbrowser
-            print(canvas.selection_get())
-            with open(files_dir + "/settings/config.json", "r") as file:
+            import webbrowser as web
+            with open(files_dir + "\\settings\\config.json", "r") as file:
                 tmp = json.load(file)['browser_path']
             if tmp is not None:
-                webbrowser.register('browser', None, webbrowser.BackgroundBrowser(tmp))
-                webbrowser.get(using='browser').open_new_tab(canvas.selection_get())
+                web.register('browser', None, web.BackgroundBrowser(tmp))
+                web.get(using='browser').open_new_tab(canvas.selection_get())
             else:
-                webbrowser.open(canvas.selection_get(), new=0)
+                web.open(canvas.selection_get(), new=0)
     except tk.TclError:
         pass
     except Exception as e:
         exception_handler(e)
 
 
+def get_updates():
+    global app_ver
+    try:
+        soup = BeautifulSoup(requests.get("https://github.com/Delivery-Klad/chat_desktop/releases"), 'html.parser')
+        if float(soup.find_all("span", {"class": "css-truncate-target"})[0].string) > app_ver:
+            if messagebox.askyesno("New app version", "Visit the download page?"):
+                import webbrowser as web
+                with open(files_dir + "\\settings\\config.json", "r") as file:
+                    tmp = json.load(file)['browser_path']
+                if tmp is not None:
+                    web.register('browser', None, web.BackgroundBrowser(tmp))
+                    web.get(using='browser').open_new_tab("https://github.com/Delivery-Klad/chat_desktop/releases")
+                else:
+                    web.open("https://github.com/Delivery-Klad/chat_desktop/releases", new=0)
+    except Exception as e:
+        exception_handler(e)
+
+
 def get_update_time():
     global time_to_check
-    with open(files_dir + "/settings/config.json", "r") as file:
+    with open(files_dir + "\\settings\\config.json", "r") as file:
         time_to_check = json.load(file)['update']
     if int(time_to_check) == -1:
         label_check2.configure(text="Never")
@@ -1403,10 +1491,10 @@ def auto_check():
         label_check2.configure(text=f"{time_to_check} Sec")
     label_check2.update()
     messagebox.showinfo('Success!', 'Notifications will be changed on next launch!')
-    with open(files_dir + "/settings/config.json", "r") as file:
+    with open(files_dir + "\\settings\\config.json", "r") as file:
         json_file = json.load(file)
     json_file['update'] = str(time_to_check)
-    with open(files_dir + "/settings/config.json", "w") as file:
+    with open(files_dir + "\\settings\\config.json", "w") as file:
         json.dump(json_file, file, indent=2)
 
 
@@ -1422,7 +1510,7 @@ def loop_msg_func():
         if current_chat != '-1':
             if current_chat[0] != 'g':
                 get_message()
-            elif current_chat[0] == 'g':
+            else:
                 get_chat_message()
         sch.enter(int(time_to_check), 1, loop_msg_func)
     except Exception as e:
@@ -1433,14 +1521,14 @@ def loop_get_msg():
     sch.run()
 
 
-def api_awake():
-    requests.head(f"{backend_url}api/awake")
-
-
-folders()
+# region startup config
 awake_thread = threading.Thread(target=api_awake, daemon=True)
 awake_thread.start()
+folders()
+get_updates_thread = threading.Thread(target=get_updates, daemon=True)
+get_updates_thread.start()
 set_theme()
+# endregion
 """m = Menu(root)
 root.config(menu=m)
 fm = Menu(m)
@@ -1579,7 +1667,6 @@ scroll = Scrollbar(frame, command=canvas.yview, bg=theme['bg'])
 scroll.pack(side=RIGHT, fill=Y)
 canvas.pack(side=RIGHT, expand=True, fill=BOTH)
 canvas.config(yscrollcommand=scroll.set)
-canvas.configure(state='disabled')
 canvas.bind("<ButtonRelease>", open_link)
 frame_2 = Frame(main2_frame2, width=850, height=500)
 frame_2.pack()
@@ -1588,7 +1675,6 @@ scroll_2 = Scrollbar(frame_2, command=canvas_2.yview, bg=theme['bg'])
 scroll_2.pack(side=RIGHT, fill=Y)
 canvas_2.pack(side=RIGHT, expand=True, fill=BOTH)
 canvas_2.config(yscrollcommand=scroll_2.set)
-canvas_2.configure(state='disabled')
 button_refresh = tk.Button(main_frame, text="REFRESH", activebackground=theme['button_bg_active'], width=120,
                            bg=theme['button_bg_positive'], relief=theme['relief'], command=lambda: get_message())
 button_refresh.pack(side=TOP, pady=3, anchor=CENTER)
@@ -1745,6 +1831,8 @@ theme2 = Radiobutton(settings_frame4, text="Custom theme", activebackground=them
 theme2.pack(side=LEFT)
 settings_frame12 = LabelFrame(settings_frame, width=600, height=25, relief=FLAT, bg=theme['bg'])
 settings_frame12.pack(side=TOP, pady=2, anchor=CENTER)
+d_z = tk.Label(settings_frame12, font=15, text="DANGER ZONE", fg="red", bg=theme['bg'])
+d_z.pack(side=TOP, padx=5)
 button_export = tk.Button(settings_frame12, text="EXPORT DATA", bg=theme['button_bg_positive'],
                           activebackground=theme['button_bg_active'], width=113, relief=theme['relief'],
                           command=lambda: export_program_data())
@@ -1767,9 +1855,12 @@ theme_editor_window.withdraw()
 theme_editor_window.title("Theme editor")
 theme_editor_window.geometry("500x550+{}+{}".format(w, h))
 theme_editor_window.resizable(False, False)
+# theme_editor_window.overrideredirect(1)
 theme_editor_window['bg'] = theme['bg']
 test_color = LabelFrame(theme_editor_window, width=500, relief=FLAT, bg=theme['bg'])
 test_color.pack(side=TOP)
+label_text_box = tk.Label(test_color, width=2, anchor=W)
+label_text_box.pack(side=LEFT)
 label_text = tk.Label(test_color, font=theme['font_main'], text="Text color", fg=theme['text_color'],
                       bg=theme['bg'], width=25, anchor=W)
 label_text.pack(side=LEFT)
@@ -1778,6 +1869,8 @@ entry_text = tk.Entry(test_color, font=12, width=25, fg=theme['text_color'], bg=
 entry_text.pack(side=LEFT)
 entry_color = LabelFrame(theme_editor_window, width=500, relief=FLAT, bg=theme['bg'])
 entry_color.pack(side=TOP, pady=5)
+label_entry_box = tk.Label(entry_color, width=2, anchor=W)
+label_entry_box.pack(side=LEFT)
 label_entry = tk.Label(entry_color, font=theme['font_main'], text="Entry color", fg=theme['text_color'],
                        bg=theme['bg'], width=25, anchor=W)
 label_entry.pack(side=LEFT)
@@ -1786,6 +1879,8 @@ entry_entry = tk.Entry(entry_color, font=12, width=25, fg=theme['text_color'], b
 entry_entry.pack(side=LEFT)
 widgets_relief = LabelFrame(theme_editor_window, width=500, relief=FLAT, bg=theme['bg'])
 widgets_relief.pack(side=TOP)
+label_wid_box = tk.Label(widgets_relief, width=2, anchor=W)
+label_wid_box.pack(side=LEFT)
 label_relief = tk.Label(widgets_relief, font=theme['font_main'], text="Widgets relief", fg=theme['text_color'],
                         bg=theme['bg'], width=25, anchor=W)
 label_relief.pack(side=LEFT)
@@ -1797,6 +1892,8 @@ popup_main["menu"].configure(bg=theme['entry'], fg=theme['text_color'], relief=t
                              activebackground=theme['button_bg_active'], borderwidth=0)
 frame_relief = LabelFrame(theme_editor_window, width=500, relief=FLAT, bg=theme['bg'])
 frame_relief.pack(side=TOP, pady=5)
+label_frame_box = tk.Label(frame_relief, width=2, anchor=W)
+label_frame_box.pack(side=LEFT)
 label_frame_r = tk.Label(frame_relief, font=theme['font_main'], text="Frame relief", fg=theme['text_color'],
                          bg=theme['bg'], width=25, anchor=W)
 label_frame_r.pack(side=LEFT)
@@ -1808,6 +1905,8 @@ popup_frames["menu"].configure(bg=theme['entry'], fg=theme['text_color'], relief
                                activebackground=theme['button_bg_active'], borderwidth=0)
 bg_frame = LabelFrame(theme_editor_window, width=500, relief=FLAT, bg=theme['bg'])
 bg_frame.pack(side=TOP)
+label_bg_box = tk.Label(bg_frame, width=2, anchor=W)
+label_bg_box.pack(side=LEFT)
 label_bg = tk.Label(bg_frame, font=theme['font_main'], text="Background color", fg=theme['text_color'],
                     bg=theme['bg'], width=25, anchor=W)
 label_bg.pack(side=LEFT)
@@ -1816,6 +1915,8 @@ entry_bg = tk.Entry(bg_frame, font=12, width=25, fg=theme['text_color'], bg=them
 entry_bg.pack(side=LEFT)
 sel_bg_frame = LabelFrame(theme_editor_window, width=500, relief=FLAT, bg=theme['bg'])
 sel_bg_frame.pack(side=TOP)
+label_sel_box = tk.Label(sel_bg_frame, width=2, anchor=W)
+label_sel_box.pack(side=LEFT)
 label_sel_bg = tk.Label(sel_bg_frame, font=theme['font_main'], text="Select background", fg=theme['text_color'],
                         bg=theme['bg'], width=25, anchor=W)
 label_sel_bg.pack(side=LEFT)
@@ -1824,6 +1925,8 @@ entry_sel_bg = tk.Entry(sel_bg_frame, font=12, width=25, fg=theme['text_color'],
 entry_sel_bg.pack(side=LEFT)
 font_frame = LabelFrame(theme_editor_window, width=500, relief=FLAT, bg=theme['bg'])
 font_frame.pack(side=TOP, pady=5)
+label_font_box = tk.Label(font_frame, width=2, anchor=W)
+label_font_box.pack(side=LEFT)
 label_font = tk.Label(font_frame, font=theme['font_main'], text="Main font", fg=theme['text_color'],
                       bg=theme['bg'], width=25, anchor=W)
 label_font.pack(side=LEFT)
@@ -1832,6 +1935,8 @@ entry_font = tk.Entry(font_frame, font=12, width=25, fg=theme['text_color'], bg=
 entry_font.pack(side=LEFT)
 font_users_frame = LabelFrame(theme_editor_window, width=500, relief=FLAT, bg=theme['bg'])
 font_users_frame.pack(side=TOP)
+label_users_box = tk.Label(font_users_frame, width=2, anchor=W)
+label_users_box.pack(side=LEFT)
 label_font_u = tk.Label(font_users_frame, font=theme['font_main'], text="Users frame font", fg=theme['text_color'],
                         bg=theme['bg'], width=25, anchor=W)
 label_font_u.pack(side=LEFT)
@@ -1840,6 +1945,8 @@ entry_font_u = tk.Entry(font_users_frame, font=12, width=25, fg=theme['text_colo
 entry_font_u.pack(side=LEFT)
 font_b_frame = LabelFrame(theme_editor_window, width=500, relief=FLAT, bg=theme['bg'])
 font_b_frame.pack(side=TOP, pady=5)
+label_font_b_box = tk.Label(font_b_frame, width=2, anchor=W)
+label_font_b_box.pack(side=LEFT)
 label_font_b = tk.Label(font_b_frame, font=theme['font_main'], text="Buttons font", fg=theme['text_color'],
                         bg=theme['bg'], width=25, anchor=W)
 label_font_b.pack(side=LEFT)
@@ -1848,6 +1955,8 @@ entry_font_b = tk.Entry(font_b_frame, font=12, width=25, fg=theme['text_color'],
 entry_font_b.pack(side=LEFT)
 frame_bg_b = LabelFrame(theme_editor_window, width=500, relief=FLAT, bg=theme['bg'])
 frame_bg_b.pack(side=TOP)
+label_bg_b_box = tk.Label(frame_bg_b, width=2, anchor=W)
+label_bg_b_box.pack(side=LEFT)
 label_bg_b = tk.Label(frame_bg_b, font=theme['font_main'], text="Buttons background", fg=theme['text_color'],
                       bg=theme['bg'], width=25, anchor=W)
 label_bg_b.pack(side=LEFT)
@@ -1856,6 +1965,8 @@ entry_bg_b = tk.Entry(frame_bg_b, font=12, width=25, fg=theme['text_color'], bg=
 entry_bg_b.pack(side=LEFT)
 frame_bg_b_pos = LabelFrame(theme_editor_window, width=500, relief=FLAT, bg=theme['bg'])
 frame_bg_b_pos.pack(side=TOP, pady=5)
+label_pos_box = tk.Label(frame_bg_b_pos, width=2, anchor=W)
+label_pos_box.pack(side=LEFT)
 label_bg_b_pos = tk.Label(frame_bg_b_pos, font=theme['font_main'], text="Buttons background positive",
                           fg=theme['text_color'], bg=theme['bg'], width=25, anchor=W)
 label_bg_b_pos.pack(side=LEFT)
@@ -1864,6 +1975,8 @@ entry_bg_b_pos = tk.Entry(frame_bg_b_pos, font=12, width=25, fg=theme['text_colo
 entry_bg_b_pos.pack(side=LEFT)
 frame_bg_b_neg = LabelFrame(theme_editor_window, width=500, relief=FLAT, bg=theme['bg'])
 frame_bg_b_neg.pack(side=TOP)
+label_neg_box = tk.Label(frame_bg_b_neg, width=2, anchor=W)
+label_neg_box.pack(side=LEFT)
 label_bg_b_neg = tk.Label(frame_bg_b_neg, font=theme['font_main'], text="Buttons background negative",
                           fg=theme['text_color'], bg=theme['bg'], width=25, anchor=W)
 label_bg_b_neg.pack(side=LEFT)
@@ -1872,6 +1985,8 @@ entry_bg_b_neg = tk.Entry(frame_bg_b_neg, font=12, width=25, fg=theme['text_colo
 entry_bg_b_neg.pack(side=LEFT)
 frame_b_act = LabelFrame(theme_editor_window, width=500, relief=FLAT, bg=theme['bg'])
 frame_b_act.pack(side=TOP, pady=5)
+label_act_box = tk.Label(frame_b_act, width=2, anchor=W)
+label_act_box.pack(side=LEFT)
 label_b_act = tk.Label(frame_b_act, font=theme['font_main'], text="Buttons active background",
                        fg=theme['text_color'], bg=theme['bg'], width=25, anchor=W)
 label_b_act.pack(side=LEFT)
@@ -1880,6 +1995,8 @@ entry_b_act = tk.Entry(frame_b_act, font=12, width=25, fg=theme['text_color'], b
 entry_b_act.pack(side=LEFT)
 frame_cursor = LabelFrame(theme_editor_window, width=500, relief=FLAT, bg=theme['bg'])
 frame_cursor.pack(side=TOP)
+label_cur_box = tk.Label(frame_cursor, width=2, anchor=W)
+label_cur_box.pack(side=LEFT)
 label_cursor = tk.Label(frame_cursor, font=theme['font_main'], text="Input fields cursor",
                         fg=theme['text_color'], bg=theme['bg'], width=25, anchor=W)
 label_cursor.pack(side=LEFT)
@@ -1910,10 +2027,10 @@ frame_users = Frame(info_frame, width=800, height=400)
 frame_users.pack()
 style = ttk.Style()
 style.theme_use("clam")
-style.configure("mystyle.Heading", background=theme['entry'], relief=theme['relief'], font=theme['font_users'])
-style.configure("mystyle", highlightthickness=0, background=theme['entry'], bd=0, font=theme['font_users'])
-style.layout("mystyle", [('mystyle.treearea', {})])
-canvas_users = ttk.Treeview(frame_users, height=29, cursor='arrow', columns=(0, 1, 2), show='headings', style="mystyle")
+style.configure("t_style.Heading", background=theme['entry'], relief=theme['relief'], font=theme['font_users'])
+style.configure("t_style", highlightthickness=0, background=theme['entry'], bd=0, font=theme['font_users'])
+style.layout("t_style", [('t_style.treearea', {})])
+canvas_users = ttk.Treeview(frame_users, height=29, cursor='arrow', columns=(0, 1, 2), show='headings', style="t_style")
 scroll_users = Scrollbar(frame_users, command=canvas_users.yview, bg=theme['bg'])
 scroll_users.pack(side=RIGHT, fill=Y)
 canvas_users.pack(side=RIGHT, expand=True, fill=BOTH)
@@ -1925,7 +2042,6 @@ canvas_users.column(0, width=60, stretch=NO)
 canvas_users.column(1, width=567)
 canvas_users.column(2, width=200, stretch=NO)
 canvas_users.tag_configure('bb', background=theme['entry'], foreground=theme['text_color'])
-
 label_loading = Label(root, font=10, text="LOADING", fg=theme['text_color'], bg=theme['bg'])
 # endregion
 auto_login()
