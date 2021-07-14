@@ -1,0 +1,8 @@
+beautifulsoup4
+bcrypt
+keyring
+qrcode
+requests
+rsa
+Pillow
+pyminizip

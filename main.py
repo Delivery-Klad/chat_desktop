@@ -1452,7 +1452,7 @@ def open_link(*args):
 def get_updates():
     global app_ver
     try:
-        soup = BeautifulSoup(requests.get("https://github.com/Delivery-Klad/chat_desktop/releases"), 'html.parser')
+        soup = BeautifulSoup(requests.get("https://github.com/Delivery-Klad/chat_desktop/releases").text, 'html.parser')
         if float(soup.find_all("span", {"class": "css-truncate-target"})[0].string) > app_ver:
             if messagebox.askyesno("New app version", "Visit the download page?"):
                 import webbrowser as web
