@@ -74,10 +74,21 @@ file2 = os.getenv('APPDATA') + "\\PojiloiChat\\settings\\config.json"
 dest = "C:/Users/dakfa/Desktop/st/path.zip"
 pyminizip.compress_multiple([file1, file2], ["\\", "\\"], dest, "None", 1)"""
 
-res = requests.get("https://github.com/Delivery-Klad/chat_desktop/releases")
+"""res = requests.get("https://github.com/Delivery-Klad/chat_desktop/releases")
 # print(res.text)
 
 from bs4 import BeautifulSoup
 
 soup = BeautifulSoup(res.text, 'html.parser')
-print(soup.find_all("span", {"class": "css-truncate-target"})[0].string)
+print(soup.find_all("span", {"class": "css-truncate-target"})[0].string)"""
+
+import pathlib
+import sys
+
+
+if sys.platform == "win32":
+    print(pathlib.Path.home() / "AppData/Roaming")
+elif sys.platform == "linux":
+    print(pathlib.Path.home() / ".local/share")
+elif sys.platform == "darwin":
+    print(pathlib.Path.home() / "Library/Application Support")

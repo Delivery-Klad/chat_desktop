@@ -1,8 +1,8 @@
 import json
 import os
-import platform
-import threading
+import pathlib
 import sched
+import threading
 import time
 import tkinter as tk
 import tkinter.ttk as ttk
@@ -10,24 +10,22 @@ from datetime import datetime, timezone
 from tkinter import *
 from tkinter import messagebox, filedialog
 from tkinter.font import Font
-from bs4 import BeautifulSoup
 import bcrypt
 import keyring
 import qrcode
 import requests
 import rsa
 from PIL import Image
+from bs4 import BeautifulSoup
 from keyring import errors
-from keyring.backends.Windows import WinVaultKeyring
-from keyring.backends.OS_X import Keyring
 from rsa.transform import int2bytes, bytes2int
 
-if platform.uname().system == "Windows":
-    keyring.set_keyring(WinVaultKeyring())
-    files_dir = os.getenv('APPDATA') + "\\PojiloiChat"
-elif platform.uname().system == "Darwin":
-    keyring.set_keyring(Keyring())
-    files_dir = os.path.join(os.environ['HOME'], "PojiloiChat")
+if "win" in sys.platform.lower():
+    files_dir = str(pathlib.Path.home()) + "/AppData/Roaming/PojiloiChat"
+elif "darwin" in sys.platform.lower():
+    files_dir = str(pathlib.Path.home()) + "/Library/Application Support/PojiloiChat"
+elif "linux" in sys.platform.lower():
+    files_dir = str(pathlib.Path.home()) + "/.local/share/PojiloiChat"
 
 app_ver = 1.8
 backend_url = "https://chat-b4ckend.herokuapp.com/"

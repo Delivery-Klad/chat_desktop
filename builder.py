@@ -10,7 +10,7 @@ elif sys.platform == "win64":
 excludes = ['PyQt5', 'colorama']
 
 packages = ["idna", "_cffi_backend", "bcrypt", "rsa", "os", "keyring", "keyring.backends",
-            "win32ctypes", "shutil", "PIL", "qrcode", "pyminizip", "bs4"]
+            "win32ctypes", "shutil", "PIL", "qrcode", "pyminizip", "bs4", "pathlib"]
 
 zip_include_packages = ['collections', 'encodings', 'importlib']
 
