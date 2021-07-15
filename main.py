@@ -18,9 +18,11 @@ import rsa
 from PIL import Image
 from bs4 import BeautifulSoup
 from keyring import errors
+from keyring.backends.Windows import WinVaultKeyring
 from rsa.transform import int2bytes, bytes2int
 
 if "win" in sys.platform.lower():
+    keyring.set_keyring(WinVaultKeyring())
     files_dir = str(pathlib.Path.home()) + "/AppData/Roaming/PojiloiChat"
 elif "darwin" in sys.platform.lower():
     files_dir = str(pathlib.Path.home()) + "/Library/Application Support/PojiloiChat"
@@ -1384,7 +1386,16 @@ def theme_editor():
 def theme_editor_save():
     theme_dict = {}
     label_text_box.configure(bg=entry_text.get())
-    label_text_box.update()
+    label_entry_box.configure(bg=entry_entry.get())
+    label_wid_box.configure(relief=relief.get())
+    label_frame_box.configure(relief=frames_relief.get())
+    label_bg_box.configure(bg=entry_bg.get())
+    label_sel_box.configure(bg=entry_sel_bg.get())
+    label_bg_b_box.configure(bg=entry_bg_b.get())
+    label_pos_box.configure(bg=entry_bg_b_pos.get())
+    label_neg_box.configure(bg=entry_bg_b_neg.get())
+    label_act_box.configure(bg=entry_b_act.get())
+    theme_editor_window.update()
     theme_dict.update({"text_color": entry_text.get(),
                        "entry": entry_entry.get(),
                        "relief": relief.get(),
@@ -1516,9 +1527,6 @@ def loop_msg_func():
     try:
         if access_token == '':
             return
-        res = message_loop()
-        if res is not None:
-            messagebox.showinfo('New messages!', 'You have new messages in chats: ' + res)
         if current_chat != '-1':
             if current_chat[0] != 'g':
                 get_message()
@@ -1733,9 +1741,15 @@ settings_frame7.pack(side=TOP, pady=2, anchor=N)
 label_chat = tk.Label(settings_frame7, font=10, text="  Create chat:", fg=theme['text_color'], bg=theme['bg'], width=18,
                       anchor=W)
 label_chat.pack(side=LEFT, anchor=W)
+empty = tk.Label(settings_frame7, text="", fg=theme['text_color'], bg=theme['bg'],
+                 width=3, anchor=W)
+empty.pack(side=LEFT)
 entry_chat = tk.Entry(settings_frame7, font=12, width=20, fg=theme['text_color'], bg=theme['entry'],
                       cursor=theme['cursor'], relief=theme['relief'])
-entry_chat.pack(side=LEFT, padx=170, anchor=CENTER)
+entry_chat.pack(side=LEFT, padx=150, anchor=CENTER)
+empty = tk.Label(settings_frame7, text="", fg=theme['text_color'], bg=theme['bg'],
+                 width=1, anchor=W)
+empty.pack(side=LEFT)
 button_c_chat = tk.Button(settings_frame7, text="CREATE", activebackground=theme['button_bg_active'], width=15,
                           bg=theme['button_bg_positive'], relief=theme['relief'], command=lambda: create_chat())
 button_c_chat.pack(side=RIGHT, anchor=E)
@@ -1744,9 +1758,15 @@ settings_frame11.pack(side=TOP, pady=2, anchor=N)
 label_pin = tk.Label(settings_frame11, font=10, text="  Pin chat:", fg=theme['text_color'], bg=theme['bg'], width=18,
                      anchor=W)
 label_pin.pack(side=LEFT, anchor=W)
+empty = tk.Label(settings_frame11, text="", fg=theme['text_color'], bg=theme['bg'],
+                 width=3, anchor=W)
+empty.pack(side=LEFT)
 entry_pin = tk.Entry(settings_frame11, font=12, width=20, fg=theme['text_color'], bg=theme['entry'],
                      cursor=theme['cursor'], relief=theme['relief'])
-entry_pin.pack(side=LEFT, padx=170, anchor=CENTER)
+entry_pin.pack(side=LEFT, padx=150, anchor=CENTER)
+empty = tk.Label(settings_frame11, text="", fg=theme['text_color'], bg=theme['bg'],
+                 width=1, anchor=W)
+empty.pack(side=LEFT)
 button_pin = tk.Button(settings_frame11, text="PIN", activebackground=theme['button_bg_active'], width=15,
                        bg=theme['button_bg_positive'], relief=theme['relief'], command=lambda: pin_chat())
 button_pin.pack(side=RIGHT, anchor=E)
@@ -2058,6 +2078,7 @@ label_loading = Label(root, font=10, text="LOADING", fg=theme['text_color'], bg=
 # endregion
 auto_login()
 get_update_time()
+print(time_to_check)
 if time_to_check is not None:
     if int(time_to_check) != -1:
         checker = threading.Thread(target=loop_get_msg, daemon=True)
