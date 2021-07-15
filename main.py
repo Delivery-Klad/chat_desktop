@@ -80,15 +80,15 @@ def folders():
     except FileExistsError:
         pass
     try:
-        os.mkdir(files_dir + "\\temp")
+        os.mkdir(files_dir + "/temp")
     except FileExistsError:
         pass
     try:
-        os.mkdir(files_dir + "\\cache")
+        os.mkdir(files_dir + "/cache")
     except FileExistsError:
         pass
     try:
-        os.mkdir(files_dir + "\\settings")
+        os.mkdir(files_dir + "/settings")
         create_theme_file()
         create_config_file()
     except FileExistsError:
@@ -111,7 +111,7 @@ def create_theme_file():
                        "button_bg_negative": "#B22222",
                        "button_bg_active": "#757575",
                        "cursor": "pencil"})
-    with open(files_dir + "\\settings\\theme.json", "w") as file:
+    with open(files_dir + "/settings/theme.json", "w") as file:
         json.dump(theme_dict, file, indent=2)
 
 
@@ -123,21 +123,21 @@ def create_config_file():
                        "pin3": None,
                        "update": 60,
                        "browser_path": None})
-    with open(files_dir + "\\settings\\config.json", "w") as file:
+    with open(files_dir + "/settings/config.json", "w") as file:
         json.dump(theme_dict, file, indent=2)
 
 
 def set_theme(flag=None):
     global theme
     if flag is None:
-        with open(files_dir + "\\settings\\config.json", "r") as file:
+        with open(files_dir + "/settings/config.json", "r") as file:
             temp = json.load(file)['theme']
     else:
         temp = flag
-        with open(files_dir + "\\settings\\config.json", "r") as file:
+        with open(files_dir + "/settings/config.json", "r") as file:
             tmp = json.load(file)
         tmp['file'] = temp
-        with open(files_dir + "\\settings\\config.json", "w") as file:
+        with open(files_dir + "/settings/config.json", "w") as file:
             json.dump(tmp, file, indent=2)
     if temp == 1:
         theme_var.set(1)
@@ -158,7 +158,7 @@ def set_theme(flag=None):
     elif temp == 2:
         theme_var.set(2)
         try:
-            with open(files_dir + "\\settings\\theme.json", "r") as file:
+            with open(files_dir + "/settings/theme.json", "r") as file:
                 theme = json.load(file)
         except Exception as er:
             messagebox.showerror("Custom theme error", str(er))
@@ -348,7 +348,7 @@ def chat_send_doc(path, chat, user, target):
 def get_messages(cur_chat, is_chat):
     global access_token
     try:
-        with open(files_dir + f"\\cache\\chat_{current_chat}_cache.json", "r") as file:
+        with open(files_dir + f"/cache/chat_{current_chat}_cache.json", "r") as file:
             max_id = json.load(file)['max_id']
     except FileNotFoundError:
         max_id = 0
@@ -531,17 +531,17 @@ def login(*args):
         except NameError:
             pass
         qr = qrcode.make(private_key)
-        qr.save(files_dir + '\\temp\\QR.png')
-        qr = Image.open(files_dir + '\\temp\\QR.png')
+        qr.save(files_dir + '/temp/QR.png')
+        qr = Image.open(files_dir + '/temp/QR.png')
         width = int(qr.size[0] / 2)
         height = int(qr.size[1] / 2)
         img = qr.resize((width, height), Image.ANTIALIAS)
-        img.save(files_dir + '\\temp\\QR.png')
-        _qr = PhotoImage(file=files_dir + "\\temp\\QR.png")
+        img.save(files_dir + '/temp/QR.png')
+        _qr = PhotoImage(file=files_dir + "/temp/QR.png")
         label_qr = Label(main1_frame, image=_qr)
         label_qr.image = _qr
         # label_qr.pack(side=RIGHT, anchor=SE) # задумка на будущее
-        os.remove(files_dir + '\\temp\\QR.png')
+        os.remove(files_dir + '/temp/QR.png')
         menu_navigation("chat")
     except Exception as e:
         label_loading.place_forget()
@@ -1143,7 +1143,7 @@ def cache_messages(messages):
     global current_chat
     try:
         try:
-            with open(files_dir + f"\\cache\\chat_{current_chat}_cache.json", "r") as file:
+            with open(files_dir + f"/cache/chat_{current_chat}_cache.json", "r") as file:
                 json_dict = json.load(file)
             count = json_dict["count"]
             for i in range(messages['count']):
@@ -1157,7 +1157,7 @@ def cache_messages(messages):
                 json_dict.update({"max_id": messages["max_id"]})
         except FileNotFoundError:
             json_dict = messages
-        with open(files_dir + f"\\cache\\chat_{current_chat}_cache.json", "w") as file:
+        with open(files_dir + f"/cache/chat_{current_chat}_cache.json", "w") as file:
             json.dump(json_dict, file, indent=2)
     except FileNotFoundError:
         pass
@@ -1168,7 +1168,7 @@ def cache_messages(messages):
 def get_cache_messages():
     global current_chat
     try:
-        with open(files_dir + f"\\cache\\chat_{current_chat}_cache.json", "r") as file:
+        with open(files_dir + f"/cache/chat_{current_chat}_cache.json", "r") as file:
             res = json.load(file)
         return res
     except FileNotFoundError:
@@ -1188,24 +1188,24 @@ def pin_chat():
             messagebox.showerror('Input error', 'User not found')
             return
         info = user + ' ' + name
-        with open(files_dir + "\\settings\\config.json", "r") as file:
+        with open(files_dir + "/settings/config.json", "r") as file:
             json_file = json.load(file)
         pin1 = json_file['pin1']
         if pin1 is None:
             json_file['pin1'] = info
-            with open(files_dir + "\\settings\\config.json", "w") as file:
+            with open(files_dir + "/settings/config.json", "w") as file:
                 json.dump(json_file, file, indent=2)
             return
         pin2 = json_file['pin2']
         if pin2 is None:
             json_file['pin2'] = info
-            with open(files_dir + "\\settings\\config.json", "w") as file:
+            with open(files_dir + "/settings/config.json", "w") as file:
                 json.dump(json_file, file, indent=2)
             return
         pin3 = json_file['pin3']
         if pin3 is None:
             json_file['pin3'] = info
-            with open(files_dir + "\\settings\\config.json", "w") as file:
+            with open(files_dir + "/settings/config.json", "w") as file:
                 json.dump(json_file, file, indent=2)
             return
         messagebox.showerror('Pin error', 'Pin limit')
@@ -1217,7 +1217,7 @@ def unpin_chat(l_frame, id: int):
     try:
         pin_chats.remove(l_frame)
         l_frame.pack_forget()
-        with open(files_dir + "\\settings\\config.json", "r") as file:
+        with open(files_dir + "/settings/config.json", "r") as file:
             json_file = json.load(file)
         if id == 1:
             json_file['pin1'] = json_file['pin2']
@@ -1228,7 +1228,7 @@ def unpin_chat(l_frame, id: int):
             json_file['pin3'] = None
         else:
             json_file['pin3'] = None
-        with open(files_dir + "\\settings\\config.json", "w") as file:
+        with open(files_dir + "/settings/config.json", "w") as file:
             json.dump(json_file, file, indent=2)
     except Exception as er:
         exception_handler(er)
@@ -1254,7 +1254,7 @@ def pin_constructor(text: str, chat: str, id: int):
 def get_pin_chats():
     global pin_chats
     try:
-        with open(files_dir + "\\settings\\config.json", "r") as file:
+        with open(files_dir + "/settings/config.json", "r") as file:
             json_file = json.load(file)
         for i in range(3):
             pin = json_file[f'pin{i + 1}']
@@ -1272,7 +1272,7 @@ def get_pin_chats():
 
 def get_browser_path():
     try:
-        with open(files_dir + "\\settings\\config.json", "r") as file:
+        with open(files_dir + "/settings/config.json", "r") as file:
             res = json.load(file)['browser_path']
         if res is None:
             res = ""
@@ -1289,10 +1289,10 @@ def save_browser_path():
         if entry_path.get()[-4:] != ".exe":
             messagebox.showerror("Input error!", "Not .exe file")
             return
-        with open(files_dir + "\\settings\\config.json", "r") as file:
+        with open(files_dir + "/settings/config.json", "r") as file:
             json_file = json.load(file)
         json_file['browser_path'] = entry_path.get()
-        with open(files_dir + "\\settings\\config.json", "w") as file:
+        with open(files_dir + "/settings/config.json", "w") as file:
             json.dump(json_file, file, indent=2)
         messagebox.showinfo("Success!", "Browser path saved")
     except Exception as e:
@@ -1301,13 +1301,13 @@ def save_browser_path():
 
 def save_theme():
     global theme_var
-    with open(files_dir + "\\settings\\config.json", "r") as file:
+    with open(files_dir + "/settings/config.json", "r") as file:
         json_file = json.load(file)
     json_file['theme'] = theme_var.get()
-    with open(files_dir + "\\settings\\config.json", "w") as file:
+    with open(files_dir + "/settings/config.json", "w") as file:
         json.dump(json_file, file, indent=2)
     if theme_var.get() == 2:
-        if not os.path.exists(files_dir + "\\settings\\theme.json"):
+        if not os.path.exists(files_dir + "/settings/theme.json"):
             create_theme_file()
         theme_editor()
     else:
@@ -1316,7 +1316,7 @@ def save_theme():
 
 def theme_editor():
     global relief, frames_relief, cursors
-    with open(files_dir + "\\settings\\theme.json", "r") as file:
+    with open(files_dir + "/settings/theme.json", "r") as file:
         temp = json.load(file)
     relief.set(temp['relief'])
     label_wid_box.configure(relief=temp['relief'])
@@ -1325,14 +1325,19 @@ def theme_editor():
     cursors.set(temp['cursor'])
     theme_editor_window.deiconify()
     theme_editor_window.grab_set()
+    entry_text.delete(0, END)
     entry_text.insert(0, temp['text_color'])
     label_text_box.configure(bg=temp['text_color'])
+    entry_entry.delete(0, END)
     entry_entry.insert(0, temp['entry'])
     label_entry_box.configure(bg=temp['entry'])
+    entry_bg.delete(0, END)
     entry_bg.insert(0, temp['bg'])
     label_bg_box.configure(bg=temp['bg'], relief=GROOVE)
+    entry_sel_bg.delete(0, END)
     entry_sel_bg.insert(0, temp['select_bg'])
     label_sel_box.configure(bg=temp['select_bg'])
+    entry_font.delete(0, END)
     entry_font.insert(0, temp['font_main'])
     try:
         font = temp['font_main'].split()
@@ -1342,6 +1347,7 @@ def theme_editor():
         exception_handler(e)
         font = Font(size=10)
     label_font_box.configure(text="Aa", font=font)
+    entry_font_u.delete(0, END)
     entry_font_u.insert(0, temp['font_users'])
     try:
         font = temp['font_main'].split()
@@ -1351,6 +1357,7 @@ def theme_editor():
         exception_handler(e)
         font = Font(size=10)
     label_users_box.configure(text="Aa", font=font)
+    entry_font_b.delete(0, END)
     entry_font_b.insert(0, temp['button_font'])
     try:
         font = temp['font_main'].split()
@@ -1360,18 +1367,24 @@ def theme_editor():
         exception_handler(e)
         font = Font(size=10)
     label_font_b_box.configure(text="Aa", font=font)
+    entry_bg_b.delete(0, END)
     entry_bg_b.insert(0, temp['button_bg'])
     label_bg_b_box.configure(bg=temp['button_bg'])
+    entry_bg_b_pos.delete(0, END)
     entry_bg_b_pos.insert(0, temp['button_bg_positive'])
     label_pos_box.configure(bg=temp['button_bg_positive'])
+    entry_bg_b_neg.delete(0, END)
     entry_bg_b_neg.insert(0, temp['button_bg_negative'])
     label_neg_box.configure(bg=temp['button_bg_negative'])
+    entry_b_act.delete(0, END)
     entry_b_act.insert(0, temp['button_bg_active'])
     label_act_box.configure(bg=temp['button_bg_active'])
 
 
 def theme_editor_save():
     theme_dict = {}
+    label_text_box.configure(bg=entry_text.get())
+    label_text_box.update()
     theme_dict.update({"text_color": entry_text.get(),
                        "entry": entry_entry.get(),
                        "relief": relief.get(),
@@ -1386,9 +1399,10 @@ def theme_editor_save():
                        "button_bg_negative": entry_bg_b_neg.get(),
                        "button_bg_active": entry_b_act.get(),
                        "cursor": cursors.get()})
-    with open(files_dir + "\\settings\\theme.json", "w") as file:
+    with open(files_dir + "/settings/theme.json", "w") as file:
         json.dump(theme_dict, file, indent=2)
-    theme_editor_window.destroy()
+    theme_editor_window.withdraw()
+    root.grab_set()
     messagebox.showinfo("Success!", "Theme will be changed on next launch!")
 
 
@@ -1398,16 +1412,16 @@ def export_program_data():
     try:
         files, paths = [], []
         destination = filedialog.askdirectory()
-        with open(files_dir + "\\settings\\key.json", "w") as file:
+        with open(files_dir + "/settings/key.json", "w") as file:
             json.dump({"key": keyring.get_password("datachat", "private_key")}, file)
-        for i in os.listdir(files_dir + "\\settings"):
-            files.append(files_dir + "\\settings\\" + i)
-        for i in os.listdir(files_dir + "\\cache"):
-            files.append(files_dir + "\\cache\\" + i)
+        for i in os.listdir(files_dir + "/settings"):
+            files.append(files_dir + "/settings/" + i)
+        for i in os.listdir(files_dir + "/cache"):
+            files.append(files_dir + "/cache/" + i)
         for i in range(len(files)):
             paths.append("\\")
-        pyminizip.compress_multiple(files, paths, destination + "\\export.zip", user_password, 3)
-        os.remove(files_dir + "\\settings\\key.json")
+        pyminizip.compress_multiple(files, paths, destination + "/export.zip", user_password, 3)
+        os.remove(files_dir + "/settings/key.json")
     except Exception as e:
         exception_handler(e)
 
@@ -1416,15 +1430,15 @@ def import_program_data():
     import pyminizip
     try:
         path = filedialog.askopenfilename(filetypes=[("Zip files", "*.zip")])
-        pyminizip.uncompress(path, user_password, files_dir + "\\temp", 0)
-        with open(files_dir + "\\temp\\key.json", "r") as file:
+        pyminizip.uncompress(path, user_password, files_dir + "/temp", 0)
+        with open(files_dir + "/temp/key.json", "r") as file:
             key = json.load(file)["key"]
         keyring.set_password("datachat", "private_key", key)
-        os.replace(files_dir + "\\temp\\theme.json", files_dir + "\\settings\\theme.json")
-        os.replace(files_dir + "\\temp\\config.json", files_dir + "\\settings\\config.json")
-        os.remove(files_dir + "\\temp\\key.json")
-        for i in os.listdir(files_dir + "\\temp"):
-            os.replace(files_dir + "\\temp\\" + i, files_dir + "\\cache\\" + i)
+        os.replace(files_dir + "/temp/theme.json", files_dir + "/settings/theme.json")
+        os.replace(files_dir + "/temp/config.json", files_dir + "/settings/config.json")
+        os.remove(files_dir + "/temp/key.json")
+        for i in os.listdir(files_dir + "/temp"):
+            os.replace(files_dir + "/temp/" + i, files_dir + "/cache/" + i)
     except Exception as e:
         exception_handler(e)
 
@@ -1434,7 +1448,7 @@ def open_link(*args):
     try:
         if "chat-b4ckend.herokuapp.com/file/get/file_" in canvas.selection_get():
             import webbrowser as web
-            with open(files_dir + "\\settings\\config.json", "r") as file:
+            with open(files_dir + "/settings/config.json", "r") as file:
                 tmp = json.load(file)['browser_path']
             if tmp is not None:
                 web.register('browser', None, web.BackgroundBrowser(tmp))
@@ -1454,7 +1468,7 @@ def get_updates():
         if float(soup.find_all("span", {"class": "css-truncate-target"})[0].string) > app_ver:
             if messagebox.askyesno("New app version", "Visit the download page?"):
                 import webbrowser as web
-                with open(files_dir + "\\settings\\config.json", "r") as file:
+                with open(files_dir + "/settings/config.json", "r") as file:
                     tmp = json.load(file)['browser_path']
                 if tmp is not None:
                     web.register('browser', None, web.BackgroundBrowser(tmp))
@@ -1467,7 +1481,7 @@ def get_updates():
 
 def get_update_time():
     global time_to_check
-    with open(files_dir + "\\settings\\config.json", "r") as file:
+    with open(files_dir + "/settings/config.json", "r") as file:
         time_to_check = json.load(file)['update']
     if int(time_to_check) == -1:
         label_check2.configure(text="Never")
@@ -1489,10 +1503,10 @@ def auto_check():
         label_check2.configure(text=f"{time_to_check} Sec")
     label_check2.update()
     messagebox.showinfo('Success!', 'Notifications will be changed on next launch!')
-    with open(files_dir + "\\settings\\config.json", "r") as file:
+    with open(files_dir + "/settings/config.json", "r") as file:
         json_file = json.load(file)
     json_file['update'] = str(time_to_check)
-    with open(files_dir + "\\settings\\config.json", "w") as file:
+    with open(files_dir + "/settings/config.json", "w") as file:
         json.dump(json_file, file, indent=2)
 
 
@@ -2048,6 +2062,7 @@ if time_to_check is not None:
     if int(time_to_check) != -1:
         checker = threading.Thread(target=loop_get_msg, daemon=True)
         sch.enter(int(time_to_check), 1, loop_msg_func)
+# print(root.winfo_children())
 if __name__ == "__main__":
     root.title("Chat")
     root.geometry("200x165+{}+{}".format(w, h))
