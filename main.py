@@ -1,31 +1,31 @@
 import json
 import linecache
 import os
-import pathlib
-import sched
-import threading
-import time
-import tkinter as tk
-import tkinter.ttk as ttk
-from datetime import datetime, timezone
-from tkinter import *
-from tkinter import messagebox, filedialog
-from tkinter.font import Font
-import bcrypt
-import keyring
-import qrcode
-import requests
 import rsa
+import bcrypt
+import qrcode
+import keyring
+import pathlib
+import requests
+import threading
+import tkinter as tk
+from tkinter import *
+import tkinter.ttk as ttk
+from tkinter.font import Font
+from tkinter import messagebox, filedialog
+from datetime import datetime, timezone
 from PIL import Image
 from bs4 import BeautifulSoup
 from keyring import errors
-from keyring.backends.Windows import WinVaultKeyring
 from rsa.transform import int2bytes, bytes2int
 
 if "win" in sys.platform.lower():
+    from keyring.backends.Windows import WinVaultKeyring
     keyring.set_keyring(WinVaultKeyring())
     files_dir = str(pathlib.Path.home()) + "/AppData/Roaming/PojiloiChat"
 elif "darwin" in sys.platform.lower():
+    from keyring.backends.macOS import Keyring
+    keyring.set_keyring(Keyring)
     files_dir = str(pathlib.Path.home()) + "/Library/Application Support/PojiloiChat"
 elif "linux" in sys.platform.lower():
     files_dir = str(pathlib.Path.home()) + "/.local/share/PojiloiChat"
@@ -45,7 +45,6 @@ relief, frames_relief, cursors = StringVar(), StringVar(), StringVar()
 private_key = rsa.PrivateKey(1, 2, 3, 4, 5)
 time_to_check = 60.0
 utc_diff = datetime.now(timezone.utc).astimezone().utcoffset()
-sch = sched.scheduler(time.time, time.sleep)
 
 
 class CustomBox:
@@ -63,51 +62,51 @@ class CustomBox:
         self.box.overrideredirect(1)
         self.line = Label(self.box, width=50, height=0, bg="red")
         self.line.pack(side=TOP)
-        self.text = Label(self.box, font=10, height=4, fg=theme['text_color'], bg=theme['bg'])
+        self.text = Text(self.box, font=10, height=4, width=27, bg=theme['bg'], fg=theme['text_color'], relief="flat",
+                         wrap=WORD)
+        self.text.tag_configure("center", justify='center')
         self.text.pack(side=TOP)
         self.button = Button(self.box, width=15, text="Ok", fg=theme['text_color'], relief=theme['relief'],
                              bg=theme['button_bg'], activebackground=theme['button_bg_active'],
                              command=lambda: self.destroy())
-        self.button.pack(side=TOP)
-        self.button_pos = Button(self.box, width=15, text="Ok", fg=theme['text_color'], relief=theme['relief'],
+        self.button.pack(side=TOP, padx=5)
+        self.button_pos = Button(self.box, width=15, text="No", fg=theme['text_color'], relief=theme['relief'],
                                  bg=theme['button_bg'], activebackground=theme['button_bg_active'],
                                  command=lambda: self.destroy())
 
     def showinfo(self, title, text):
         self.box.deiconify()
         self.box.grab_set()
-        self.text.configure(text=text)
+        self.text.insert(END, text)
+        self.text.tag_add("center", "1.0", "end")
         self.line.configure(bg="#1E90FF", text=title)
 
     def showwarning(self, title, text):
         self.box.deiconify()
         self.box.grab_set()
-        self.text.configure(text=text)
+        self.text.insert(END, text)
         self.line.configure(bg="#FF8C00", text=title)
 
     def showerror(self, title, text):
         self.box.deiconify()
         self.box.grab_set()
-        self.text.configure(text=text)
+        self.text.insert(END, text)
+        self.text.tag_add("center", "1.0", "end")
         self.line.configure(bg="#8B0000", text=title)
 
-    def askyesno(self, title, text):
+    def askyesno(self, title, text, func):
         self.box.deiconify()
         self.box.grab_set()
-        self.text.configure(text=text)
+        self.text.insert(END, text)
+        self.text.tag_add("center", "1.0", "end")
         self.line.configure(bg="#8B0000", text=title)
         self.button.pack_forget()
-        self.button.configure(text="Yes", command=lambda: self.positive())
-        self.button.pack(side=LEFT)
-        self.button_pos.pack(side=LEFT)
+        self.button.configure(text="Yes", command=lambda: (func(), self.destroy()))
+        self.button.pack(side=LEFT, padx=5)
+        self.button_pos.pack(side=LEFT, padx=5)
 
     def destroy(self):
         self.box.destroy()
-
-    def positive(self):
-        self.destroy()
-        print(1)
-        return True
 
 
 def folders():
@@ -196,10 +195,10 @@ def set_theme(flag=None):
         try:
             with open(files_dir + "/settings/theme.json", "r") as file:
                 theme = json.load(file)
-        except Exception as er:
+        except Exception as e:
             m_box = CustomBox()
-            m_box.showerror("Custom theme error", str(er))
-            exception_handler(er)
+            m_box.showerror("Custom theme error", str(e))
+            exception_handler(e)
             set_theme(0)
     else:
         theme_var.set(0)
@@ -222,22 +221,23 @@ def set_theme(flag=None):
 def exception_handler(e):
     try:
         exc_type, exc_obj, tb = sys.exc_info()
-        frame = tb.tb_frame
+        _frame = tb.tb_frame
         linenos = tb.tb_lineno
-        filename = frame.f_code.co_filename
+        filename = _frame.f_code.co_filename
         linecache.checkcache(filename)
-        line = linecache.getline(filename, linenos, frame.f_globals)
-        reason = f"{time} EXCEPTION IN ({filename}, LINE {linenos} '{line.strip()}'): {exc_obj}"
+        line = linecache.getline(filename, linenos, _frame.f_globals)
+        reason = f"EXCEPTION IN ({filename}, LINE {linenos} '{line.strip()}'): {exc_obj}"
         print(f"{reason}\n")
-    except Exception as er:
-        print(er)
+        print(e)
+    except Exception as e:
+        print(e)
 
 
 def request(method, url, req_json=None, files=None, headers=None):
     try:
         return requests.request(method=method, url=url, json=req_json, files=files, headers=headers)
-    except Exception as er:
-        exception_handler(er)
+    except Exception as e:
+        exception_handler(e)
 
 
 def response_handler(method, url, req_json=None, files=None, headers=None):
@@ -253,8 +253,8 @@ def response_handler(method, url, req_json=None, files=None, headers=None):
             m_box = CustomBox()
             m_box.showerror("Something went wrong!", f"Response {res.status_code}")
             return None
-    except Exception as er:
-        exception_handler(er)
+    except Exception as e:
+        exception_handler(e)
 
 
 def api_awake():
@@ -264,8 +264,8 @@ def api_awake():
 def auto_check_message():
     try:
         get_message()
-    except Exception as er:
-        exception_handler(er)
+    except Exception as e:
+        exception_handler(e)
 
 
 def check_input(password: str, log: str):
@@ -292,8 +292,8 @@ def check_password(log, pas):
     try:
         return response_handler(method="post", url=f"{backend_url}auth",
                                 req_json={"login": log, "password": pas}).json()
-    except Exception as er:
-        exception_handler(er)
+    except Exception as e:
+        exception_handler(e)
 
 
 def create_user(lgn, hashed_pass, mail):
@@ -302,43 +302,43 @@ def create_user(lgn, hashed_pass, mail):
                                                                                           'password': hashed_pass,
                                                                                           'pubkey': keys_generation(),
                                                                                           'email': mail}).json()
-    except Exception as er:
-        exception_handler(er)
+    except Exception as e:
+        exception_handler(e)
 
 
 def get_id(log):
     try:
         return response_handler(method="get", url=f"{backend_url}user/get_id?login={log}").json()
-    except Exception as er:
-        exception_handler(er)
+    except Exception as e:
+        exception_handler(e)
 
 
 def find_user(user):
     try:
         return response_handler(method="get", url=f"{backend_url}user/find?login={user}").json()
-    except Exception as er:
-        exception_handler(er)
+    except Exception as e:
+        exception_handler(e)
 
 
 def get_user_nickname(user):
     try:
         return response_handler(method="get", url=f"{backend_url}user/get_nickname?id={user}").json()
-    except Exception as er:
-        exception_handler(er)
+    except Exception as e:
+        exception_handler(e)
 
 
-def get_random_users():  # дописать
+def get_random_users():
     try:
         return response_handler(method="get", url=f"{backend_url}user/get_random").json()
-    except Exception as er:
-        exception_handler(er)
+    except Exception as e:
+        exception_handler(e)
 
 
 def get_pubkey(user):
     try:
         return response_handler(method="get", url=f"{backend_url}user/get_pubkey?id={user}").json()
-    except Exception as er:
-        exception_handler(er)
+    except Exception as e:
+        exception_handler(e)
 
 
 def message_send(chat_id, message, message1):
@@ -348,8 +348,8 @@ def message_send(chat_id, message, message1):
                                 req_json={"sender": user_id, "destination": chat_id,
                                           "message": message, "message1": message1},
                                 headers={'Authorization': f'Bearer {access_token}'}).json()
-    except Exception as er:
-        exception_handler(er)
+    except Exception as e:
+        exception_handler(e)
 
 
 def message_loop():
@@ -357,8 +357,8 @@ def message_loop():
     try:
         return response_handler(method="get", url=f"{backend_url}message/loop",
                                 headers={'Authorization': f'Bearer {access_token}'}).json()
-    except Exception as er:
-        exception_handler(er)
+    except Exception as e:
+        exception_handler(e)
 
 
 def message_send_chat(chat, user, target, message):
@@ -367,8 +367,8 @@ def message_send_chat(chat, user, target, message):
         return response_handler(method="post", url=f"{backend_url}message/send/chat",
                                 req_json={"sender": f"{chat}_{user}", "destination": target, "message": message},
                                 headers={'Authorization': f'Bearer {access_token}'}).json()
-    except Exception as er:
-        exception_handler(er)
+    except Exception as e:
+        exception_handler(e)
 
 
 def doc_send(path, chat):
@@ -377,8 +377,8 @@ def doc_send(path, chat):
         return response_handler(method="get",
                                 url=f"{backend_url}url/shorter?url={upload_file(path)}&destination={chat}",
                                 headers={'Authorization': f'Bearer {access_token}'}).json()
-    except Exception as er:
-        exception_handler(er)
+    except Exception as e:
+        exception_handler(e)
 
 
 def chat_send_doc(path, chat, user, target):
@@ -387,8 +387,8 @@ def chat_send_doc(path, chat, user, target):
         return response_handler(method="get",
                                 url=f"{backend_url}url/shorter/chat?url={upload_file(path)}&sender={chat}_{user}&"
                                     f"destination={target}", headers={'Authorization': f'Bearer {access_token}'}).json()
-    except Exception as er:
-        exception_handler(er)
+    except Exception as e:
+        exception_handler(e)
 
 
 def get_messages(cur_chat, is_chat):
@@ -405,8 +405,8 @@ def get_messages(cur_chat, is_chat):
                                     headers={'Authorization': f'Bearer {access_token}'}).json()
         except AttributeError:
             return None
-    except Exception as er:
-        exception_handler(er)
+    except Exception as e:
+        exception_handler(e)
 
 
 def regenerate_keys():
@@ -421,8 +421,8 @@ def regenerate_keys():
             m_box.showinfo("Success", "Regeneration successful!")
         else:
             m_box.showerror("Failed", "Regeneration failed!")
-    except Exception as er:
-        exception_handler(er)
+    except Exception as e:
+        exception_handler(e)
 
 
 def chat_create(name):
@@ -430,58 +430,58 @@ def chat_create(name):
     try:
         return response_handler(method="post", url=f"{backend_url}chat/create", req_json={"name": name},
                                 headers={'Authorization': f'Bearer {access_token}'}).json()
-    except Exception as er:
-        exception_handler(er)
+    except Exception as e:
+        exception_handler(e)
 
 
 def get_chat_id(name: str):
     try:
         return response_handler(method="get", url=f"{backend_url}chat/get_id?name={name}").json()
-    except Exception as er:
-        exception_handler(er)
+    except Exception as e:
+        exception_handler(e)
 
 
 def get_chat_name(group_id: str):
     try:
         return response_handler(method="get", url=f"{backend_url}chat/get_name?group_id={group_id}").json()
-    except Exception as er:
-        exception_handler(er)
+    except Exception as e:
+        exception_handler(e)
 
 
 def get_user_groups(user: int):
     try:
         return response_handler(method="get", url=f"{backend_url}user/get_groups?user_id={user}").json()
-    except Exception as er:
-        exception_handler(er)
+    except Exception as e:
+        exception_handler(e)
 
 
 def get_chat_users(group_id: str):
     try:
         return response_handler(method="get", url=f"{backend_url}chat/get_users?group_id={group_id}").json()
-    except Exception as er:
-        exception_handler(er)
+    except Exception as e:
+        exception_handler(e)
 
 
 def upload_file(path: str):
     try:
         return response_handler(method="post", url=f"{backend_url}file/upload", files={"file": open(path, "rb")}).json()
-    except Exception as er:
-        exception_handler(er)
+    except Exception as e:
+        exception_handler(e)
 
 
 def send_recovery(user: str):
     try:
         return response_handler(method="post", url=f"{backend_url}recovery/send?login={user}").json()
-    except Exception as er:
-        exception_handler(er)
+    except Exception as e:
+        exception_handler(e)
 
 
 def validate_recovery(local_code: str, lgn: str, hashed_pass=None):
     try:
         return response_handler(method="post", url=f"{backend_url}recovery/validate",
                                 req_json={"code": local_code, "login": lgn, "password": hashed_pass}).json()
-    except Exception as er:
-        exception_handler(er)
+    except Exception as e:
+        exception_handler(e)
 
 
 def update_password(old_pass: str, new_pass: str):
@@ -490,8 +490,8 @@ def update_password(old_pass: str, new_pass: str):
         return response_handler(method="put", url=f"{backend_url}user/update_password",
                                 req_json={"old_password": old_pass, "new_password": new_pass},
                                 headers={'Authorization': f'Bearer {access_token}'}).json()
-    except Exception as er:
-        exception_handler(er)
+    except Exception as e:
+        exception_handler(e)
 
 
 def user_invite(name: str, user: int):
@@ -499,8 +499,8 @@ def user_invite(name: str, user: int):
     try:
         return response_handler(method="post", url=f"{backend_url}chat/invite", req_json={"name": name, "user": user},
                                 headers={'Authorization': f'Bearer {access_token}'}).json()
-    except Exception as er:
-        exception_handler(er)
+    except Exception as e:
+        exception_handler(e)
 
 
 def user_kick(name: str, user: int):
@@ -508,8 +508,8 @@ def user_kick(name: str, user: int):
     try:
         return response_handler(method="post", url=f"{backend_url}chat/kick", req_json={"name": name, "user": user},
                                 headers={'Authorization': f'Bearer {access_token}'}).json()
-    except Exception as er:
-        exception_handler(er)
+    except Exception as e:
+        exception_handler(e)
 
 
 # endregion
@@ -521,8 +521,8 @@ def auto_login():
             entry_log.insert(0, lgn)
             entry_pass.insert(0, psw)
             remember_var.set(1)
-    except Exception as er:
-        exception_handler(er)
+    except Exception as e:
+        exception_handler(e)
 
 
 def clear_auto_login():
@@ -574,10 +574,6 @@ def login(*args):
         get_private_key()
         hide_auth_menu()
         label_loading.place_forget()
-        try:
-            checker.start()
-        except NameError:
-            pass
         qr = qrcode.make(private_key)
         qr.save(files_dir + '/temp/QR.png')
         qr = Image.open(files_dir + '/temp/QR.png')
@@ -834,8 +830,8 @@ def get_message():
                 canvas.update()
             except KeyError:
                 break
-    except Exception as er:
-        exception_handler(er)
+    except Exception as e:
+        exception_handler(e)
 
 
 def encrypt(msg: bytes, pubkey):
@@ -844,8 +840,8 @@ def encrypt(msg: bytes, pubkey):
         pubkey = rsa.PublicKey(int(pubkey[0]), int(pubkey[1]))
         encrypt_message = rsa.encrypt(msg, pubkey)
         return bytes2int(encrypt_message)
-    except Exception as er:
-        exception_handler(er)
+    except Exception as e:
+        exception_handler(e)
 
 
 def decrypt(msg: bytes):
@@ -853,8 +849,8 @@ def decrypt(msg: bytes):
     try:
         decrypted_message = rsa.decrypt(msg, private_key)
         return decrypted_message.decode('utf-8')
-    except Exception as er:
-        exception_handler(er)
+    except Exception as e:
+        exception_handler(e)
         return None
 
 
@@ -911,16 +907,16 @@ def keys_generation():
         keyring.set_password('datachat', 'private_key', privkey.save_pkcs1().decode('ascii'))
         private_key = privkey
         return pubkey
-    except Exception as er:
-        exception_handler(er)
+    except Exception as e:
+        exception_handler(e)
 
 
 def get_private_key():
     try:
         global private_key
         private_key = rsa.PrivateKey.load_pkcs1(keyring.get_password('datachat', 'private_key').encode('utf-8'))
-    except Exception as er:
-        exception_handler(er)
+    except Exception as e:
+        exception_handler(e)
 
 
 def create_chat():
@@ -1073,8 +1069,8 @@ def recovery_menu():
         auth_frame.pack_forget()
         root.geometry("200x100+{}+{}".format(w, h))
         recovery_frame.pack(side=TOP, anchor=CENTER)
-    except Exception as er:
-        exception_handler(er)
+    except Exception as e:
+        exception_handler(e)
 
 
 def new_pass_menu():
@@ -1088,8 +1084,8 @@ def new_pass_menu():
         recovery_frame.pack_forget()
         root.geometry("200x130+{}+{}".format(w, h))
         new_pass_frame.pack(side=TOP, anchor=CENTER)
-    except Exception as er:
-        exception_handler(er)
+    except Exception as e:
+        exception_handler(e)
 
 
 def change_password():
@@ -1137,8 +1133,8 @@ def set_new_pass():
                     auth_frame.pack(side=TOP, anchor=CENTER)
                 else:
                     m_box.showerror("Failed", "Password has not been changed")
-    except Exception as er:
-        exception_handler(er)
+    except Exception as e:
+        exception_handler(e)
 
 
 def pass_code():
@@ -1292,8 +1288,8 @@ def unpin_chat(l_frame, id: int):
             json_file['pin3'] = None
         with open(files_dir + "/settings/config.json", "w") as file:
             json.dump(json_file, file, indent=2)
-    except Exception as er:
-        exception_handler(er)
+    except Exception as e:
+        exception_handler(e)
 
 
 def pin_constructor(text: str, chat: str, id: int):
@@ -1309,8 +1305,8 @@ def pin_constructor(text: str, chat: str, id: int):
         button2.pack(side=LEFT, anchor=N, padx=3)
         local_frame.pack(side=TOP, anchor=N)
         pin_chats.append(local_frame)
-    except Exception as er:
-        exception_handler(er)
+    except Exception as e:
+        exception_handler(e)
 
 
 def get_pin_chats():
@@ -1328,8 +1324,8 @@ def get_pin_chats():
                     return
             pin = pin.split()
             pin_constructor(pin[1], pin[0], i + 1)
-    except Exception as er:
-        exception_handler(er)
+    except Exception as e:
+        exception_handler(e)
 
 
 def get_browser_path():
@@ -1448,16 +1444,19 @@ def theme_editor():
 def theme_editor_save():
     theme_dict = {}
     m_box = CustomBox()
-    label_text_box.configure(bg=entry_text.get())
-    label_entry_box.configure(bg=entry_entry.get())
-    label_wid_box.configure(relief=relief.get())
-    label_frame_box.configure(relief=frames_relief.get())
-    label_bg_box.configure(bg=entry_bg.get())
-    label_sel_box.configure(bg=entry_sel_bg.get())
-    label_bg_b_box.configure(bg=entry_bg_b.get())
-    label_pos_box.configure(bg=entry_bg_b_pos.get())
-    label_neg_box.configure(bg=entry_bg_b_neg.get())
-    label_act_box.configure(bg=entry_b_act.get())
+    try:
+        label_text_box.configure(bg=entry_text.get())
+        label_entry_box.configure(bg=entry_entry.get())
+        label_wid_box.configure(relief=relief.get())
+        label_frame_box.configure(relief=frames_relief.get())
+        label_bg_box.configure(bg=entry_bg.get())
+        label_sel_box.configure(bg=entry_sel_bg.get())
+        label_bg_b_box.configure(bg=entry_bg_b.get())
+        label_pos_box.configure(bg=entry_bg_b_pos.get())
+        label_neg_box.configure(bg=entry_bg_b_neg.get())
+        label_act_box.configure(bg=entry_b_act.get())
+    except Exception as e:
+        exception_handler(e)
     theme_editor_window.update()
     theme_dict.update({"text_color": entry_text.get(),
                        "entry": entry_entry.get(),
@@ -1537,20 +1536,28 @@ def open_link(*args):
         exception_handler(e)
 
 
-def get_updates():
-    global app_ver
+def get_updates(*args):
+    global app_ver, root
     try:
+        root.update()
         soup = BeautifulSoup(requests.get("https://github.com/Delivery-Klad/chat_desktop/releases").text, 'html.parser')
         if float(soup.find_all("span", {"class": "css-truncate-target"})[0].string) > app_ver:
-            if messagebox.askyesno("New app version", "Visit the download page?"):
-                import webbrowser as web
-                with open(files_dir + "/settings/config.json", "r") as file:
-                    tmp = json.load(file)['browser_path']
-                if tmp is not None:
-                    web.register('browser', None, web.BackgroundBrowser(tmp))
-                    web.get(using='browser').open_new_tab("https://github.com/Delivery-Klad/chat_desktop/releases")
-                else:
-                    web.open("https://github.com/Delivery-Klad/chat_desktop/releases", new=0)
+            m_box = CustomBox()
+            m_box.askyesno("New app version", "Visit the download page?", open_download_page)
+    except Exception as e:
+        exception_handler(e)
+
+
+def open_download_page():
+    try:
+        import webbrowser as web
+        with open(files_dir + "/settings/config.json", "r") as file:
+            tmp = json.load(file)['browser_path']
+        if tmp is not None:
+            web.register('browser', None, web.BackgroundBrowser(tmp))
+            web.get(using='browser').open_new_tab("https://github.com/Delivery-Klad/chat_desktop/releases")
+        else:
+            web.open("https://github.com/Delivery-Klad/chat_desktop/releases", new=0)
     except Exception as e:
         exception_handler(e)
 
@@ -1589,22 +1596,24 @@ def auto_check():
 
 def loop_msg_func():
     global time_to_check
+    if time_to_check == -1:
+        return
     print('check')
     try:
         if access_token == '':
             return
+        res = message_loop()
+        if res is not None:
+            m_box = CustomBox()
+            m_box.showinfo("New Messages!", f"You have new messages in chats: {res}")
         if current_chat != '-1':
             if current_chat[0] != 'g':
                 get_message()
             else:
                 get_chat_message()
-        sch.enter(int(time_to_check), 1, loop_msg_func)
+        root.after(int(time_to_check) * 1000, loop_msg_func)
     except Exception as e:
         exception_handler(e)
-
-
-def loop_get_msg():
-    sch.run()
 
 
 # region startup config
@@ -1787,7 +1796,6 @@ button_send2 = tk.Button(group_frame, text="SEND", activebackground=theme['butto
                          bg=theme['button_bg_positive'], width=8, state='disabled', command=lambda: send_chat_message())
 button_send2.pack(side=LEFT, anchor=E, padx=3)
 entry_log.focus_set()
-# root.after(500, loop)
 # endregion
 # region settings
 settings_frame_2 = LabelFrame(settings_frame, width=600, height=25, relief=FLAT, bg=theme['bg'])
@@ -2142,18 +2150,15 @@ label_loading = Label(root, font=10, text="LOADING", fg=theme['text_color'], bg=
 # endregion
 auto_login()
 get_update_time()
-get_updates()
 if time_to_check is not None:
     if int(time_to_check) != -1:
-        checker = threading.Thread(target=loop_get_msg, daemon=True)
-        sch.enter(int(time_to_check), 1, loop_msg_func)
+        root.after(int(time_to_check) * 1000, loop_msg_func)
 # print(root.winfo_children())
-# ms1 = CustomBox()
-# print(ms1.askyesno("Aboba?", "or aboba?"))
 if __name__ == "__main__":
     root.title("Chat")
     root.geometry("200x165+{}+{}".format(w, h))
     root.resizable(False, False)
     root['bg'] = theme['bg']
+    get_updates()
     # root.overrideredirect(1)  # remove title bar
     root.mainloop()
