@@ -1,7 +1,6 @@
-import json
-import linecache
 import os
 import rsa
+import json
 import bcrypt
 import qrcode
 import keyring
@@ -12,10 +11,9 @@ import tkinter as tk
 from tkinter import *
 import tkinter.ttk as ttk
 from tkinter.font import Font
-from tkinter import messagebox, filedialog
+from tkinter import filedialog
 from datetime import datetime, timezone
 from PIL import Image
-from bs4 import BeautifulSoup
 from keyring import errors
 from rsa.transform import int2bytes, bytes2int
 
@@ -39,7 +37,7 @@ root = tk.Tk()
 spacing, spacing_2 = 0, 0
 w = root.winfo_screenwidth() // 2 - 140
 h = root.winfo_screenheight() // 2 - 100
-code, user_id, email, user_login, user_password, access_token = '', '', '', '', '', ''
+code, user_id, email, user_login, user_password, access_token = "", "", "", "", "", ""
 remember_var, theme_var = IntVar(), IntVar()
 relief, frames_relief, cursors = StringVar(), StringVar(), StringVar()
 private_key = rsa.PrivateKey(1, 2, 3, 4, 5)
@@ -60,11 +58,11 @@ class CustomBox:
         self.box.attributes("-topmost", True)
         self.box['bg'] = theme['bg']
         self.box.overrideredirect(1)
-        self.line = Label(self.box, width=50, height=0, bg="red")
+        self.line = Label(self.box, width=50, height=0)
         self.line.pack(side=TOP)
         self.text = Text(self.box, font=10, height=4, width=27, bg=theme['bg'], fg=theme['text_color'], relief="flat",
                          wrap=WORD)
-        self.text.tag_configure("center", justify='center')
+        self.text.tag_configure("center", justify="center")
         self.text.pack(side=TOP)
         self.button = Button(self.box, width=15, text="Ok", fg=theme['text_color'], relief=theme['relief'],
                              bg=theme['button_bg'], activebackground=theme['button_bg_active'],
@@ -219,6 +217,7 @@ def set_theme(flag=None):
 
 
 def exception_handler(e):
+    import linecache
     try:
         exc_type, exc_obj, tb = sys.exc_info()
         _frame = tb.tb_frame
@@ -248,7 +247,7 @@ def response_handler(method, url, req_json=None, files=None, headers=None):
             return res
         elif res.status_code == 401:
             access_token = check_password(user_login, user_password)
-            return request(method, url, req_json, headers={'Authorization': f'Bearer {access_token}'})
+            return request(method, url, req_json, headers={"Authorization": f"Bearer {access_token}"})
         else:
             m_box = CustomBox()
             m_box.showerror("Something went wrong!", f"Response {res.status_code}")
@@ -271,18 +270,18 @@ def auto_check_message():
 def check_input(password: str, log: str):
     m_box = CustomBox()
     if len(log) < 5:
-        m_box.showerror('Input error', 'Login length must be more than 5 characters')
+        m_box.showerror("Input error", "Login length must be more than 5 characters")
         return False
     if len(password) < 8:
-        m_box.showerror('Input error', 'Password does not meet the requirements')
+        m_box.showerror("Input error", 'Password does not meet the requirements')
         return False
     for i in password:
         if ord(i) < 45 or ord(i) > 122:
-            m_box.showerror('Input error', 'Unsupported symbols')
+            m_box.showerror("Input error", "Unsupported symbols")
             return False
     for i in log:
         if ord(i) < 45 or ord(i) > 122:
-            m_box.showerror('Input error', 'Unsupported symbols')
+            m_box.showerror("Input error", "Unsupported symbols")
             return False
     return True
 
@@ -298,10 +297,10 @@ def check_password(log, pas):
 
 def create_user(lgn, hashed_pass, mail):
     try:
-        return response_handler(method="post", url=f"{backend_url}user/create", req_json={'login': lgn,
-                                                                                          'password': hashed_pass,
-                                                                                          'pubkey': keys_generation(),
-                                                                                          'email': mail}).json()
+        return response_handler(method="post", url=f"{backend_url}user/create", req_json={"login": lgn,
+                                                                                          "password": hashed_pass,
+                                                                                          "pubkey": keys_generation(),
+                                                                                          "email": mail}).json()
     except Exception as e:
         exception_handler(e)
 
@@ -347,7 +346,7 @@ def message_send(chat_id, message, message1):
         return response_handler(method="post", url=f"{backend_url}message/send",
                                 req_json={"sender": user_id, "destination": chat_id,
                                           "message": message, "message1": message1},
-                                headers={'Authorization': f'Bearer {access_token}'}).json()
+                                headers={"Authorization": f"Bearer {access_token}"}).json()
     except Exception as e:
         exception_handler(e)
 
@@ -356,7 +355,7 @@ def message_loop():
     global access_token
     try:
         return response_handler(method="get", url=f"{backend_url}message/loop",
-                                headers={'Authorization': f'Bearer {access_token}'}).json()
+                                headers={"Authorization": f"Bearer {access_token}"}).json()
     except Exception as e:
         exception_handler(e)
 
@@ -366,7 +365,7 @@ def message_send_chat(chat, user, target, message):
     try:
         return response_handler(method="post", url=f"{backend_url}message/send/chat",
                                 req_json={"sender": f"{chat}_{user}", "destination": target, "message": message},
-                                headers={'Authorization': f'Bearer {access_token}'}).json()
+                                headers={"Authorization": f"Bearer {access_token}"}).json()
     except Exception as e:
         exception_handler(e)
 
@@ -376,7 +375,7 @@ def doc_send(path, chat):
     try:
         return response_handler(method="get",
                                 url=f"{backend_url}url/shorter?url={upload_file(path)}&destination={chat}",
-                                headers={'Authorization': f'Bearer {access_token}'}).json()
+                                headers={"Authorization": f"Bearer {access_token}"}).json()
     except Exception as e:
         exception_handler(e)
 
@@ -386,7 +385,7 @@ def chat_send_doc(path, chat, user, target):
     try:
         return response_handler(method="get",
                                 url=f"{backend_url}url/shorter/chat?url={upload_file(path)}&sender={chat}_{user}&"
-                                    f"destination={target}", headers={'Authorization': f'Bearer {access_token}'}).json()
+                                    f"destination={target}", headers={"Authorization": f"Bearer {access_token}"}).json()
     except Exception as e:
         exception_handler(e)
 
@@ -402,7 +401,7 @@ def get_messages(cur_chat, is_chat):
         try:
             return response_handler(method="get", url=f"{backend_url}message/get?chat_id={cur_chat}&is_chat={is_chat}&"
                                                       f"max_id={max_id}",
-                                    headers={'Authorization': f'Bearer {access_token}'}).json()
+                                    headers={"Authorization": f"Bearer {access_token}"}).json()
         except AttributeError:
             return None
     except Exception as e:
@@ -416,7 +415,7 @@ def regenerate_keys():
         m_box = CustomBox()
         res = response_handler(method="put", url=f"{backend_url}user/update_pubkey",
                                req_json={'pubkey': keys_generation()},
-                               headers={'Authorization': f'Bearer {access_token}'}).json()
+                               headers={"Authorization": f"Bearer {access_token}"}).json()
         if res:
             m_box.showinfo("Success", "Regeneration successful!")
         else:
@@ -429,7 +428,7 @@ def chat_create(name):
     global access_token
     try:
         return response_handler(method="post", url=f"{backend_url}chat/create", req_json={"name": name},
-                                headers={'Authorization': f'Bearer {access_token}'}).json()
+                                headers={"Authorization": f"Bearer {access_token}"}).json()
     except Exception as e:
         exception_handler(e)
 
@@ -489,7 +488,7 @@ def update_password(old_pass: str, new_pass: str):
     try:
         return response_handler(method="put", url=f"{backend_url}user/update_password",
                                 req_json={"old_password": old_pass, "new_password": new_pass},
-                                headers={'Authorization': f'Bearer {access_token}'}).json()
+                                headers={"Authorization": f"Bearer {access_token}"}).json()
     except Exception as e:
         exception_handler(e)
 
@@ -498,7 +497,7 @@ def user_invite(name: str, user: int):
     global access_token
     try:
         return response_handler(method="post", url=f"{backend_url}chat/invite", req_json={"name": name, "user": user},
-                                headers={'Authorization': f'Bearer {access_token}'}).json()
+                                headers={"Authorization": f"Bearer {access_token}"}).json()
     except Exception as e:
         exception_handler(e)
 
@@ -507,7 +506,7 @@ def user_kick(name: str, user: int):
     global access_token
     try:
         return response_handler(method="post", url=f"{backend_url}chat/kick", req_json={"name": name, "user": user},
-                                headers={'Authorization': f'Bearer {access_token}'}).json()
+                                headers={"Authorization": f"Bearer {access_token}"}).json()
     except Exception as e:
         exception_handler(e)
 
@@ -515,8 +514,8 @@ def user_kick(name: str, user: int):
 # endregion
 def auto_login():
     try:
-        lgn = keyring.get_password('datachat', 'login')
-        psw = keyring.get_password('datachat', 'password')
+        lgn = keyring.get_password("datachat", "login")
+        psw = keyring.get_password("datachat", "password")
         if lgn is not None and psw is not None:
             entry_log.insert(0, lgn)
             entry_pass.insert(0, psw)
@@ -527,18 +526,23 @@ def auto_login():
 
 def clear_auto_login():
     try:
-        keyring.delete_password('datachat', 'login')
+        keyring.delete_password("datachat", "login")
     except errors.PasswordDeleteError:
         pass
     try:
-        keyring.delete_password('datachat', 'password')
+        keyring.delete_password("datachat", "password")
     except errors.PasswordDeleteError:
         pass
 
 
 def fill_auto_login_file(lgn: str, psw: str):
-    keyring.set_password('datachat', 'login', lgn)
-    keyring.set_password('datachat', 'password', psw)
+    keyring.set_password("datachat", "login", lgn)
+    keyring.set_password("datachat", "password", psw)
+
+
+def regenerate_encryption_keys():
+    m_box = CustomBox()
+    m_box.askyesno("Regenerate keys", "Aare you sure? You will lose access to all messages", regenerate_keys)
 
 
 def login(*args):
@@ -549,19 +553,18 @@ def login(*args):
     try:
         m_box = CustomBox()
         if len(entry_log.get()) == 0 or len(entry_pass.get()) == 0:
-            m_box.showerror('Input error', 'Fill all input fields')
+            m_box.showerror("Input error", "Fill all input fields")
             label_loading.place_forget()
             return
         res = check_password(entry_log.get(), entry_pass.get())
         user_password = entry_pass.get()
         if res is None:
-            m_box.showerror('Input error', 'User not found')
+            m_box.showerror("Input error", "User not found")
             label_loading.place_forget()
             return
         elif not res:
-            msg = messagebox.askquestion('Input error', 'Wrong password, recover?', icon='error')
-            if msg == 'yes':
-                pass_code()
+            m_box = CustomBox()
+            m_box.askyesno("Input error", "Wrong password, recover?", pass_code)
             label_loading.place_forget()
             return
         access_token = res
@@ -575,17 +578,17 @@ def login(*args):
         hide_auth_menu()
         label_loading.place_forget()
         qr = qrcode.make(private_key)
-        qr.save(files_dir + '/temp/QR.png')
-        qr = Image.open(files_dir + '/temp/QR.png')
+        qr.save(files_dir + "/temp/QR.png")
+        qr = Image.open(files_dir + "/temp/QR.png")
         width = int(qr.size[0] / 2)
         height = int(qr.size[1] / 2)
         img = qr.resize((width, height), Image.ANTIALIAS)
-        img.save(files_dir + '/temp/QR.png')
+        img.save(files_dir + "/temp/QR.png")
         _qr = PhotoImage(file=files_dir + "/temp/QR.png")
         label_qr = Label(main1_frame, image=_qr)
         label_qr.image = _qr
         # label_qr.pack(side=RIGHT, anchor=SE) # задумка на будущее
-        os.remove(files_dir + '/temp/QR.png')
+        os.remove(files_dir + "/temp/QR.png")
         menu_navigation("chat")
     except Exception as e:
         label_loading.place_forget()
@@ -621,20 +624,20 @@ def register():
         mail = entry_email.get()
         m_box = CustomBox()
         if len(lgn) == 0 or len(psw) == 0:
-            m_box.showerror('Input error', 'Fill all input fields')
+            m_box.showerror("Input error", "Fill all input fields")
             return
-        if len(mail) <= 8 or ' ' in mail or '@' not in mail or '.' not in mail:
-            m_box.showerror('Input error', 'Enter valid email')
+        if len(mail) <= 8 or " " in mail or "@" not in mail or "." not in mail:
+            m_box.showerror("Input error", "Enter valid email")
             return
         if not check_input(psw, lgn):
             return
-        hashed_pass = bcrypt.hashpw(psw.encode('utf-8'), bcrypt.gensalt())
+        hashed_pass = bcrypt.hashpw(psw.encode("utf-8"), bcrypt.gensalt())
         hashed_pass = str(hashed_pass)[2:-1]
         res = create_user(lgn, hashed_pass, mail)
         if res:
             m_box.showinfo("Success", "Register success!")
         else:
-            m_box.showerror('Input error', 'User already register')
+            m_box.showerror("Input error", "User already register")
     except Exception as e:
         exception_handler(e)
 
@@ -680,7 +683,7 @@ def menu_navigation(menu: str):
         main_frame.pack(side=LEFT, anchor=CENTER)
         canvas.delete(0.0, END)
         current_chat = "-1"
-        label_chat_id.configure(text='Current chat with: ')
+        label_chat_id.configure(text="Current chat with: ")
         entry_chat_id.delete(0, tk.END)
         spacing, spacing_2 = 0, 0
         button_send2.configure(state='disabled')
@@ -716,7 +719,7 @@ def menu_navigation(menu: str):
                     date = str(datetime.strptime(user["last_activity"], "%Y-%m-%dT%H:%M:%S") + utc_diff)[2:]
                 except TypeError:
                     date = ""
-                canvas_users.insert(parent='', index=END, values=(user['id'], user['login'], date), tags=('bb',))
+                canvas_users.insert(parent='', index=END, values=(user['id'], user['login'], date), tags=("users_tag",))
             except KeyError:
                 break
     elif menu == "group":
@@ -755,8 +758,8 @@ def menu_navigation(menu: str):
 
 def change_group(gr_id: str, button):
     global current_chat, chats
-    button_send2.configure(state='normal')
-    button_img2.configure(state='normal')
+    button_send2.configure(state="normal")
+    button_img2.configure(state="normal")
     current_chat = gr_id
     for key in chats:
         chats[key].configure(bg=theme['button_bg'])
@@ -771,14 +774,14 @@ def send_message():
         msg = entry_msg.get()
         m_box = CustomBox()
         if len(msg) == 0:
-            m_box.showerror('Input error', 'Fill all input fields')
+            m_box.showerror("Input error", "Fill all input fields")
             return
         for i in msg:
             if ord(i) < 32 or ord(i) > 1366:
-                m_box.showerror('Input error', 'Unsupported symbols')
+                m_box.showerror("Input error", "Unsupported symbols")
                 return
-        encrypt_msg = encrypt(msg.encode('utf-8'), get_pubkey(current_chat))
-        encrypt_msg1 = encrypt(msg.encode('utf-8'), get_pubkey(user_id))
+        encrypt_msg = encrypt(msg.encode("utf-8"), get_pubkey(current_chat))
+        encrypt_msg1 = encrypt(msg.encode("utf-8"), get_pubkey(user_id))
         message_send(current_chat, encrypt_msg, encrypt_msg1)
         entry_msg.delete(0, tk.END)
         get_message()
@@ -816,16 +819,16 @@ def get_message():
         chat_nick = 0
         for i in range(res['count']):
             try:
-                message = res[f"item_{i}"]
-                if chat_nick == 0 and message["from_id"] != user_login:
-                    chat_nick = message["from_id"]
-                nick = user_login if message["from_id"] == user_login else chat_nick
+                message = res[f'item_{i}']
+                if chat_nick == 0 and message['from_id'] != user_login:
+                    chat_nick = message['from_id']
+                nick = user_login if message['from_id'] == user_login else chat_nick
                 if message['from_id'] == user_login:
-                    decrypt_msg = decrypt(int2bytes(message["message1"]))
+                    decrypt_msg = decrypt(int2bytes(message['message1']))
                 else:
-                    decrypt_msg = decrypt(int2bytes(message["message"]))
-                date = datetime.strptime(message["date"], "%Y-%m-%dT%H:%M:%S")
-                content = f'{str(date + utc_diff)[2:]} {nick}: {decrypt_msg}\n'
+                    decrypt_msg = decrypt(int2bytes(message['message']))
+                date = datetime.strptime(message['date'], "%Y-%m-%dT%H:%M:%S")
+                content = f"{str(date + utc_diff)[2:]} {nick}: {decrypt_msg}\n"
                 canvas.insert(END, content)
                 canvas.update()
             except KeyError:
@@ -836,7 +839,7 @@ def get_message():
 
 def encrypt(msg: bytes, pubkey):
     try:
-        pubkey = pubkey.split(', ')
+        pubkey = pubkey.split(", ")
         pubkey = rsa.PublicKey(int(pubkey[0]), int(pubkey[1]))
         encrypt_message = rsa.encrypt(msg, pubkey)
         return bytes2int(encrypt_message)
@@ -848,7 +851,7 @@ def decrypt(msg: bytes):
     global private_key
     try:
         decrypted_message = rsa.decrypt(msg, private_key)
-        return decrypted_message.decode('utf-8')
+        return decrypted_message.decode("utf-8")
     except Exception as e:
         exception_handler(e)
         return None
@@ -857,7 +860,7 @@ def decrypt(msg: bytes):
 def login_handler(*args):
     if len(entry_log.get()) == 0:
         m_box = CustomBox()
-        m_box.showerror('Input error', 'Fill all input fields')
+        m_box.showerror("Input error", "Fill all input fields")
         return
     elif len(entry_pass.get()) != 0:
         login()
@@ -904,7 +907,7 @@ def keys_generation():
     try:
         (pubkey, privkey) = rsa.newkeys(1024)
         pubkey = str(pubkey)[10:-1]
-        keyring.set_password('datachat', 'private_key', privkey.save_pkcs1().decode('ascii'))
+        keyring.set_password("datachat", "private_key", privkey.save_pkcs1().decode("ascii"))
         private_key = privkey
         return pubkey
     except Exception as e:
@@ -914,7 +917,7 @@ def keys_generation():
 def get_private_key():
     try:
         global private_key
-        private_key = rsa.PrivateKey.load_pkcs1(keyring.get_password('datachat', 'private_key').encode('utf-8'))
+        private_key = rsa.PrivateKey.load_pkcs1(keyring.get_password("datachat", "private_key").encode("utf-8"))
     except Exception as e:
         exception_handler(e)
 
@@ -928,22 +931,22 @@ def create_chat():
         if len(name) < 5:
             m_box.showerror("Input error", "Name length must be more than 5 characters")
             return
-        if name[-3:] != '_gr':
+        if name[-3:] != "_gr":
             m_box.showerror("Input error", "Name must contain '_gr' in the end")
             return
         for i in name:
             if ord(i) < 45 or ord(i) > 122:
-                m_box.showerror('Input error', 'Unsupported symbols')
+                m_box.showerror("Input error", 'Unsupported symbols')
                 return
         res = chat_create(name)
         if res:
-            m_box.showinfo('Success', 'Chat created')
+            m_box.showinfo("Success", "Chat created")
             return
         elif res is None:
-            m_box.showerror('Name error', 'Name exists')
+            m_box.showerror("Name error", "Name exists")
             return
         else:
-            m_box.showerror('Unknown error', 'oooops!')
+            m_box.showerror("Unknown error", "oooops!")
     except Exception as e:
         exception_handler(e)
 
@@ -955,10 +958,10 @@ def send_chat_message():
     try:
         m_box = CustomBox()
         if len(message) == 0:
-            m_box.showerror('Input error', 'Fill all input fields')
+            m_box.showerror("Input error", "Fill all input fields")
             return
         for i in get_chat_users(current_chat):
-            message_send_chat(current_chat, user_id, i[0], encrypt(message.encode('utf-8'), get_pubkey(i[0])))
+            message_send_chat(current_chat, user_id, i[0], encrypt(message.encode("utf-8"), get_pubkey(i[0])))
             entry_msg2.delete(0, tk.END)
         get_chat_message()
     except Exception as e:
@@ -994,10 +997,10 @@ def get_chat_message():
         canvas_2.delete(0.0, END)
         for i in range(res['count']):
             try:
-                message = res[f"item_{i}"]
-                decrypt_msg = decrypt(int2bytes(message["message"]))
-                date = datetime.strptime(message["date"], "%Y-%m-%dT%H:%M:%S")
-                content = f'{str(date + utc_diff)[2:]} {message["from_id"]}: {decrypt_msg}\n'
+                message = res[f'item_{i}']
+                decrypt_msg = decrypt(int2bytes(message['message']))
+                date = datetime.strptime(message['date'], "%Y-%m-%dT%H:%M:%S")
+                content = f"{str(date + utc_diff)[2:]} {message['from_id']}: {decrypt_msg}\n"
                 canvas_2.insert(END, content)
                 canvas_2.update()
             except KeyError:
@@ -1013,18 +1016,18 @@ def invite_to_group():
     inv_group = entry_gr_toinv.get()
     m_box = CustomBox()
     if len(inv_user) == 0 and len(inv_group) == 0:
-        m_box.showerror('Input error', 'Entries length must be more than 0 characters')
+        m_box.showerror("Input error", "Entries length must be more than 0 characters")
         return
     try:
         name = get_chat_name(inv_group)
         groups = get_user_groups(inv_user)
         if name in groups:
-            m_box.showerror('Input error', "Пользователь уже состоит в группе")
+            m_box.showerror("Input error", "User already in group")
             return
         if not user_invite(name, int(inv_user)):
-            m_box.showerror('Access error', "You are not chat's owner")
+            m_box.showerror("Access error", "You are not chat's owner")
             return
-        m_box.showinfo('Success', "Success")
+        m_box.showinfo("Success", "Success")
     except Exception as e:
         exception_handler(e)
 
@@ -1036,18 +1039,18 @@ def kick_from_group():
     kick_group = entry_gr_tokick.get()
     m_box = CustomBox()
     if len(kick_user) == 0 and len(kick_group) == 0:
-        m_box.showerror('Input error', 'Entries lenght must be more than 0 characters')
+        m_box.showerror("Input error", "Entries length must be more than 0 characters")
         return
     try:
         name = get_chat_name(kick_group)
         groups = get_user_groups(kick_user)
         if name not in groups:
-            m_box.showerror('Input error', "User is not in group")
+            m_box.showerror("Input error", "User is not in group")
             return
         if not user_kick(name, int(kick_user)):
-            m_box.showerror('Access error', "You are not chat's owner")
+            m_box.showerror("Access error", "You are not chat's owner")
             return
-        m_box.showinfo('Success', "Success")
+        m_box.showinfo("Success", "Success")
     except Exception as e:
         exception_handler(e)
 
@@ -1079,7 +1082,7 @@ def new_pass_menu():
         m_box = CustomBox()
         code = entry_code.get()
         if not validate_recovery(entry_code.get(), entry_log.get()):
-            m_box.showerror('Input error', 'Incorrect code')
+            m_box.showerror("Input error", "Incorrect code")
             return
         recovery_frame.pack_forget()
         root.geometry("200x130+{}+{}".format(w, h))
@@ -1096,7 +1099,7 @@ def change_password():
         if len(entry_old_pass.get()) == 0 or len(entry_new_pass.get()):
             m_box.showerror("Input error!", "Empty input field!")
             return
-        hashed_pass = bcrypt.hashpw(entry_new_pass.get().encode('utf-8'), bcrypt.gensalt())
+        hashed_pass = bcrypt.hashpw(entry_new_pass.get().encode("utf-8"), bcrypt.gensalt())
         hashed_pass = str(hashed_pass)[2:-1]
         res = update_password(entry_old_pass.get(), hashed_pass)
         if res:
@@ -1104,7 +1107,7 @@ def change_password():
             fill_auto_login_file(user_login, entry_new_pass.get())
             return
         elif res is None:
-            m_box.showerror('Input error', 'User not found')
+            m_box.showerror("Input error", "User not found")
             return
         else:
             m_box.showerror("Input error", "Current password is wrong")
@@ -1120,7 +1123,7 @@ def set_new_pass():
         if check_input(entry_new_p2.get(), entry_new_p.get()):
             if entry_new_p.get() == entry_new_p2.get():
                 m_box = CustomBox()
-                hashed_pass = bcrypt.hashpw(entry_new_p.get().encode('utf-8'), bcrypt.gensalt())
+                hashed_pass = bcrypt.hashpw(entry_new_p.get().encode("utf-8"), bcrypt.gensalt())
                 hashed_pass = str(hashed_pass)[2:-1]
                 res = validate_recovery(code, user_login, hashed_pass)
                 if res:
@@ -1142,14 +1145,14 @@ def pass_code():
         m_box = CustomBox()
         res = send_recovery(entry_log.get())
         if res:
-            m_box.showinfo('Recovery', 'Recovery code has been sent to your email')
+            m_box.showinfo("Recovery", "Recovery code has been sent to your email")
             recovery_menu()
             return
         elif res is None:
-            m_box.showwarning('Recovery', 'User not found')
+            m_box.showwarning("Recovery", "User not found")
             return
         else:
-            m_box.showerror('Recovery', 'Recovery code has not been sent')
+            m_box.showerror("Recovery", "Recovery code has not been sent")
     except Exception as e:
         exception_handler(e)
 
@@ -1159,17 +1162,17 @@ def open_chat(chat_id):
     button_chat_id.update()
     m_box = CustomBox()
     if len(chat_id) == 0 or not chat_id.isnumeric():
-        m_box.showerror('Input error', 'Chat id must be a number')
+        m_box.showerror("Input error", "Chat id must be a number")
         return
     nick = get_user_nickname(int(chat_id))
     if nick is not None:
-        label_chat_id.configure(text='Current chat with: ' + nick)
+        label_chat_id.configure(text="Current chat with: " + nick)
     else:
-        m_box.showerror('Input error', 'User not found')
+        m_box.showerror("Input error", "User not found")
         return
     current_chat = chat_id
-    button_send.configure(state='normal')
-    button_img.configure(state='normal')
+    button_send.configure(state="normal")
+    button_img.configure(state="normal")
     canvas.delete(0.0, END)
     get_message()
 
@@ -1186,10 +1189,10 @@ def search_user():
             try:
                 user = users_list[f'user_{i}']
                 try:
-                    date = str(datetime.strptime(user["last_activity"], "%Y-%m-%dT%H:%M:%S") + utc_diff)[2:]
+                    date = str(datetime.strptime(user['last_activity'], "%Y-%m-%dT%H:%M:%S") + utc_diff)[2:]
                 except TypeError:
                     date = ""
-                canvas_users.insert(parent='', index=END, values=(user['id'], user['login'], date), tags=('bb',))
+                canvas_users.insert(parent='', index=END, values=(user['id'], user['login'], date), tags=("users_tag",))
             except KeyError:
                 break
     except Exception as e:
@@ -1202,16 +1205,16 @@ def cache_messages(messages):
         try:
             with open(files_dir + f"/cache/chat_{current_chat}_cache.json", "r") as file:
                 json_dict = json.load(file)
-            count = json_dict["count"]
+            count = json_dict['count']
             for i in range(messages['count']):
                 try:
-                    message = messages[f"item_{i}"]
-                    json_dict.update({f"item_{i + count}": message})
+                    message = messages[f'item_{i}']
+                    json_dict.update({f'item_{i + count}': message})
                 except KeyError:
                     break
-            json_dict.update({"count": count + messages["count"]})
+            json_dict.update({'count': count + messages['count']})
             if messages['max_id'] != 0:
-                json_dict.update({"max_id": messages["max_id"]})
+                json_dict.update({'max_id': messages['max_id']})
         except FileNotFoundError:
             json_dict = messages
         with open(files_dir + f"/cache/chat_{current_chat}_cache.json", "w") as file:
@@ -1239,13 +1242,13 @@ def pin_chat():
         user = entry_pin.get()
         m_box = CustomBox()
         if len(user) == 0:
-            m_box.showerror('Input error', 'Empty input')
+            m_box.showerror("Input error", "Empty input")
             return
         name = get_user_nickname(user)
         if name is None:
-            m_box.showerror('Input error', 'User not found')
+            m_box.showerror("Input error", "User not found")
             return
-        info = user + ' ' + name
+        info = user + " " + name
         with open(files_dir + "/settings/config.json", "r") as file:
             json_file = json.load(file)
         pin1 = json_file['pin1']
@@ -1266,7 +1269,7 @@ def pin_chat():
             with open(files_dir + "/settings/config.json", "w") as file:
                 json.dump(json_file, file, indent=2)
             return
-        m_box.showerror('Pin error', 'Pin limit')
+        m_box.showerror("Pin error", "Pin limit")
     except Exception as e:
         exception_handler(e)
 
@@ -1298,7 +1301,7 @@ def pin_constructor(text: str, chat: str, id: int):
         button1 = tk.Button(local_frame, text=text, activebackground=theme['button_bg_active'], bg=theme['button_bg'],
                             width=13, relief=theme['relief'], font=theme['button_font'],
                             command=lambda: (menu_navigation("chat"), open_chat(chat)))
-        button2 = tk.Button(local_frame, text='-', activebackground=theme['button_bg_active'], width=2,
+        button2 = tk.Button(local_frame, text="-", activebackground=theme['button_bg_active'], width=2,
                             font=theme['button_font'], bg=theme['button_bg_negative'], relief=theme['relief'],
                             command=lambda: unpin_chat(local_frame, id))
         button1.pack(side=LEFT, anchor=N)
@@ -1485,8 +1488,10 @@ def export_program_data():
     try:
         files, paths = [], []
         destination = filedialog.askdirectory()
+        if destination == "":
+            return
         with open(files_dir + "/settings/key.json", "w") as file:
-            json.dump({"key": keyring.get_password("datachat", "private_key")}, file)
+            json.dump({'key': keyring.get_password("datachat", "private_key")}, file)
         for i in os.listdir(files_dir + "/settings"):
             files.append(files_dir + "/settings/" + i)
         for i in os.listdir(files_dir + "/cache"):
@@ -1505,6 +1510,8 @@ def import_program_data():
     import pyminizip
     try:
         path = filedialog.askopenfilename(filetypes=[("Zip files", "*.zip")])
+        if path == "":
+            return
         pyminizip.uncompress(path, user_password, files_dir + "/temp", 0)
         with open(files_dir + "/temp/key.json", "r") as file:
             key = json.load(file)["key"]
@@ -1526,8 +1533,8 @@ def open_link(*args):
             with open(files_dir + "/settings/config.json", "r") as file:
                 tmp = json.load(file)['browser_path']
             if tmp is not None:
-                web.register('browser', None, web.BackgroundBrowser(tmp))
-                web.get(using='browser').open_new_tab(canvas.selection_get())
+                web.register("browser", None, web.BackgroundBrowser(tmp))
+                web.get(using="browser").open_new_tab(canvas.selection_get())
             else:
                 web.open(canvas.selection_get(), new=0)
     except tk.TclError:
@@ -1538,12 +1545,14 @@ def open_link(*args):
 
 def get_updates(*args):
     global app_ver, root
+    from bs4 import BeautifulSoup
     try:
         root.update()
         soup = BeautifulSoup(requests.get("https://github.com/Delivery-Klad/chat_desktop/releases").text, 'html.parser')
         if float(soup.find_all("span", {"class": "css-truncate-target"})[0].string) > app_ver:
             m_box = CustomBox()
-            m_box.askyesno("New app version", "Visit the download page?", open_download_page)
+            m_box.askyesno("New app version", "New app version is now available\nVisit the download page?",
+                           open_download_page)
     except Exception as e:
         exception_handler(e)
 
@@ -1554,8 +1563,8 @@ def open_download_page():
         with open(files_dir + "/settings/config.json", "r") as file:
             tmp = json.load(file)['browser_path']
         if tmp is not None:
-            web.register('browser', None, web.BackgroundBrowser(tmp))
-            web.get(using='browser').open_new_tab("https://github.com/Delivery-Klad/chat_desktop/releases")
+            web.register("browser", None, web.BackgroundBrowser(tmp))
+            web.get(using="browser").open_new_tab("https://github.com/Delivery-Klad/chat_desktop/releases")
         else:
             web.open("https://github.com/Delivery-Klad/chat_desktop/releases", new=0)
     except Exception as e:
@@ -1586,7 +1595,7 @@ def auto_check():
     else:
         label_check2.configure(text=f"{time_to_check} Sec")
     label_check2.update()
-    m_box.showinfo('Success!', 'Notifications will be changed on next launch!')
+    m_box.showinfo("Success!", "Notifications will be changed on next launch!")
     with open(files_dir + "/settings/config.json", "r") as file:
         json_file = json.load(file)
     json_file['update'] = str(time_to_check)
@@ -1606,8 +1615,8 @@ def loop_msg_func():
         if res is not None:
             m_box = CustomBox()
             m_box.showinfo("New Messages!", f"You have new messages in chats: {res}")
-        if current_chat != '-1':
-            if current_chat[0] != 'g':
+        if current_chat != "-1":
+            if current_chat[0] != "g":
                 get_message()
             else:
                 get_chat_message()
@@ -1646,7 +1655,7 @@ entry_pass = tk.Entry(auth_frame, font=12, width=20, fg=theme['text_color'], bg=
 entry_pass.bind("<Return>", login)
 entry_pass.pack(side=TOP)
 check_remember = tk.Checkbutton(auth_frame, font=theme['font_main'], fg=theme['text_color'], bg=theme['bg'],
-                                text='Remember me', activebackground=theme['bg'], selectcolor=theme['bg'],
+                                text="Remember me", activebackground=theme['bg'], selectcolor=theme['bg'],
                                 variable=remember_var)
 check_remember.pack(side=TOP, anchor=S)
 button_login = tk.Button(auth_frame, text="LOGIN", activebackground=theme['button_bg_active'], relief=theme['relief'],
@@ -1803,7 +1812,7 @@ settings_frame_2.pack(side=TOP, pady=2, anchor=N)
 label_check = tk.Label(settings_frame_2, font=10, text="  Update frequency:", fg=theme['text_color'], bg=theme['bg'],
                        width=18, anchor=W)
 label_check.pack(side=LEFT, anchor=W)
-label_check2 = tk.Label(settings_frame_2, font=12, text='1 min', width=20, fg=theme['text_color'], bg=theme['bg'])
+label_check2 = tk.Label(settings_frame_2, font=12, text="1 min", width=20, fg=theme['text_color'], bg=theme['bg'])
 label_check2.pack(side=LEFT, padx=170, anchor=CENTER)
 button_check_msg = tk.Button(settings_frame_2, text="UPDATE", activebackground=theme['button_bg_active'], width=15,
                              bg=theme['button_bg_positive'], relief=theme['relief'], command=lambda: auto_check())
@@ -1947,7 +1956,7 @@ button_export.pack(side=TOP, anchor=CENTER)
 button_import.pack(side=TOP, pady=5, anchor=CENTER)
 button_regenerate = tk.Button(settings_frame12, text="REGENERATE ENCRYPTION KEYS", bg=theme['button_bg_positive'],
                               activebackground=theme['button_bg_active'], width=113, relief=theme['relief'],
-                              command=lambda: regenerate_keys())
+                              command=lambda: regenerate_encryption_keys())
 button_regenerate.pack(side=TOP, anchor=CENTER)
 # endregion
 # region json editor
@@ -2112,7 +2121,7 @@ popup_cur["menu"].configure(bg=theme['entry'], fg=theme['text_color'], relief=th
                             activebackground=theme['button_bg_active'], borderwidth=0)
 # print(popup_cur.keys())
 button_save = tk.Button(theme_editor_window, text="SAVE", bg=theme['button_bg_positive'], relief=theme['relief'],
-                        activebackground=theme['button_bg_active'], width=64, command=lambda: theme_editor_save())
+                        activebackground=theme['button_bg_active'], width=67, command=lambda: theme_editor_save())
 button_save.pack(side=TOP, pady=5)
 # endregion
 # region info
@@ -2133,8 +2142,8 @@ style = ttk.Style()
 style.theme_use("clam")
 style.configure("t_style.Heading", background=theme['entry'], relief=theme['relief'], font=theme['font_users'])
 style.configure("t_style", highlightthickness=0, background=theme['entry'], bd=0, font=theme['font_users'])
-style.layout("t_style", [('t_style.treearea', {})])
-canvas_users = ttk.Treeview(frame_users, height=29, cursor='arrow', columns=(0, 1, 2), show='headings', style="t_style")
+style.layout("t_style", [("t_style.treearea", {})])
+canvas_users = ttk.Treeview(frame_users, height=29, cursor="arrow", columns=(0, 1, 2), show="headings", style="t_style")
 scroll_users = Scrollbar(frame_users, command=canvas_users.yview, bg=theme['bg'])
 scroll_users.pack(side=RIGHT, fill=Y)
 canvas_users.pack(side=RIGHT, expand=True, fill=BOTH)
@@ -2145,7 +2154,7 @@ canvas_users.heading(2, text="Last activity", anchor=W)
 canvas_users.column(0, width=60, stretch=NO)
 canvas_users.column(1, width=567)
 canvas_users.column(2, width=200, stretch=NO)
-canvas_users.tag_configure('bb', background=theme['entry'], foreground=theme['text_color'])
+canvas_users.tag_configure("users_tag", background=theme['entry'], foreground=theme['text_color'])
 label_loading = Label(root, font=10, text="LOADING", fg=theme['text_color'], bg=theme['bg'])
 # endregion
 auto_login()
@@ -2160,5 +2169,4 @@ if __name__ == "__main__":
     root.resizable(False, False)
     root['bg'] = theme['bg']
     get_updates()
-    # root.overrideredirect(1)  # remove title bar
     root.mainloop()
