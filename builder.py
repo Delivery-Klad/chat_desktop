@@ -10,7 +10,7 @@ elif sys.platform == "win64":
 excludes = ['PyQt5', 'colorama']
 
 packages = ["idna", "_cffi_backend", "bcrypt", "rsa", "os", "keyring", "keyring.backends",
-            "win32ctypes", "shutil", "PIL", "qrcode", "pyminizip", "bs4", "pathlib"]
+            "win32ctypes", "shutil", "PIL", "qrcode", "pyminizip", "pathlib"]
 
 zip_include_packages = ['collections', 'encodings', 'importlib']
 
@@ -20,8 +20,11 @@ options = {'build_exe': {
     'zip_include_packages': zip_include_packages, }
 }
 
-setup(name="main",                              # bdist_msi
+executables = [Executable("main.py", base=base)]
+
+setup(name="Chat",                              # bdist_msi
+      author="Delivery Klad",
       options=options,
-      version="1.8",
-      description='description',
-      executables=[Executable("main.py", base=base)])
+      version="2.2",
+      description='Encrypted chat',
+      executables=executables)

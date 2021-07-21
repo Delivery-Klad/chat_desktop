@@ -6,14 +6,13 @@ import qrcode
 import keyring
 import pathlib
 import requests
-import threading
+from PIL import Image
 import tkinter as tk
 from tkinter import *
 import tkinter.ttk as ttk
 from tkinter.font import Font
 from tkinter import filedialog
 from datetime import datetime, timezone
-from PIL import Image
 from keyring import errors
 from rsa.transform import int2bytes, bytes2int
 
@@ -26,9 +25,11 @@ elif "darwin" in sys.platform.lower():
     keyring.set_keyring(Keyring)
     files_dir = str(pathlib.Path.home()) + "/Library/Application Support/PojiloiChat"
 elif "linux" in sys.platform.lower():
+    from keyring.backends.kwallet import KeyringBackend
+    keyring.set_keyring(KeyringBackend)
     files_dir = str(pathlib.Path.home()) + "/.local/share/PojiloiChat"
 
-app_ver = 2.0
+app_ver = 2.2
 backend_url = "https://chat-b4ckend.herokuapp.com/"
 chats, theme = {}, {}
 pin_chats = []
@@ -92,7 +93,7 @@ class CustomBox:
         self.text.tag_add("center", "1.0", "end")
         self.line.configure(bg="#8B0000", text=title)
 
-    def askyesno(self, title, text, func):
+    def askyesno(self, title, text, func, func2=None):
         self.box.deiconify()
         self.box.grab_set()
         self.text.insert(END, text)
@@ -101,6 +102,8 @@ class CustomBox:
         self.button.pack_forget()
         self.button.configure(text="Yes", command=lambda: (func(), self.destroy()))
         self.button.pack(side=LEFT, padx=5)
+        if func2 is not None:
+            self.button_pos.configure(command=lambda: (func2(), self.destroy()))
         self.button_pos.pack(side=LEFT, padx=5)
 
     def destroy(self):
@@ -256,10 +259,6 @@ def response_handler(method, url, req_json=None, files=None, headers=None):
         exception_handler(e)
 
 
-def api_awake():
-    requests.head(f"{backend_url}api/awake")
-
-
 def auto_check_message():
     try:
         get_message()
@@ -287,6 +286,18 @@ def check_input(password: str, log: str):
 
 
 # region API
+def api_awake():
+    global root
+    root.update()
+    try:
+        res = requests.get(f"{backend_url}api/awake").json()
+        res = res.split(" ")
+        get_updates(float(res[0]), float(res[1]))
+        print(res)
+    except Exception as e:
+        exception_handler(e)
+
+
 def check_password(log, pas):
     try:
         return response_handler(method="post", url=f"{backend_url}auth",
@@ -549,7 +560,6 @@ def login(*args):
     global user_login, user_id, user_password, access_token
     label_loading.place(x=60, y=60)
     button_login.update()
-    awake_thread.join()
     try:
         m_box = CustomBox()
         if len(entry_log.get()) == 0 or len(entry_pass.get()) == 0:
@@ -1543,13 +1553,18 @@ def open_link(*args):
         exception_handler(e)
 
 
-def get_updates(*args):
+def get_updates(app_version, old_version):
     global app_ver, root
-    from bs4 import BeautifulSoup
     try:
         root.update()
-        soup = BeautifulSoup(requests.get("https://github.com/Delivery-Klad/chat_desktop/releases").text, 'html.parser')
-        if float(soup.find_all("span", {"class": "css-truncate-target"})[0].string) > app_ver:
+        print(f"Current app: {app_ver}\nValid app: {app_version}\nOld app: {old_version}")
+        if old_version >= app_ver:
+            print("too old version")
+            m_box = CustomBox()
+            m_box.askyesno("Need update", "Your app version is out of date\nVisit the download page?",
+                           open_download_page, close_app)
+        elif app_version > app_ver:
+            print("old version")
             m_box = CustomBox()
             m_box.askyesno("New app version", "New app version is now available\nVisit the download page?",
                            open_download_page)
@@ -1569,6 +1584,10 @@ def open_download_page():
             web.open("https://github.com/Delivery-Klad/chat_desktop/releases", new=0)
     except Exception as e:
         exception_handler(e)
+
+
+def close_app():
+    exit(0)
 
 
 def get_update_time():
@@ -1626,8 +1645,6 @@ def loop_msg_func():
 
 
 # region startup config
-awake_thread = threading.Thread(target=api_awake, daemon=True)
-awake_thread.start()
 folders()
 set_theme()
 # endregion
@@ -2168,5 +2185,5 @@ if __name__ == "__main__":
     root.geometry("200x165+{}+{}".format(w, h))
     root.resizable(False, False)
     root['bg'] = theme['bg']
-    get_updates()
+    api_awake()
     root.mainloop()
