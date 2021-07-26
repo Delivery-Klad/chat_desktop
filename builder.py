@@ -22,9 +22,9 @@ options = {'build_exe': {
 
 executables = [Executable("main.py", base=base)]
 
-setup(name="Chat",                              # bdist_msi
+setup(name="Chat",                              # bdist_msi, bdist_mac
       author="Delivery Klad",
       options=options,
-      version="2.2",
+      version="2.4",
       description='Encrypted chat',
       executables=executables)

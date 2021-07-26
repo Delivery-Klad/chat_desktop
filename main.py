@@ -16,20 +16,7 @@ from datetime import datetime, timezone
 from keyring import errors
 from rsa.transform import int2bytes, bytes2int
 
-if "win" in sys.platform.lower():
-    from keyring.backends.Windows import WinVaultKeyring
-    keyring.set_keyring(WinVaultKeyring())
-    files_dir = str(pathlib.Path.home()) + "/AppData/Roaming/PojiloiChat"
-elif "darwin" in sys.platform.lower():
-    from keyring.backends.macOS import Keyring
-    keyring.set_keyring(Keyring)
-    files_dir = str(pathlib.Path.home()) + "/Library/Application Support/PojiloiChat"
-elif "linux" in sys.platform.lower():
-    from keyring.backends.kwallet import KeyringBackend
-    keyring.set_keyring(KeyringBackend)
-    files_dir = str(pathlib.Path.home()) + "/.local/share/PojiloiChat"
-
-app_ver = 2.2
+app_ver = 2.4
 backend_url = "https://chat-b4ckend.herokuapp.com/"
 chats, theme = {}, {}
 pin_chats = []
@@ -44,6 +31,22 @@ relief, frames_relief, cursors = StringVar(), StringVar(), StringVar()
 private_key = rsa.PrivateKey(1, 2, 3, 4, 5)
 time_to_check = 60.0
 utc_diff = datetime.now(timezone.utc).astimezone().utcoffset()
+
+if "win" in sys.platform.lower():
+    from keyring.backends.Windows import WinVaultKeyring
+
+    keyring.set_keyring(WinVaultKeyring())
+    files_dir = str(pathlib.Path.home()) + "/AppData/Roaming/PojiloiChat"
+elif "darwin" in sys.platform.lower():
+    from keyring.backends.macOS import Keyring
+
+    keyring.set_keyring(Keyring)
+    files_dir = str(pathlib.Path.home()) + "/Library/Application Support/PojiloiChat"
+elif "linux" in sys.platform.lower():
+    from keyring.backends.kwallet import KeyringBackend
+
+    keyring.set_keyring(KeyringBackend)
+    files_dir = str(pathlib.Path.home()) + "/.local/share/PojiloiChat"
 
 
 class CustomBox:
@@ -300,7 +303,7 @@ def api_awake():
 
 def check_password(log, pas):
     try:
-        return response_handler(method="post", url=f"{backend_url}auth",
+        return response_handler(method="post", url=f"{backend_url}login",
                                 req_json={"login": log, "password": pas}).json()
     except Exception as e:
         exception_handler(e)
@@ -308,10 +311,10 @@ def check_password(log, pas):
 
 def create_user(lgn, hashed_pass, mail):
     try:
-        return response_handler(method="post", url=f"{backend_url}user/create", req_json={"login": lgn,
-                                                                                          "password": hashed_pass,
-                                                                                          "pubkey": keys_generation(),
-                                                                                          "email": mail}).json()
+        return response_handler(method="post", url=f"{backend_url}register", req_json={"login": lgn,
+                                                                                       "password": hashed_pass,
+                                                                                       "pubkey": keys_generation(),
+                                                                                       "email": mail}).json()
     except Exception as e:
         exception_handler(e)
 
@@ -352,11 +355,10 @@ def get_pubkey(user):
 
 
 def message_send(chat_id, message, message1):
-    global user_id, access_token
+    global access_token
     try:
         return response_handler(method="post", url=f"{backend_url}message/send",
-                                req_json={"sender": user_id, "destination": chat_id,
-                                          "message": message, "message1": message1},
+                                req_json={"destination": chat_id, "message": message, "message1": message1},
                                 headers={"Authorization": f"Bearer {access_token}"}).json()
     except Exception as e:
         exception_handler(e)
@@ -371,11 +373,11 @@ def message_loop():
         exception_handler(e)
 
 
-def message_send_chat(chat, user, target, message):
+def message_send_chat(chat, target, message):  # проверить
     global access_token
     try:
         return response_handler(method="post", url=f"{backend_url}message/send/chat",
-                                req_json={"sender": f"{chat}_{user}", "destination": target, "message": message},
+                                req_json={"sender": chat, "destination": target, "message": message},
                                 headers={"Authorization": f"Bearer {access_token}"}).json()
     except Exception as e:
         exception_handler(e)
@@ -465,7 +467,7 @@ def get_user_groups(user: int):
         exception_handler(e)
 
 
-def get_chat_users(group_id: str):
+def get_chat_users(group_id: str):  # авторизация
     try:
         return response_handler(method="get", url=f"{backend_url}chat/get_users?group_id={group_id}").json()
     except Exception as e:
@@ -522,7 +524,18 @@ def user_kick(name: str, user: int):
         exception_handler(e)
 
 
+def remove_data_request():
+    global access_token
+    try:
+        return response_handler(method="delete", url=f"{backend_url}user/remove",
+                                headers={"Authorization": f"Bearer {access_token}"}).json()
+    except Exception as e:
+        exception_handler(e)
+
+
 # endregion
+
+
 def auto_login():
     try:
         lgn = keyring.get_password("datachat", "login")
@@ -971,7 +984,7 @@ def send_chat_message():
             m_box.showerror("Input error", "Fill all input fields")
             return
         for i in get_chat_users(current_chat):
-            message_send_chat(current_chat, user_id, i[0], encrypt(message.encode("utf-8"), get_pubkey(i[0])))
+            message_send_chat(current_chat, i[0], encrypt(message.encode("utf-8"), get_pubkey(i[0])))
             entry_msg2.delete(0, tk.END)
         get_chat_message()
     except Exception as e:
