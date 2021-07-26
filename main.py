@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from keyring import errors
 from rsa.transform import int2bytes, bytes2int
 
-app_ver = 2.4
+app_ver = 2.6
 backend_url = "https://chat-b4ckend.herokuapp.com/"
 chats, theme = {}, {}
 pin_chats = []

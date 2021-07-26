@@ -7,7 +7,7 @@ if sys.platform == "win32":
 elif sys.platform == "win64":
     base = "Win64GUI"
 
-excludes = ['PyQt5', 'colorama']
+excludes = ['PyQt5', 'colorama', 'pandas', 'sqlalchemy', 'numpy', 'notebook', 'Django', 'schedule']
 
 packages = ["idna", "_cffi_backend", "bcrypt", "rsa", "os", "keyring", "keyring.backends",
             "win32ctypes", "shutil", "PIL", "qrcode", "pyminizip", "pathlib"]
@@ -25,6 +25,6 @@ executables = [Executable("main.py", base=base)]
 setup(name="Chat",                              # bdist_msi, bdist_mac
       author="Delivery Klad",
       options=options,
-      version="2.4",
+      version="2.6",
       description='Encrypted chat',
       executables=executables)
