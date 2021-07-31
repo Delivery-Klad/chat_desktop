@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from keyring import errors
 from rsa.transform import int2bytes, bytes2int
 
-app_ver = 2.6
+app_ver = 2.8
 backend_url = "https://chat-b4ckend.herokuapp.com/"
 chats, theme = {}, {}
 pin_chats = []
@@ -293,7 +293,7 @@ def api_awake():
     global root
     root.update()
     try:
-        res = requests.get(f"{backend_url}api/awake").json()
+        res = requests.get(f"{backend_url}service/awake").json()
         res = res.split(" ")
         get_updates(float(res[0]), float(res[1]))
         print(res)
@@ -303,18 +303,18 @@ def api_awake():
 
 def check_password(log, pas):
     try:
-        return response_handler(method="post", url=f"{backend_url}login",
-                                req_json={"login": log, "password": pas}).json()
+        return response_handler(method="post", url=f"{backend_url}auth/login", req_json={"login": log,
+                                                                                         "password": pas}).json()
     except Exception as e:
         exception_handler(e)
 
 
 def create_user(lgn, hashed_pass, mail):
     try:
-        return response_handler(method="post", url=f"{backend_url}register", req_json={"login": lgn,
-                                                                                       "password": hashed_pass,
-                                                                                       "pubkey": keys_generation(),
-                                                                                       "email": mail}).json()
+        return response_handler(method="post", url=f"{backend_url}auth/register", req_json={"login": lgn,
+                                                                                            "password": hashed_pass,
+                                                                                            "pubkey": keys_generation(),
+                                                                                            "email": mail}).json()
     except Exception as e:
         exception_handler(e)
 
@@ -373,7 +373,7 @@ def message_loop():
         exception_handler(e)
 
 
-def message_send_chat(chat, target, message):  # проверить
+def message_send_chat(chat, target, message):
     global access_token
     try:
         return response_handler(method="post", url=f"{backend_url}message/send/chat",
@@ -387,7 +387,7 @@ def doc_send(path, chat):
     global access_token
     try:
         return response_handler(method="get",
-                                url=f"{backend_url}url/shorter?url={upload_file(path)}&destination={chat}",
+                                url=f"{backend_url}file/shorter?url={upload_file(path)}&destination={chat}",
                                 headers={"Authorization": f"Bearer {access_token}"}).json()
     except Exception as e:
         exception_handler(e)
@@ -397,7 +397,7 @@ def chat_send_doc(path, chat, user, target):
     global access_token
     try:
         return response_handler(method="get",
-                                url=f"{backend_url}url/shorter/chat?url={upload_file(path)}&sender={chat}_{user}&"
+                                url=f"{backend_url}file/shorter/chat?url={upload_file(path)}&sender={chat}_{user}&"
                                     f"destination={target}", headers={"Authorization": f"Bearer {access_token}"}).json()
     except Exception as e:
         exception_handler(e)
@@ -467,9 +467,11 @@ def get_user_groups(user: int):
         exception_handler(e)
 
 
-def get_chat_users(group_id: str):  # авторизация
+def get_chat_users(group_id: str):
+    global access_token
     try:
-        return response_handler(method="get", url=f"{backend_url}chat/get_users?group_id={group_id}").json()
+        return response_handler(method="get", url=f"{backend_url}chat/get_users?group_id={group_id}",
+                                headers={"Authorization": f"Bearer {access_token}"}).json()
     except Exception as e:
         exception_handler(e)
 
