@@ -1,4 +1,5 @@
 import os
+import sys
 import rsa
 import json
 import bcrypt
@@ -8,13 +9,14 @@ import pathlib
 import requests
 from PIL import Image
 import tkinter as tk
-from tkinter import *
 import tkinter.ttk as ttk
 from tkinter.font import Font
 from tkinter import filedialog
 from datetime import datetime, timezone
 from keyring import errors
 from rsa.transform import int2bytes, bytes2int
+from tkinter import IntVar, StringVar, Label, Text, Button, LabelFrame, TOP, LEFT, RIGHT, BOTTOM, Toplevel, WORD, END,\
+    PhotoImage, CENTER, Y, N, W, E, S, NW, NO, FLAT, GROOVE, BOTH, Frame, Scrollbar, OptionMenu, Radiobutton
 
 app_ver = 2.8
 backend_url = "https://chat-b4ckend.herokuapp.com/"
@@ -296,7 +298,6 @@ def api_awake():
         res = requests.get(f"{backend_url}service/awake").json()
         res = res.split(" ")
         get_updates(float(res[0]), float(res[1]))
-        print(res)
     except Exception as e:
         exception_handler(e)
 
@@ -834,7 +835,7 @@ def get_message():
     except NotImplementedError:
         pass
     res = get_messages(current_chat, 0)
-    print(res)
+    # print(res)
     if res is None:
         return
     cache_messages(res)
@@ -853,8 +854,12 @@ def get_message():
                 else:
                     decrypt_msg = decrypt(int2bytes(message['message']))
                 date = datetime.strptime(message['date'], "%Y-%m-%dT%H:%M:%S")
-                content = f"{str(date + utc_diff)[2:]} {nick}: {decrypt_msg}\n"
-                canvas.insert(END, content)
+                if "chat-b4ckend.herokuapp.com/file/get/file_" not in decrypt_msg:
+                    content = f"{str(date + utc_diff)[2:]} {nick}: {decrypt_msg}\n"
+                    canvas.insert(END, content)
+                else:
+                    canvas.insert(END, f"{str(date + utc_diff)[2:]} {nick}: ")
+                    canvas.insert(END, f"{decrypt_msg}\n", "url_tag")
                 canvas.update()
             except KeyError:
                 break
@@ -1025,8 +1030,12 @@ def get_chat_message():
                 message = res[f'item_{i}']
                 decrypt_msg = decrypt(int2bytes(message['message']))
                 date = datetime.strptime(message['date'], "%Y-%m-%dT%H:%M:%S")
-                content = f"{str(date + utc_diff)[2:]} {message['from_id']}: {decrypt_msg}\n"
-                canvas_2.insert(END, content)
+                if "chat-b4ckend.herokuapp.com/file/get/file_" not in decrypt_msg:
+                    content = f"{str(date + utc_diff)[2:]} {message['from_id']}: {decrypt_msg}\n"
+                    canvas_2.insert(END, content)
+                else:
+                    canvas_2.insert(END, f"{str(date + utc_diff)[2:]} {message['from_id']}: ")
+                    canvas_2.insert(END, f"{decrypt_msg}\n", "url_tag")
                 canvas_2.update()
             except KeyError:
                 break
@@ -1550,18 +1559,20 @@ def import_program_data():
         exception_handler(e)
 
 
-def open_link(*args):
-    global backend_url
+def open_link(event):
     try:
-        if "chat-b4ckend.herokuapp.com/file/get/file_" in canvas.selection_get():
-            import webbrowser as web
-            with open(files_dir + "/settings/config.json", "r") as file:
-                tmp = json.load(file)['browser_path']
-            if tmp is not None:
-                web.register("browser", None, web.BackgroundBrowser(tmp))
-                web.get(using="browser").open_new_tab(canvas.selection_get())
-            else:
-                web.open(canvas.selection_get(), new=0)
+        index = event.widget.index("@%s,%s" % (event.x, event.y))
+        tag_indices = list(event.widget.tag_ranges('url_tag'))
+        for start, end in zip(tag_indices[0::2], tag_indices[1::2]):
+            if event.widget.compare(start, '<=', index) and event.widget.compare(index, '<', end):
+                import webbrowser as web
+                with open(files_dir + "/settings/config.json", "r") as file:
+                    tmp = json.load(file)['browser_path']
+                if tmp is not None:
+                    web.register("browser", None, web.BackgroundBrowser(tmp))
+                    web.get(using="browser").open_new_tab(event.widget.get(start, end))
+                else:
+                    web.open(event.widget.get(start, end), new=0)
     except tk.TclError:
         pass
     except Exception as e:
@@ -1572,7 +1583,7 @@ def get_updates(app_version, old_version):
     global app_ver, root
     try:
         root.update()
-        print(f"Current app: {app_ver}\nValid app: {app_version}\nOld app: {old_version}")
+        print(f"Current app is up to date: {app_ver == app_version}\nOld app: {old_version}")
         if old_version >= app_ver:
             print("too old version")
             m_box = CustomBox()
@@ -1801,7 +1812,8 @@ scroll = Scrollbar(frame, command=canvas.yview, bg=theme['bg'])
 scroll.pack(side=RIGHT, fill=Y)
 canvas.pack(side=RIGHT, expand=True, fill=BOTH)
 canvas.config(yscrollcommand=scroll.set)
-canvas.bind("<ButtonRelease>", open_link)
+canvas.tag_config("url_tag", foreground="blue", underline=True)
+canvas.tag_bind("url_tag", "<Button-1>", open_link)
 frame_2 = Frame(main2_frame2, width=850, height=500)
 frame_2.pack()
 canvas_2 = Text(frame_2, fg=theme['text_color'], bg=theme['entry'], width=105, height=27, cursor='arrow')
@@ -1809,6 +1821,8 @@ scroll_2 = Scrollbar(frame_2, command=canvas_2.yview, bg=theme['bg'])
 scroll_2.pack(side=RIGHT, fill=Y)
 canvas_2.pack(side=RIGHT, expand=True, fill=BOTH)
 canvas_2.config(yscrollcommand=scroll_2.set)
+canvas_2.tag_config("url_tag", foreground="blue", underline=True)
+canvas_2.tag_bind("url_tag", "<Button-1>", open_link)
 button_refresh = tk.Button(main_frame, text="REFRESH", activebackground=theme['button_bg_active'], width=120,
                            bg=theme['button_bg_positive'], relief=theme['relief'], command=lambda: get_message())
 button_refresh.pack(side=TOP, pady=3, anchor=CENTER)
