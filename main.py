@@ -1,5 +1,7 @@
 import os
 import sys
+import time
+
 import rsa
 import json
 import bcrypt
@@ -15,10 +17,10 @@ from tkinter import filedialog
 from datetime import datetime, timezone
 from keyring import errors
 from rsa.transform import int2bytes, bytes2int
-from tkinter import IntVar, StringVar, Label, Text, Button, LabelFrame, TOP, LEFT, RIGHT, BOTTOM, Toplevel, WORD, END,\
+from tkinter import IntVar, StringVar, Label, Text, Button, LabelFrame, TOP, LEFT, RIGHT, BOTTOM, Toplevel, WORD, END, \
     PhotoImage, CENTER, Y, N, W, E, S, NW, NO, FLAT, GROOVE, BOTH, Frame, Scrollbar, OptionMenu, Radiobutton
 
-app_ver = 2.8
+app_ver = 3.0
 backend_url = "https://chat-b4ckend.herokuapp.com/"
 chats, theme = {}, {}
 pin_chats = []
@@ -36,17 +38,14 @@ utc_diff = datetime.now(timezone.utc).astimezone().utcoffset()
 
 if "win" in sys.platform.lower():
     from keyring.backends.Windows import WinVaultKeyring
-
     keyring.set_keyring(WinVaultKeyring())
     files_dir = str(pathlib.Path.home()) + "/AppData/Roaming/PojiloiChat"
 elif "darwin" in sys.platform.lower():
     from keyring.backends.macOS import Keyring
-
     keyring.set_keyring(Keyring)
     files_dir = str(pathlib.Path.home()) + "/Library/Application Support/PojiloiChat"
 elif "linux" in sys.platform.lower():
     from keyring.backends.kwallet import KeyringBackend
-
     keyring.set_keyring(KeyringBackend)
     files_dir = str(pathlib.Path.home()) + "/.local/share/PojiloiChat"
 
@@ -537,8 +536,6 @@ def remove_data_request():
 
 
 # endregion
-
-
 def auto_login():
     try:
         lgn = keyring.get_password("datachat", "login")
@@ -547,6 +544,7 @@ def auto_login():
             entry_log.insert(0, lgn)
             entry_pass.insert(0, psw)
             remember_var.set(1)
+            login()
     except Exception as e:
         exception_handler(e)
 
@@ -854,11 +852,10 @@ def get_message():
                 else:
                     decrypt_msg = decrypt(int2bytes(message['message']))
                 date = datetime.strptime(message['date'], "%Y-%m-%dT%H:%M:%S")
+                canvas.insert(END, f"{str(date + utc_diff)[2:]} {nick}: ")
                 if "chat-b4ckend.herokuapp.com/file/get/file_" not in decrypt_msg:
-                    content = f"{str(date + utc_diff)[2:]} {nick}: {decrypt_msg}\n"
-                    canvas.insert(END, content)
+                    canvas.insert(END, f"{decrypt_msg}\n")
                 else:
-                    canvas.insert(END, f"{str(date + utc_diff)[2:]} {nick}: ")
                     canvas.insert(END, f"{decrypt_msg}\n", "url_tag")
                 canvas.update()
             except KeyError:
@@ -1030,11 +1027,10 @@ def get_chat_message():
                 message = res[f'item_{i}']
                 decrypt_msg = decrypt(int2bytes(message['message']))
                 date = datetime.strptime(message['date'], "%Y-%m-%dT%H:%M:%S")
+                canvas_2.insert(END, f"{str(date + utc_diff)[2:]} {message['from_id']}: ")
                 if "chat-b4ckend.herokuapp.com/file/get/file_" not in decrypt_msg:
-                    content = f"{str(date + utc_diff)[2:]} {message['from_id']}: {decrypt_msg}\n"
-                    canvas_2.insert(END, content)
+                    canvas_2.insert(END, f"{decrypt_msg}\n")
                 else:
-                    canvas_2.insert(END, f"{str(date + utc_diff)[2:]} {message['from_id']}: ")
                     canvas_2.insert(END, f"{decrypt_msg}\n", "url_tag")
                 canvas_2.update()
             except KeyError:
@@ -1583,7 +1579,7 @@ def get_updates(app_version, old_version):
     global app_ver, root
     try:
         root.update()
-        print(f"Current app is up to date: {app_ver == app_version}\nOld app: {old_version}")
+        print(f"Current app is up to date: {app_ver >= app_version}\nOld app: {old_version}")
         if old_version >= app_ver:
             print("too old version")
             m_box = CustomBox()
@@ -1668,6 +1664,11 @@ def loop_msg_func():
         root.after(int(time_to_check) * 1000, loop_msg_func)
     except Exception as e:
         exception_handler(e)
+
+
+def on_closing():
+    root.destroy()
+    exit(0)
 
 
 # region startup config
@@ -1807,7 +1808,8 @@ button_chat_id = tk.Button(chat_frame, text="OPEN", activebackground=theme['butt
 button_chat_id.pack(side=RIGHT, anchor=E)
 frame = Frame(main2_frame, width=850, height=450)
 frame.pack()
-canvas = Text(frame, fg=theme['text_color'], bg=theme['entry'], width=105, cursor='arrow')
+canvas = Text(frame, fg=theme['text_color'], bg=theme['entry'], width=105, cursor='arrow',
+              selectforeground=theme['text_color'], selectbackground=theme['entry'])
 scroll = Scrollbar(frame, command=canvas.yview, bg=theme['bg'])
 scroll.pack(side=RIGHT, fill=Y)
 canvas.pack(side=RIGHT, expand=True, fill=BOTH)
@@ -1816,7 +1818,8 @@ canvas.tag_config("url_tag", foreground="blue", underline=True)
 canvas.tag_bind("url_tag", "<Button-1>", open_link)
 frame_2 = Frame(main2_frame2, width=850, height=500)
 frame_2.pack()
-canvas_2 = Text(frame_2, fg=theme['text_color'], bg=theme['entry'], width=105, height=27, cursor='arrow')
+canvas_2 = Text(frame_2, fg=theme['text_color'], bg=theme['entry'], width=105, height=27, cursor='arrow',
+                selectforeground=theme['text_color'], selectbackground=theme['entry'])
 scroll_2 = Scrollbar(frame_2, command=canvas_2.yview, bg=theme['bg'])
 scroll_2.pack(side=RIGHT, fill=Y)
 canvas_2.pack(side=RIGHT, expand=True, fill=BOTH)
@@ -2203,7 +2206,6 @@ canvas_users.column(2, width=200, stretch=NO)
 canvas_users.tag_configure("users_tag", background=theme['entry'], foreground=theme['text_color'])
 label_loading = Label(root, font=10, text="LOADING", fg=theme['text_color'], bg=theme['bg'])
 # endregion
-auto_login()
 get_update_time()
 if time_to_check is not None:
     if int(time_to_check) != -1:
@@ -2214,5 +2216,7 @@ if __name__ == "__main__":
     root.geometry("200x165+{}+{}".format(w, h))
     root.resizable(False, False)
     root['bg'] = theme['bg']
+    auto_login()
     api_awake()
+    root.protocol("WM_DELETE_WINDOW", on_closing)
     root.mainloop()
