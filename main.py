@@ -8,26 +8,25 @@ import keyring
 import pathlib
 import requests
 from PIL import Image
-import tkinter as tk
-import tkinter.ttk as ttk
 from tkinter.font import Font
 from tkinter import filedialog
 from datetime import datetime, timezone
 from keyring import errors
 from rsa.transform import int2bytes, bytes2int
-from tkinter import IntVar, StringVar, Label, Text, Button, LabelFrame, TOP, LEFT, RIGHT, BOTTOM, Toplevel, WORD, END, \
-    PhotoImage, CENTER, Y, N, W, E, S, NW, NO, FLAT, GROOVE, BOTH, Frame, Scrollbar, OptionMenu, Radiobutton, Canvas, \
-    Entry, Checkbutton, Tk, TclError
+from tkinter.ttk import Style, Treeview
+from tkinter import IntVar, StringVar, Toplevel, TOP, LEFT, RIGHT, CENTER, WORD, END, FLAT, GROOVE, Y, N, W, E, S, NW,\
+    NO, BOTH, Canvas, PhotoImage, OptionMenu, Radiobutton, Checkbutton, Scrollbar, LabelFrame, Label, Button, Frame,\
+    TclError, Tk, Text, Entry
 
-app_ver = 3.0
-# backend_url = "https://chat-b4ckend.herokuapp.com/"
-backend_url = "http://localhost:8000/"
+app_ver = 3.2
+backend_url = "https://chat-b4ckend.herokuapp.com/"
+# backend_url = "http://localhost:8000/"
 chats, theme = {}, {}
 current_chat = "-1"
 root = Tk()
-spacing, spacing_2 = 0, 0
-w = root.winfo_screenwidth() // 2 - 140
-h = root.winfo_screenheight() // 2 - 100
+spacing, spacing_2, x, y = 0, 0, 0, 0
+w = root.winfo_screenwidth() // 2 - 80
+h = root.winfo_screenheight() // 2 - 130
 code, user_id, email, user_login, user_password, access_token = "", "", "", "", "", ""
 remember_var, theme_var = IntVar(), IntVar()
 relief, frames_relief, cursors = StringVar(), StringVar(), StringVar()
@@ -37,22 +36,19 @@ utc_diff = datetime.now(timezone.utc).astimezone().utcoffset()
 
 if "win" in sys.platform.lower():
     from keyring.backends.Windows import WinVaultKeyring
-
     keyring.set_keyring(WinVaultKeyring())
     files_dir = str(pathlib.Path.home()) + "/AppData/Roaming/PojiloiChat"
 elif "darwin" in sys.platform.lower():
     from keyring.backends.macOS import Keyring
-
     keyring.set_keyring(Keyring)
     files_dir = str(pathlib.Path.home()) + "/Library/Application Support/PojiloiChat"
 elif "linux" in sys.platform.lower():
     from keyring.backends.kwallet import KeyringBackend
-
     keyring.set_keyring(KeyringBackend)
     files_dir = str(pathlib.Path.home()) + "/.local/share/PojiloiChat"
 
 
-class ScrollableFrame(ttk.Frame):
+class ScrollableFrame(Frame):
     def __init__(self, container, *args, **kwargs):
         super().__init__(container, *args, **kwargs)
         _canvas = Canvas(self, width=230, height=500, bg=theme['bg'], relief=FLAT, highlightthickness=0)
@@ -84,6 +80,8 @@ class CustomBox:
                          wrap=WORD)
         self.text.tag_configure("center", justify="center")
         self.text.pack(side=TOP)
+        self.entry = Entry(self.box, font=12, width=20, fg=theme['text_color'], bg=theme['entry'],
+                           relief=theme['relief'], cursor=theme['cursor'])
         self.button = Button(self.box, width=15, text="Ok", fg=theme['text_color'], relief=theme['relief'],
                              bg=theme['button_bg'], activebackground=theme['button_bg_active'],
                              command=lambda: self.destroy())
@@ -103,6 +101,7 @@ class CustomBox:
         self.box.deiconify()
         self.box.grab_set()
         self.text.insert(END, text)
+        self.text.tag_add("center", "1.0", "end")
         self.line.configure(bg="#FF8C00", text=title)
 
     def showerror(self, title, text):
@@ -124,6 +123,16 @@ class CustomBox:
         if func2 is not None:
             self.button_pos.configure(command=lambda: (func2(), self.destroy()))
         self.button_pos.pack(side=LEFT, padx=5)
+
+    def askentry(self, title, func):
+        self.box.deiconify()
+        self.box.grab_set()
+        self.text.pack_forget()
+        self.entry.pack(side=TOP, pady=25, padx=5)
+        self.line.configure(bg="#8B0000", text=title)
+        self.button.pack_forget()
+        self.button.configure(text="Go", command=lambda: (func(self.entry.get()), self.destroy()))
+        self.button.pack(side=TOP, padx=5)
 
     def destroy(self):
         self.box.destroy()
@@ -587,7 +596,7 @@ def regenerate_encryption_keys():
 
 def login(*args):
     global user_login, user_id, user_password, access_token
-    label_loading.place(x=60, y=60)
+    label_loading.place(x=60, y=80)
     button_login.update()
     try:
         m_box = CustomBox()
@@ -614,6 +623,13 @@ def login(*args):
         user_login = entry_log.get()
         user_id = get_id(user_login)
         get_private_key()
+        local_chats = response_handler(method="get", url=f"{backend_url}chat/get_all",
+                                       headers={"Authorization": f"Bearer {access_token}"}).json()
+        for i in range(local_chats['count']):
+            try:
+                build(local_chats[f'item_{i}'])
+            except KeyError:
+                break
         hide_auth_menu()
         label_loading.place_forget()
         qr = qrcode.make(private_key)
@@ -682,11 +698,19 @@ def register():
 
 
 def hide_auth_menu():
-    global w, h
+    global w, h, empty_top_frame, button_close
     w -= 200
     auth_frame.pack_forget()
     root.geometry("1100x525+{}+{}".format(w, h))
     entry_msg.focus_set()
+    empty_top_frame.pack_forget()
+    button_close.pack_forget()
+    button_chat.pack(side=LEFT, anchor=W)
+    button_info.pack(side=LEFT, padx=5, anchor=W)
+    button_settings.pack(side=LEFT, anchor=W)
+    button_logout.pack(side=LEFT, padx=5, anchor=W)
+    empty_top_frame.pack(side=LEFT, padx=470, anchor=W)
+    button_close.pack(side=RIGHT, anchor=E)
     menu_frame.pack(side=LEFT, pady=5, anchor=N)
     main_frame.pack(side=LEFT, anchor=CENTER)
 
@@ -697,16 +721,10 @@ def menu_navigation(menu: str):
         button_chat.update()
         for key in chats:
             chats[key].pack_forget()
-        button_chat.pack(side=TOP, anchor=N)
-        button_info.pack(side=TOP, pady=5, anchor=N)
-        button_settings.pack(side=TOP, anchor=N)
-        button_groups.pack(side=TOP, pady=5, anchor=N)
-        button_logout.pack(side=TOP, pady=5, anchor=N)
         button_back.pack_forget()
         button_chat.configure(bg=theme['button_bg_positive'])
         button_info.configure(bg=theme['button_bg'])
         button_settings.configure(bg=theme['button_bg'])
-        button_groups.configure(bg=theme['button_bg'])
         main1_frame.pack_forget()
         settings_frame.pack_forget()
         group_frame.pack_forget()
@@ -714,17 +732,15 @@ def menu_navigation(menu: str):
         canvas.delete(0.0, END)
         current_chat = "-1"
         label_chat_id.configure(text="Current chat with: ")
-        entry_chat_id.delete(0, END)
         spacing, spacing_2 = 0, 0
-        button_send2.configure(state='disabled')
-        button_img2.configure(state='disabled')
-        canvas_2.delete(0.0, END)
+        button_send.configure(state='disabled')
+        button_img.configure(state='disabled')
+        canvas.delete(0.0, END)
     elif menu == "set":
         button_settings.update()
         button_chat.configure(bg=theme['button_bg'])
         button_info.configure(bg=theme['button_bg'])
         button_settings.configure(bg=theme['button_bg_positive'])
-        button_groups.configure(bg=theme['button_bg'])
         main_frame.pack_forget()
         main1_frame.pack_forget()
         group_frame.pack_forget()
@@ -734,7 +750,6 @@ def menu_navigation(menu: str):
         button_chat.configure(bg=theme['button_bg'])
         button_info.configure(bg=theme['button_bg_positive'])
         button_settings.configure(bg=theme['button_bg'])
-        button_groups.configure(bg=theme['button_bg'])
         main_frame.pack_forget()
         settings_frame.pack_forget()
         group_frame.pack_forget()
@@ -752,44 +767,6 @@ def menu_navigation(menu: str):
                 canvas_users.insert(parent='', index=END, values=(user['id'], user['login'], date), tags=("users_tag",))
             except KeyError:
                 break
-    elif menu == "group":
-        button_groups.update()
-        button_chat.pack_forget()
-        button_settings.pack_forget()
-        button_info.pack_forget()
-        button_logout.pack_forget()
-        button_groups.pack_forget()
-        main_frame.pack_forget()
-        main1_frame.pack_forget()
-        settings_frame.pack_forget()
-        groups = get_user_groups(int(user_id))
-        counter = 0
-        for i in groups:
-            counter += 1
-            chats[i] = Button(menu_frame, text=i, bg=theme['button_bg'], width=17, relief=theme['relief'],
-                              font=theme['button_font'], activebackground=theme['button_bg_active'],
-                              command=lambda: change_group(get_chat_id(groups[counter - 1]),
-                                                           chats[groups[counter - 1]]))
-            if counter % 2 == 0:
-                chats[i].pack(side=TOP, pady=5, anchor=N)
-            else:
-                chats[i].pack(side=TOP, anchor=N)
-        group_frame.pack(side=LEFT, anchor=CENTER)
-        if counter % 2 == 0:
-            button_back.pack(side=TOP, anchor=N)
-        else:
-            button_back.pack(side=TOP, pady=5, anchor=N)
-
-
-def change_group(gr_id: str, button):
-    global current_chat, chats
-    button_send2.configure(state="normal")
-    button_img2.configure(state="normal")
-    current_chat = gr_id
-    for key in chats:
-        chats[key].configure(bg=theme['button_bg'])
-    button.configure(bg=theme['button_bg_positive'])
-    get_chat_message()
 
 
 def send_message():
@@ -897,16 +874,15 @@ def login_handler(*args):
 
 
 def send_message_handler(*args):
+    global current_chat
     if str(root.focus_get()) == ".!labelframe2.!entry":
         if len(entry_msg.get()) != 0:
-            send_message()
+            if current_chat[0] != "g":
+                send_message()
+            else:
+                send_chat_message()
         else:
             entry_msg.focus_set()
-    elif str(root.focus_get()) == ".!labelframe2.!entry2":
-        if len(entry_msg2.get()) != 0:
-            send_message()
-        else:
-            entry_msg2.focus_set()
 
 
 def change_pass_handler(*args):
@@ -981,8 +957,8 @@ def create_chat():
 
 def send_chat_message():
     global user_id, current_chat
-    button_send2.update()
-    message = entry_msg2.get()
+    button_send.update()
+    message = entry_msg.get()
     try:
         m_box = CustomBox()
         if len(message) == 0:
@@ -990,7 +966,7 @@ def send_chat_message():
             return
         for i in get_chat_users(current_chat):
             message_send_chat(current_chat, i[0], encrypt(message.encode("utf-8"), get_pubkey(i[0])))
-            entry_msg2.delete(0, END)
+            entry_msg.delete(0, END)
         get_chat_message()
     except Exception as e:
         exception_handler(e)
@@ -998,7 +974,7 @@ def send_chat_message():
 
 def send_chat_doc():
     global user_id, current_chat
-    button_img2.update()
+    button_img.update()
     try:
         path = filedialog.askopenfilename(filetypes=[("All files", "*.*")])
         if len(path) == 0:
@@ -1013,7 +989,7 @@ def send_chat_doc():
 def get_chat_message():
     global current_chat
     try:
-        button_refresh2.update()
+        button_refresh.update()
     except NotImplementedError:
         pass
     res = get_messages(current_chat, 1)
@@ -1022,18 +998,18 @@ def get_chat_message():
     cache_messages(res)
     res = get_cache_messages()
     try:
-        canvas_2.delete(0.0, END)
+        canvas.delete(0.0, END)
         for i in range(res['count']):
             try:
                 message = res[f'item_{i}']
                 decrypt_msg = decrypt(int2bytes(message['message']))
                 date = datetime.strptime(message['date'], "%Y-%m-%dT%H:%M:%S")
-                canvas_2.insert(END, f"{str(date + utc_diff)[2:]} {message['from_id']}: ")
+                canvas.insert(END, f"{str(date + utc_diff)[2:]} {message['from_id']}: ")
                 if "chat-b4ckend.herokuapp.com/file/get/file_" not in decrypt_msg:
-                    canvas_2.insert(END, f"{decrypt_msg}\n")
+                    canvas.insert(END, f"{decrypt_msg}\n")
                 else:
-                    canvas_2.insert(END, f"{decrypt_msg}\n", "url_tag")
-                canvas_2.update()
+                    canvas.insert(END, f"{decrypt_msg}\n", "url_tag")
+                canvas.update()
             except KeyError:
                 break
     except Exception as e:
@@ -1090,6 +1066,10 @@ def logout():
     global w, h
     w += 200
     menu_navigation("chat")
+    button_chat.pack_forget()
+    button_info.pack_forget()
+    button_settings.pack_forget()
+    button_logout.pack_forget()
     menu_frame.pack_forget()
     main_frame.pack_forget()
     root.geometry("200x190+{}+{}".format(w, h))
@@ -1190,10 +1170,15 @@ def pass_code():
 
 def open_chat(chat_id):
     global current_chat
-    button_chat_id.update()
     m_box = CustomBox()
     if len(chat_id) == 0 or not chat_id.isnumeric():
-        m_box.showerror("Input error", "Chat id must be a number")
+        current_chat = chat_id
+        name = get_chat_name(current_chat)
+        label_chat_id.configure(text="Current chat with: " + name)
+        button_send.configure(state="normal")
+        button_img.configure(state="normal")
+        canvas.delete(0.0, END)
+        get_chat_message()
         return
     nick = get_user_nickname(int(chat_id))
     if nick is not None:
@@ -1573,28 +1558,67 @@ def loop_msg_func():
         exception_handler(e)
 
 
-def on_closing():
-    root.destroy()
-    exit(0)
-
-
 def build(i):
-    print(i)
-    chat_label = Label(menu_frame.scrollable_frame, font=theme['font_main'], bg="#A0A0A0", width=25, height=2,
+    chat_label = Label(menu_frame.scrollable_frame, font=theme['font_main'], bg="#606060", width=25, height=2,
                        fg=theme['text_color'], text=f"{i['username']}\t\t\t\n{decrypt(int2bytes(i['message']))[:20]}",
                        anchor=NW)
     chat_label.pack(side=TOP, anchor=N, pady=2)
-    chat_label.bind("<Button-1>", lambda e: open_chat(i['user_id']))
+    chat_label.bind("<Button-1>", lambda e: (menu_navigation("chat"), open_chat(i['user_id'])))
 
 
-def test():
-    local_chats = response_handler(method="get", url=f"{backend_url}chat/get_all",
-                                   headers={"Authorization": f"Bearer {access_token}"}).json()
-    for i in range(local_chats['count']):
-        try:
-            build(local_chats[f'item_{i}'])
-        except KeyError:
-            break
+def start_chat():
+    m_box = CustomBox()
+    m_box.askentry("Enter user id", open_chat)
+
+
+def send():
+    global current_chat
+    if current_chat[0] != "g":
+        send_message()
+    else:
+        send_chat_message()
+
+
+def send_document():
+    global current_chat
+    if current_chat[0] != "g":
+        send_doc()
+    else:
+        send_chat_doc()
+
+
+def get_all_messages():
+    global current_chat
+    if current_chat[0] != "g":
+        get_message()
+    else:
+        get_chat_message()
+
+
+def mouse_down(event):
+    global x, y
+    x, y = event.x, event.y
+
+
+def mouse_up(event):
+    global x, y
+    print(f"{event.x} {event.y}")
+    x, y = None, None
+
+
+def mouse_drag(event):
+    global x, y
+    try:
+        x0 = root.winfo_x() + event.x - x
+        y0 = root.winfo_y() + event.y - y
+        root.geometry("+%s+%s" % (x0, y0))
+    except Exception as e:
+        print(e)
+
+
+def on_closing():
+    root.destroy()
+    exit(0)
 
 
 # region startup config
@@ -1607,16 +1631,19 @@ fm = Menu(m)
 m.add_cascade(label="File", menu=fm)
 fmm = Menu(fm)
 fm.add_cascade(label="Export", menu=fmm)"""
-
 # region auth
-top_frame = LabelFrame(root, width=200, height=25, relief=FLAT, bg="red")
-top_frame.pack(side=TOP, anchor=CENTER)
-test_but = Button(top_frame, text="x", activebackground=theme['button_bg_active'], relief=theme['relief'],
-                  bg=theme['button_bg_positive'], width=1, command=lambda: login(), font=theme['button_font'])
-test_but.pack(side=LEFT, anchor=W)
-test_but2 = Button(top_frame, text="o", activebackground=theme['button_bg_active'], relief=theme['relief'],
-                   bg=theme['button_bg_positive'], width=1, command=lambda: login(), font=theme['button_font'])
-test_but2.pack(side=RIGHT, anchor=E)
+test = LabelFrame(root, width=1097, height=31, relief=FLAT, bg="red")
+test.place(x=1, y=1)
+top_frame = LabelFrame(root, width=200, height=25, relief=FLAT, bg=theme['bg'])
+top_frame.pack(side=TOP, pady=1, anchor=CENTER)
+top_frame.bind('<ButtonPress-1>', mouse_down)
+top_frame.bind('<B1-Motion>', mouse_drag)
+top_frame.bind('<ButtonRelease-1>', mouse_up)
+empty_top_frame = Label(top_frame, text=" ", relief=theme['relief'], bg=theme['bg'], width=1)
+empty_top_frame.pack(side=LEFT, padx=80, anchor=W)
+button_close = Button(top_frame, text="✖", activebackground=theme['bg'], relief=theme['relief'],
+                      bg=theme['bg'], width=2, command=lambda: on_closing())
+button_close.pack(side=RIGHT, anchor=E)
 auth_frame = LabelFrame(root, width=200, height=130, relief=FLAT, bg=theme['bg'])
 auth_frame.pack(side=TOP, anchor=CENTER)
 label_user = Label(auth_frame, font=theme['font_main'], text="Username:", bg=theme['bg'],
@@ -1694,28 +1721,23 @@ main_frame = LabelFrame(root, width=850, height=500, bg=theme['bg'], relief=them
 group_frame = LabelFrame(root, width=850, height=500, bg=theme['bg'], relief=theme['relief'])
 settings_frame = LabelFrame(root, width=600, height=500, bg=theme['bg'], relief=theme['frame_relief'])
 menu_frame = ScrollableFrame(root)
-
-button_chat = Button(menu_frame.scrollable_frame, text="CHAT", activebackground=theme['button_bg_active'],
+start_new_chat = Label(menu_frame.scrollable_frame, font=theme['font_main'], bg="#606060", width=25, height=1,
+                       fg=theme['text_color'], text=f"+ Add new chat", anchor=CENTER)
+start_new_chat.pack(side=TOP, anchor=N, pady=2)
+start_new_chat.bind("<Button-1>", lambda e: (menu_navigation("chat"), start_chat()))
+button_chat = Button(top_frame, text="💬", activebackground=theme['button_bg_active'],
                      relief=theme['relief'], font=theme['button_font'],
-                     bg=theme['button_bg_positive'], width=17, command=lambda: menu_navigation("chat"))
-button_chat.pack(side=TOP, anchor=N)
-button_info = Button(menu_frame.scrollable_frame, text="INFO", activebackground=theme['button_bg_active'],
+                     bg=theme['button_bg_positive'], width=2, command=lambda: menu_navigation("chat"))
+button_info = Button(top_frame, text="❓", activebackground=theme['button_bg_active'],
                      bg=theme['button_bg'], font=theme['button_font'],
-                     width=17, relief=theme['relief'], command=lambda: menu_navigation("info"))
-button_info.pack(side=TOP, pady=5, anchor=N)
-button_settings = Button(menu_frame.scrollable_frame, text="SETTINGS", activebackground=theme['button_bg_active'],
-                         width=17, bg=theme['button_bg'], relief=theme['relief'],
+                     width=2, relief=theme['relief'], command=lambda: menu_navigation("info"))
+button_settings = Button(top_frame, text="⚙", activebackground=theme['button_bg_active'],
+                         width=2, bg=theme['button_bg'], relief=theme['relief'],
                          command=lambda: menu_navigation("set"), font=theme['button_font'])
-button_settings.pack(side=TOP, anchor=N)
-button_groups = Button(menu_frame.scrollable_frame, text="GROUPS", activebackground=theme['button_bg_active'],
-                       bg=theme['button_bg'], font=theme['button_font'],
-                       width=17, relief=theme['relief'], command=lambda: menu_navigation("group"))
-button_groups.pack(side=TOP, pady=5, anchor=N)
-button_logout = Button(menu_frame.scrollable_frame, text="LOGOUT", activebackground=theme['button_bg_active'],
-                       bg=theme['button_bg_negative'], width=17, relief=theme['relief'], font=theme['button_font'],
+button_logout = Button(top_frame, text="→", activebackground=theme['button_bg_active'],
+                       bg=theme['button_bg_negative'], width=2, relief=theme['relief'], font=theme['button_font'],
                        command=lambda: logout())
-button_logout.pack(side=BOTTOM, pady=5, anchor=N)
-button_back = Button(menu_frame.scrollable_frame, text="BACK", activebackground=theme['button_bg_active'],
+button_back = Button(top_frame, text="BACK", activebackground=theme['button_bg_active'],
                      bg=theme['button_bg_negative'], width=17, relief=theme['relief'], font=theme['button_font'],
                      command=lambda: menu_navigation("chat"))
 main2_frame = LabelFrame(main_frame, width=600, height=350, relief=FLAT, bg=theme['bg'])
@@ -1725,16 +1747,10 @@ main2_frame2.pack(side=TOP, anchor=CENTER)
 # endregion
 # region chat
 chat_frame = LabelFrame(main2_frame, width=600, height=25, relief=FLAT, bg=theme['bg'])
-chat_frame.pack(side=TOP, pady=2, anchor=N)
+chat_frame.pack(side=TOP, pady=2, anchor=W)
 label_chat_id = Label(chat_frame, font=theme['font_main'], text="Current chat with: ", fg=theme['text_color'],
                       bg=theme['bg'], width=25, anchor=W)
 label_chat_id.pack(side=LEFT, anchor=W)
-entry_chat_id = Entry(chat_frame, font=12, width=20, fg=theme['text_color'], bg=theme['entry'],
-                      relief=theme['relief'], cursor=theme['cursor'])
-entry_chat_id.pack(side=LEFT, padx=165, anchor=CENTER)
-button_chat_id = Button(chat_frame, text="OPEN", activebackground=theme['button_bg_active'], relief=theme['relief'],
-                        bg=theme['button_bg_positive'], width=15, command=lambda: open_chat(entry_chat_id.get()))
-button_chat_id.pack(side=RIGHT, anchor=E)
 frame = Frame(main2_frame, width=850, height=450)
 frame.pack()
 canvas = Text(frame, fg=theme['text_color'], bg=theme['entry'], width=105, cursor='arrow',
@@ -1745,44 +1761,19 @@ canvas.pack(side=RIGHT, expand=True, fill=BOTH)
 canvas.config(yscrollcommand=scroll.set)
 canvas.tag_config("url_tag", foreground="blue", underline=True)
 canvas.tag_bind("url_tag", "<Button-1>", open_link)
-frame_2 = Frame(main2_frame2, width=850, height=500)
-frame_2.pack()
-canvas_2 = Text(frame_2, fg=theme['text_color'], bg=theme['entry'], width=105, height=27, cursor='arrow',
-                selectforeground=theme['text_color'], selectbackground=theme['entry'])
-scroll_2 = Scrollbar(frame_2, command=canvas_2.yview, bg=theme['bg'])
-scroll_2.pack(side=RIGHT, fill=Y)
-canvas_2.pack(side=RIGHT, expand=True, fill=BOTH)
-canvas_2.config(yscrollcommand=scroll_2.set)
-canvas_2.tag_config("url_tag", foreground="blue", underline=True)
-canvas_2.tag_bind("url_tag", "<Button-1>", open_link)
 button_refresh = Button(main_frame, text="REFRESH", activebackground=theme['button_bg_active'], width=120,
-                        bg=theme['button_bg_positive'], relief=theme['relief'], command=lambda: get_message())
+                        bg=theme['button_bg_positive'], relief=theme['relief'], command=lambda: get_all_messages())
 button_refresh.pack(side=TOP, pady=3, anchor=CENTER)
 entry_msg = Entry(main_frame, font=10, width=85, relief=theme['relief'], fg=theme['text_color'], bg=theme['entry'],
                   cursor=theme['cursor'])
 entry_msg.bind("<Return>", send_message_handler)
 entry_msg.pack(side=LEFT, padx=3)
 button_img = Button(main_frame, text="➕", activebackground=theme['button_bg_active'], bg=theme['button_bg_positive'],
-                    width=3, relief=theme['relief'], command=lambda: send_doc(), state='disabled')
+                    width=3, relief=theme['relief'], command=lambda: send_document(), state='disabled')
 button_img.pack(side=LEFT, anchor=E)
 button_send = Button(main_frame, text="SEND", activebackground=theme['button_bg_active'], relief=theme['relief'],
-                     bg=theme['button_bg_positive'], width=8, command=lambda: send_message(), state='disabled')
+                     bg=theme['button_bg_positive'], width=8, command=lambda: send(), state='disabled')
 button_send.pack(side=LEFT, anchor=E, padx=3)
-
-button_refresh2 = Button(group_frame, text="REFRESH", activebackground=theme['button_bg_active'], width=121,
-                         bg=theme['button_bg_positive'], relief=theme['relief'], command=lambda: get_chat_message())
-button_refresh2.pack(side=TOP, pady=3, anchor=CENTER)
-entry_msg2 = Entry(group_frame, font=10, width=85, relief=theme['relief'], fg=theme['text_color'], bg=theme['entry'],
-                   cursor=theme['cursor'])
-# entry_msg2.bind("<Return>", send_chat_message())
-entry_msg2.pack(side=LEFT, padx=3)
-button_img2 = Button(group_frame, text="➕", activebackground=theme['button_bg_active'], relief=theme['relief'],
-                     bg=theme['button_bg_positive'], width=3, state='disabled', command=lambda: send_chat_doc())
-button_img2.pack(side=LEFT, anchor=E)
-button_send2 = Button(group_frame, text="SEND", activebackground=theme['button_bg_active'], relief=theme['relief'],
-                      bg=theme['button_bg_positive'], width=8, state='disabled', command=lambda: send_chat_message())
-button_send2.pack(side=LEFT, anchor=E, padx=3)
-entry_log.focus_set()
 # endregion
 # region settings
 settings_frame_2 = LabelFrame(settings_frame, width=600, height=25, relief=FLAT, bg=theme['bg'])
@@ -1905,15 +1896,19 @@ theme2 = Radiobutton(settings_frame4, text="Custom theme", activebackground=them
                      command=lambda: save_theme(), selectcolor=theme['bg'])
 theme2.pack(side=LEFT)
 settings_frame12 = LabelFrame(settings_frame, width=600, height=25, relief=FLAT, bg=theme['bg'])
-settings_frame12.pack(side=TOP, pady=2, anchor=CENTER)
+settings_frame12.pack(side=TOP, anchor=CENTER)
 d_z = Label(settings_frame12, font=15, text="DANGER ZONE", fg="red", bg=theme['bg'])
 d_z.pack(side=TOP, padx=5)
+button_delete = Button(settings_frame12, text="DELETE ACCOUNT DATA", bg=theme['button_bg_positive'],
+                       activebackground=theme['button_bg_active'], width=113, relief=theme['relief'],
+                       command=lambda: export_program_data())
 button_export = Button(settings_frame12, text="EXPORT DATA", bg=theme['button_bg_positive'],
                        activebackground=theme['button_bg_active'], width=113, relief=theme['relief'],
                        command=lambda: export_program_data())
 button_import = Button(settings_frame12, text="IMPORT DATA", bg=theme['button_bg_positive'],
                        activebackground=theme['button_bg_active'], width=113, relief=theme['relief'],
                        command=lambda: import_program_data())
+button_delete.pack(side=TOP, pady=5, anchor=CENTER)
 button_export.pack(side=TOP, anchor=CENTER)
 button_import.pack(side=TOP, pady=5, anchor=CENTER)
 button_regenerate = Button(settings_frame12, text="REGENERATE ENCRYPTION KEYS", bg=theme['button_bg_positive'],
@@ -2100,12 +2095,12 @@ button_search = Button(info_frame_2, text="SEARCH", activebackground=theme['butt
 button_search.pack(side=LEFT, anchor=E, padx=3)
 frame_users = Frame(info_frame, width=800, height=400)
 frame_users.pack()
-style = ttk.Style()
+style = Style()
 style.theme_use("clam")
 style.configure("t_style.Heading", background=theme['entry'], relief=theme['relief'], font=theme['font_users'])
 style.configure("t_style", highlightthickness=0, background=theme['entry'], bd=0, font=theme['font_users'])
 style.layout("t_style", [("t_style.treearea", {})])
-canvas_users = ttk.Treeview(frame_users, height=29, cursor="arrow", columns=(0, 1, 2), show="headings", style="t_style")
+canvas_users = Treeview(frame_users, height=29, cursor="arrow", columns=(0, 1, 2), show="headings", style="t_style")
 scroll_users = Scrollbar(frame_users, command=canvas_users.yview, bg=theme['bg'])
 scroll_users.pack(side=RIGHT, fill=Y)
 canvas_users.pack(side=RIGHT, expand=True, fill=BOTH)
@@ -2126,11 +2121,11 @@ if time_to_check is not None:
 # print(root.winfo_children())
 if __name__ == "__main__":
     root.title("Chat")
+    root.overrideredirect(1)
     root.geometry("200x190+{}+{}".format(w, h))
     root.resizable(False, False)
     root['bg'] = theme['bg']
     auto_login()
-    test()
     api_awake()
     root.protocol("WM_DELETE_WINDOW", on_closing)
     root.mainloop()
