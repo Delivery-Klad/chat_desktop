@@ -13,12 +13,13 @@ from tkinter import filedialog
 from datetime import datetime, timezone
 from keyring import errors
 from rsa.transform import int2bytes, bytes2int
-from tkinter.ttk import Style, Treeview
-from tkinter import IntVar, StringVar, Toplevel, TOP, LEFT, RIGHT, CENTER, WORD, END, FLAT, GROOVE, Y, N, W, E, S, NW,\
-    NO, BOTH, Canvas, PhotoImage, OptionMenu, Radiobutton, Checkbutton, Scrollbar, LabelFrame, Label, Button, Frame,\
+from tkinter.ttk import Style, Treeview, Scrollbar
+from tkinter import IntVar, StringVar, Toplevel, TOP, LEFT, RIGHT, CENTER, WORD, END, FLAT, GROOVE, Y, N, W, E, S, NW, \
+    NO, BOTH, Canvas, PhotoImage, OptionMenu, Radiobutton, Checkbutton, LabelFrame, Label, Button, Frame, \
     TclError, Tk, Text, Entry
 
-app_ver = 3.2
+
+app_ver = 3.6
 backend_url = "https://chat-b4ckend.herokuapp.com/"
 # backend_url = "http://localhost:8000/"
 chats, theme = {}, {}
@@ -33,6 +34,7 @@ relief, frames_relief, cursors = StringVar(), StringVar(), StringVar()
 private_key = rsa.PrivateKey(1, 2, 3, 4, 5)
 time_to_check = 60.0
 utc_diff = datetime.now(timezone.utc).astimezone().utcoffset()
+chat_labels = []
 
 if "win" in sys.platform.lower():
     from keyring.backends.Windows import WinVaultKeyring
@@ -52,7 +54,7 @@ class ScrollableFrame(Frame):
     def __init__(self, container, *args, **kwargs):
         super().__init__(container, *args, **kwargs)
         _canvas = Canvas(self, width=230, height=500, bg=theme['bg'], relief=FLAT, highlightthickness=0)
-        scrollbar = Scrollbar(self, orient="vertical", command=_canvas.yview, relief=FLAT, troughcolor=theme['bg'])
+        scrollbar = Scrollbar(self, orient="vertical", command=_canvas.yview)
         self.scrollable_frame = Frame(_canvas, bg=theme['bg'], relief=FLAT)
         self.scrollable_frame.bind("<Configure>", lambda e: _canvas.configure(scrollregion=_canvas.bbox("all")))
         _canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
@@ -557,9 +559,9 @@ def remove_data_request():
                                 headers={"Authorization": f"Bearer {access_token}"}).json()
     except Exception as e:
         exception_handler(e)
-
-
 # endregion
+
+
 def auto_login():
     try:
         lgn = keyring.get_password("datachat", "login")
@@ -651,7 +653,7 @@ def login(*args):
 
 
 def show_reg_frame():
-    root.geometry("200x205+{}+{}".format(w, h))
+    root.geometry("200x215+{}+{}".format(w, h))
     button_login.pack_forget()
     button_reg_m.pack_forget()
     check_remember.pack_forget()
@@ -666,7 +668,7 @@ def back_to_login():
     entry_email.pack_forget()
     button_login_b.pack_forget()
     button_reg.pack_forget()
-    root.geometry("200x190+{}+{}".format(w, h))
+    root.geometry("200x200+{}+{}".format(w, h))
     check_remember.pack(side=TOP, anchor=S)
     button_login.pack(side=LEFT, pady=3, anchor=CENTER)
     button_reg_m.pack(side=RIGHT, pady=3, anchor=CENTER)
@@ -689,8 +691,10 @@ def register():
         hashed_pass = bcrypt.hashpw(psw.encode("utf-8"), bcrypt.gensalt())
         hashed_pass = str(hashed_pass)[2:-1]
         res = create_user(lgn, hashed_pass, mail)
-        if res:
+        if res is True:
             m_box.showinfo("Success", "Register success!")
+        elif res is None:
+            m_box.showerror("Input error", "Can't register this login!")
         else:
             m_box.showerror("Input error", "User already register")
     except Exception as e:
@@ -1063,7 +1067,7 @@ def kick_from_group():
 
 
 def logout():
-    global w, h
+    global w, h, chat_labels
     w += 200
     menu_navigation("chat")
     button_chat.pack_forget()
@@ -1072,7 +1076,13 @@ def logout():
     button_logout.pack_forget()
     menu_frame.pack_forget()
     main_frame.pack_forget()
-    root.geometry("200x190+{}+{}".format(w, h))
+    empty_top_frame.pack_forget()
+    empty_top_frame.pack(side=LEFT, padx=80, anchor=W)
+    button_close.pack(side=RIGHT, anchor=E)
+    root.geometry("200x200+{}+{}".format(w, h))
+    for i in chat_labels:
+        i[0].pack_forget()
+    chat_labels = []
     entry_log.focus_set()
     auth_frame.pack(side=TOP, anchor=CENTER)
 
@@ -1081,7 +1091,7 @@ def recovery_menu():
     global w, h, code
     try:
         auth_frame.pack_forget()
-        root.geometry("200x125+{}+{}".format(w, h))
+        root.geometry("200x135+{}+{}".format(w, h))
         recovery_frame.pack(side=TOP, anchor=CENTER)
     except Exception as e:
         exception_handler(e)
@@ -1096,7 +1106,7 @@ def new_pass_menu():
             m_box.showerror("Input error", "Incorrect code")
             return
         recovery_frame.pack_forget()
-        root.geometry("200x155+{}+{}".format(w, h))
+        root.geometry("200x165+{}+{}".format(w, h))
         new_pass_frame.pack(side=TOP, anchor=CENTER)
     except Exception as e:
         exception_handler(e)
@@ -1142,7 +1152,7 @@ def set_new_pass():
                     fill_auto_login_file(user_login, entry_new_p.get())
                     entry_pass.delete(0, END)
                     entry_pass.insert(0, entry_new_p.get())
-                    root.geometry("200x185+{}+{}".format(w, h))
+                    root.geometry("200x195+{}+{}".format(w, h))
                     new_pass_frame.pack_forget()
                     auth_frame.pack(side=TOP, anchor=CENTER)
                 else:
@@ -1476,7 +1486,7 @@ def get_updates(app_version, old_version):
             print("too old version")
             m_box = CustomBox()
             m_box.askyesno("Need update", "Your app version is out of date\nVisit the download page?",
-                           open_download_page, close_app)
+                           open_download_page, on_closing)
         elif app_version > app_ver:
             print("old version")
             m_box = CustomBox()
@@ -1498,10 +1508,6 @@ def open_download_page():
             web.open("https://github.com/Delivery-Klad/chat_desktop/releases", new=0)
     except Exception as e:
         exception_handler(e)
-
-
-def close_app():
-    exit(0)
 
 
 def get_update_time():
@@ -1559,11 +1565,21 @@ def loop_msg_func():
 
 
 def build(i):
+    global chat_labels
+    name = i['username']
+    if name[-3:] == "_gr":
+        name = name[:-3] + " (Group)"
+    while len(name) < 20:
+        name += " "
+    message = decrypt(int2bytes(i['message']))[:20]
+    while len(message) < 20:
+        message += " "
     chat_label = Label(menu_frame.scrollable_frame, font=theme['font_main'], bg="#606060", width=25, height=2,
-                       fg=theme['text_color'], text=f"{i['username']}\t\t\t\n{decrypt(int2bytes(i['message']))[:20]}",
+                       fg=theme['text_color'], text=f"{name}\n{' ' * 6}{message}", justify=LEFT,
                        anchor=NW)
-    chat_label.pack(side=TOP, anchor=N, pady=2)
+    chat_label.pack(side=TOP, anchor=N, pady=2, fill=BOTH)
     chat_label.bind("<Button-1>", lambda e: (menu_navigation("chat"), open_chat(i['user_id'])))
+    chat_labels.append([chat_label, i['user_id']])
 
 
 def start_chat():
@@ -1616,6 +1632,14 @@ def mouse_drag(event):
         print(e)
 
 
+def refresh_token():
+    global access_token
+    print("refresh")
+    access_token = response_handler(method="put", url=f"{backend_url}auth/refresh",
+                                    headers={"Authorization": f"Bearer {access_token}"}).json()
+    root.after(570000, refresh_token)
+
+
 def on_closing():
     root.destroy()
     exit(0)
@@ -1631,6 +1655,15 @@ fm = Menu(m)
 m.add_cascade(label="File", menu=fm)
 fmm = Menu(fm)
 fm.add_cascade(label="Export", menu=fmm)"""
+# region Style
+style = Style()
+style.theme_use("clam")
+style.configure("t_style.Heading", background=theme['entry'], relief=theme['relief'], font=theme['font_users'])
+style.configure("t_style", highlightthickness=0, background=theme['entry'], bd=0, font=theme['font_users'])
+style.layout("t_style", [("t_style.treearea", {})])
+style.configure("Vertical.TScrollbar", background=theme['entry'], bordercolor=theme['bg'], arrowcolor="white",
+                darkcolor=theme['bg'], lightcolor=theme['bg'], troughcolor=theme['bg'], gripcount=0)
+# endregion
 # region auth
 test = LabelFrame(root, width=1097, height=31, relief=FLAT, bg="red")
 test.place(x=1, y=1)
@@ -1728,7 +1761,7 @@ start_new_chat.bind("<Button-1>", lambda e: (menu_navigation("chat"), start_chat
 button_chat = Button(top_frame, text="💬", activebackground=theme['button_bg_active'],
                      relief=theme['relief'], font=theme['button_font'],
                      bg=theme['button_bg_positive'], width=2, command=lambda: menu_navigation("chat"))
-button_info = Button(top_frame, text="❓", activebackground=theme['button_bg_active'],
+button_info = Button(top_frame, text="🔍", activebackground=theme['button_bg_active'],
                      bg=theme['button_bg'], font=theme['button_font'],
                      width=2, relief=theme['relief'], command=lambda: menu_navigation("info"))
 button_settings = Button(top_frame, text="⚙", activebackground=theme['button_bg_active'],
@@ -1755,7 +1788,7 @@ frame = Frame(main2_frame, width=850, height=450)
 frame.pack()
 canvas = Text(frame, fg=theme['text_color'], bg=theme['entry'], width=105, cursor='arrow',
               selectforeground=theme['text_color'], selectbackground=theme['entry'])
-scroll = Scrollbar(frame, command=canvas.yview, bg=theme['bg'])
+scroll = Scrollbar(frame, command=canvas.yview, orient="vertical")
 scroll.pack(side=RIGHT, fill=Y)
 canvas.pack(side=RIGHT, expand=True, fill=BOTH)
 canvas.config(yscrollcommand=scroll.set)
@@ -1763,7 +1796,7 @@ canvas.tag_config("url_tag", foreground="blue", underline=True)
 canvas.tag_bind("url_tag", "<Button-1>", open_link)
 button_refresh = Button(main_frame, text="REFRESH", activebackground=theme['button_bg_active'], width=120,
                         bg=theme['button_bg_positive'], relief=theme['relief'], command=lambda: get_all_messages())
-button_refresh.pack(side=TOP, pady=3, anchor=CENTER)
+button_refresh.pack(side=TOP, padx=3, pady=3, anchor=CENTER)
 entry_msg = Entry(main_frame, font=10, width=85, relief=theme['relief'], fg=theme['text_color'], bg=theme['entry'],
                   cursor=theme['cursor'])
 entry_msg.bind("<Return>", send_message_handler)
@@ -1803,7 +1836,6 @@ empty.pack(side=LEFT)
 button_c_chat = Button(settings_frame7, text="CREATE", activebackground=theme['button_bg_active'], width=15,
                        bg=theme['button_bg_positive'], relief=theme['relief'], command=lambda: create_chat())
 button_c_chat.pack(side=RIGHT, anchor=E)
-
 settings_frame8 = LabelFrame(settings_frame, width=600, height=25, relief=FLAT, bg=theme['bg'])
 settings_frame8.pack(side=TOP, pady=2, anchor=N)
 settings_frame9 = LabelFrame(settings_frame8, width=600, height=25, relief=FLAT, bg=theme['bg'])
@@ -2095,13 +2127,8 @@ button_search = Button(info_frame_2, text="SEARCH", activebackground=theme['butt
 button_search.pack(side=LEFT, anchor=E, padx=3)
 frame_users = Frame(info_frame, width=800, height=400)
 frame_users.pack()
-style = Style()
-style.theme_use("clam")
-style.configure("t_style.Heading", background=theme['entry'], relief=theme['relief'], font=theme['font_users'])
-style.configure("t_style", highlightthickness=0, background=theme['entry'], bd=0, font=theme['font_users'])
-style.layout("t_style", [("t_style.treearea", {})])
 canvas_users = Treeview(frame_users, height=29, cursor="arrow", columns=(0, 1, 2), show="headings", style="t_style")
-scroll_users = Scrollbar(frame_users, command=canvas_users.yview, bg=theme['bg'])
+scroll_users = Scrollbar(frame_users, command=canvas_users.yview)
 scroll_users.pack(side=RIGHT, fill=Y)
 canvas_users.pack(side=RIGHT, expand=True, fill=BOTH)
 canvas_users.config(yscrollcommand=scroll_users.set)
@@ -2119,10 +2146,11 @@ if time_to_check is not None:
     if int(time_to_check) != -1:
         root.after(int(time_to_check) * 1000, loop_msg_func)
 # print(root.winfo_children())
+root.after(570000, refresh_token)
 if __name__ == "__main__":
     root.title("Chat")
     root.overrideredirect(1)
-    root.geometry("200x190+{}+{}".format(w, h))
+    root.geometry("200x200+{}+{}".format(w, h))
     root.resizable(False, False)
     root['bg'] = theme['bg']
     auto_login()
