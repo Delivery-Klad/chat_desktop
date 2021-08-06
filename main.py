@@ -1,25 +1,25 @@
-import os
-import sys
-import rsa
-import json
-import bcrypt
-import qrcode
-import keyring
-import pathlib
+from os import mkdir, remove, path, listdir, replace
+from sys import platform, exc_info
+from pathlib import Path
+from json import dump, load
 import requests
-from PIL import Image
-from tkinter.font import Font
-from tkinter import filedialog
 from datetime import datetime, timezone
-from keyring import errors
+
+from PIL import Image
+from qrcode import make
+from bcrypt import hashpw, gensalt
+from keyring import errors, set_keyring, set_password, get_password, delete_password
+from rsa import PrivateKey, PublicKey, encrypt, decrypt, newkeys
 from rsa.transform import int2bytes, bytes2int
+
+from tkinter.font import Font
 from tkinter.ttk import Style, Treeview, Scrollbar
 from tkinter import IntVar, StringVar, Toplevel, TOP, LEFT, RIGHT, CENTER, WORD, END, FLAT, GROOVE, Y, N, W, E, S, NW, \
-    NO, BOTH, Canvas, PhotoImage, OptionMenu, Radiobutton, Checkbutton, LabelFrame, Label, Button, Frame, \
-    TclError, Tk, Text, Entry
+    NO, BOTH, Canvas, PhotoImage, OptionMenu, Radiobutton, Checkbutton, LabelFrame, Label, Button, Frame, TclError,\
+    Tk, Text, Entry, filedialog
 
 
-app_ver = 3.6
+app_ver = 3.8
 backend_url = "https://chat-b4ckend.herokuapp.com/"
 # backend_url = "http://localhost:8000/"
 chats, theme = {}, {}
@@ -31,23 +31,23 @@ h = root.winfo_screenheight() // 2 - 130
 code, user_id, email, user_login, user_password, access_token = "", "", "", "", "", ""
 remember_var, theme_var = IntVar(), IntVar()
 relief, frames_relief, cursors = StringVar(), StringVar(), StringVar()
-private_key = rsa.PrivateKey(1, 2, 3, 4, 5)
+private_key = PrivateKey(1, 2, 3, 4, 5)
 time_to_check = 60.0
 utc_diff = datetime.now(timezone.utc).astimezone().utcoffset()
 chat_labels = []
 
-if "win" in sys.platform.lower():
+if "win" in platform.lower():
     from keyring.backends.Windows import WinVaultKeyring
-    keyring.set_keyring(WinVaultKeyring())
-    files_dir = str(pathlib.Path.home()) + "/AppData/Roaming/PojiloiChat"
-elif "darwin" in sys.platform.lower():
+    set_keyring(WinVaultKeyring())
+    files_dir = str(Path.home()) + "/AppData/Roaming/PojiloiChat"
+elif "darwin" in platform.lower():
     from keyring.backends.macOS import Keyring
-    keyring.set_keyring(Keyring)
-    files_dir = str(pathlib.Path.home()) + "/Library/Application Support/PojiloiChat"
-elif "linux" in sys.platform.lower():
+    set_keyring(Keyring)
+    files_dir = str(Path.home()) + "/Library/Application Support/PojiloiChat"
+elif "linux" in platform.lower():
     from keyring.backends.kwallet import KeyringBackend
-    keyring.set_keyring(KeyringBackend)
-    files_dir = str(pathlib.Path.home()) + "/.local/share/PojiloiChat"
+    set_keyring(KeyringBackend)
+    files_dir = str(Path.home()) + "/.local/share/PojiloiChat"
 
 
 class ScrollableFrame(Frame):
@@ -76,18 +76,22 @@ class CustomBox:
         self.box.attributes("-topmost", True)
         self.box['bg'] = theme['bg']
         self.box.overrideredirect(1)
+        self.bg = Label(self.box, width=50, height=30, bg="red")
+        self.bg.place(x=0, y=0)
+        self.bg_footer = Label(self.box, height=2, bg=theme['bg'])
+        self.bg_footer.place(x=2, y=88, relwidth=0.985)
         self.line = Label(self.box, width=50, height=0)
         self.line.pack(side=TOP)
         self.text = Text(self.box, font=10, height=4, width=27, bg=theme['bg'], fg=theme['text_color'], relief="flat",
                          wrap=WORD)
         self.text.tag_configure("center", justify="center")
-        self.text.pack(side=TOP)
+        self.text.pack(side=TOP, padx=2)
         self.entry = Entry(self.box, font=12, width=20, fg=theme['text_color'], bg=theme['entry'],
                            relief=theme['relief'], cursor=theme['cursor'])
         self.button = Button(self.box, width=15, text="Ok", fg=theme['text_color'], relief=theme['relief'],
                              bg=theme['button_bg'], activebackground=theme['button_bg_active'],
                              command=lambda: self.destroy())
-        self.button.pack(side=TOP, padx=5)
+        self.button.pack(side=TOP, padx=5, pady=1)
         self.button_pos = Button(self.box, width=15, text="No", fg=theme['text_color'], relief=theme['relief'],
                                  bg=theme['button_bg'], activebackground=theme['button_bg_active'],
                                  command=lambda: self.destroy())
@@ -98,6 +102,7 @@ class CustomBox:
         self.text.insert(END, text)
         self.text.tag_add("center", "1.0", "end")
         self.line.configure(bg="#1E90FF", text=title)
+        self.bg.configure(bg="#1E90FF")
 
     def showwarning(self, title, text):
         self.box.deiconify()
@@ -105,6 +110,7 @@ class CustomBox:
         self.text.insert(END, text)
         self.text.tag_add("center", "1.0", "end")
         self.line.configure(bg="#FF8C00", text=title)
+        self.bg.configure(bg="#FF8C00")
 
     def showerror(self, title, text):
         self.box.deiconify()
@@ -112,6 +118,7 @@ class CustomBox:
         self.text.insert(END, text)
         self.text.tag_add("center", "1.0", "end")
         self.line.configure(bg="#8B0000", text=title)
+        self.bg.configure(bg="#8B0000")
 
     def askyesno(self, title, text, func, func2=None):
         self.box.deiconify()
@@ -119,12 +126,13 @@ class CustomBox:
         self.text.insert(END, text)
         self.text.tag_add("center", "1.0", "end")
         self.line.configure(bg="#8B0000", text=title)
+        self.bg.configure(bg="#8B0000")
         self.button.pack_forget()
         self.button.configure(text="Yes", command=lambda: (func(), self.destroy()))
-        self.button.pack(side=LEFT, padx=5)
+        self.button.pack(side=LEFT, padx=5, pady=1)
         if func2 is not None:
             self.button_pos.configure(command=lambda: (func2(), self.destroy()))
-        self.button_pos.pack(side=LEFT, padx=5)
+        self.button_pos.pack(side=LEFT, padx=5, pady=1)
 
     def askentry(self, title, func):
         self.box.deiconify()
@@ -132,9 +140,10 @@ class CustomBox:
         self.text.pack_forget()
         self.entry.pack(side=TOP, pady=25, padx=5)
         self.line.configure(bg="#8B0000", text=title)
+        self.bg.configure(bg="#8B0000")
         self.button.pack_forget()
         self.button.configure(text="Go", command=lambda: (func(self.entry.get()), self.destroy()))
-        self.button.pack(side=TOP, padx=5)
+        self.button.pack(side=TOP, padx=5, pady=1)
 
     def destroy(self):
         self.box.destroy()
@@ -142,19 +151,19 @@ class CustomBox:
 
 def folders():
     try:
-        os.mkdir(files_dir)
+        mkdir(files_dir)
     except FileExistsError:
         pass
     try:
-        os.mkdir(files_dir + "/temp")
+        mkdir(files_dir + "/temp")
     except FileExistsError:
         pass
     try:
-        os.mkdir(files_dir + "/cache")
+        mkdir(files_dir + "/cache")
     except FileExistsError:
         pass
     try:
-        os.mkdir(files_dir + "/settings")
+        mkdir(files_dir + "/settings")
         create_theme_file()
         create_config_file()
     except FileExistsError:
@@ -178,7 +187,7 @@ def create_theme_file():
                        "button_bg_active": "#757575",
                        "cursor": "pencil"})
     with open(files_dir + "/settings/theme.json", "w") as file:
-        json.dump(theme_dict, file, indent=2)
+        dump(theme_dict, file, indent=2)
 
 
 def create_config_file():
@@ -190,21 +199,21 @@ def create_config_file():
                        "update": 60,
                        "browser_path": None})
     with open(files_dir + "/settings/config.json", "w") as file:
-        json.dump(theme_dict, file, indent=2)
+        dump(theme_dict, file, indent=2)
 
 
 def set_theme(flag=None):
     global theme
     if flag is None:
         with open(files_dir + "/settings/config.json", "r") as file:
-            temp = json.load(file)['theme']
+            temp = load(file)['theme']
     else:
         temp = flag
         with open(files_dir + "/settings/config.json", "r") as file:
-            tmp = json.load(file)
+            tmp = load(file)
         tmp['file'] = temp
         with open(files_dir + "/settings/config.json", "w") as file:
-            json.dump(tmp, file, indent=2)
+            dump(tmp, file, indent=2)
     if temp == 1:
         theme_var.set(1)
         theme = {"text_color": "#FFFFFF",
@@ -225,7 +234,7 @@ def set_theme(flag=None):
         theme_var.set(2)
         try:
             with open(files_dir + "/settings/theme.json", "r") as file:
-                theme = json.load(file)
+                theme = load(file)
         except Exception as e:
             m_box = CustomBox()
             m_box.showerror("Custom theme error", str(e))
@@ -252,7 +261,7 @@ def set_theme(flag=None):
 def exception_handler(e):
     import linecache
     try:
-        exc_type, exc_obj, tb = sys.exc_info()
+        exc_type, exc_obj, tb = exc_info()
         _frame = tb.tb_frame
         linenos = tb.tb_lineno
         filename = _frame.f_code.co_filename
@@ -320,7 +329,7 @@ def api_awake():
     global root
     root.update()
     try:
-        res = requests.get(f"{backend_url}service/awake").json()
+        res = request(method="get", url=f"{backend_url}service/awake").json()
         res = res.split(" ")
         get_updates(float(res[0]), float(res[1]))
     except Exception as e:
@@ -409,21 +418,21 @@ def message_send_chat(chat, target, message):
         exception_handler(e)
 
 
-def doc_send(path, chat):
+def doc_send(file_path, chat):
     global access_token
     try:
         return response_handler(method="get",
-                                url=f"{backend_url}file/shorter?url={upload_file(path)}&destination={chat}",
+                                url=f"{backend_url}file/shorter?url={upload_file(file_path)}&destination={chat}",
                                 headers={"Authorization": f"Bearer {access_token}"}).json()
     except Exception as e:
         exception_handler(e)
 
 
-def chat_send_doc(path, chat, user, target):
+def chat_send_doc(file_path, chat, user, target):
     global access_token
     try:
         return response_handler(method="get",
-                                url=f"{backend_url}file/shorter/chat?url={upload_file(path)}&sender={chat}_{user}&"
+                                url=f"{backend_url}file/shorter/chat?url={upload_file(file_path)}&sender={chat}_{user}&"
                                     f"destination={target}", headers={"Authorization": f"Bearer {access_token}"}).json()
     except Exception as e:
         exception_handler(e)
@@ -433,7 +442,7 @@ def get_messages(cur_chat, is_chat):
     global access_token
     try:
         with open(files_dir + f"/cache/chat_{current_chat}_cache.json", "r") as file:
-            max_id = json.load(file)['max_id']
+            max_id = load(file)['max_id']
     except FileNotFoundError:
         max_id = 0
     try:
@@ -502,9 +511,10 @@ def get_chat_users(group_id: str):
         exception_handler(e)
 
 
-def upload_file(path: str):
+def upload_file(file_path: str):
     try:
-        return response_handler(method="post", url=f"{backend_url}file/upload", files={"file": open(path, "rb")}).json()
+        return response_handler(method="post", url=f"{backend_url}file/upload",
+                                files={"file": open(file_path, "rb")}).json()
     except Exception as e:
         exception_handler(e)
 
@@ -564,8 +574,8 @@ def remove_data_request():
 
 def auto_login():
     try:
-        lgn = keyring.get_password("datachat", "login")
-        psw = keyring.get_password("datachat", "password")
+        lgn = get_password("datachat", "login")
+        psw = get_password("datachat", "password")
         if lgn is not None and psw is not None:
             entry_log.insert(0, lgn)
             entry_pass.insert(0, psw)
@@ -577,25 +587,31 @@ def auto_login():
 
 def clear_auto_login():
     try:
-        keyring.delete_password("datachat", "login")
+        delete_password("datachat", "login")
     except errors.PasswordDeleteError:
         pass
     try:
-        keyring.delete_password("datachat", "password")
+        delete_password("datachat", "password")
     except errors.PasswordDeleteError:
         pass
 
 
 def fill_auto_login_file(lgn: str, psw: str):
-    keyring.set_password("datachat", "login", lgn)
-    keyring.set_password("datachat", "password", psw)
+    set_password("datachat", "login", lgn)
+    set_password("datachat", "password", psw)
 
 
 def regenerate_encryption_keys():
     m_box = CustomBox()
-    m_box.askyesno("Regenerate keys", "Aare you sure? You will lose access to all messages", regenerate_keys)
+    m_box.askyesno("Regenerate keys", "Are you sure? You will lose access to all messages", regenerate_keys)
 
 
+def delete_account():
+    m_box = CustomBox()
+    m_box.askyesno("Delete account", "Are you sure? You will lose access to your account", remove_data_request)
+
+
+# noinspection PyUnusedLocal
 def login(*args):
     global user_login, user_id, user_password, access_token
     label_loading.place(x=60, y=80)
@@ -634,7 +650,7 @@ def login(*args):
                 break
         hide_auth_menu()
         label_loading.place_forget()
-        qr = qrcode.make(private_key)
+        qr = make(private_key)
         qr.save(files_dir + "/temp/QR.png")
         qr = Image.open(files_dir + "/temp/QR.png")
         width = int(qr.size[0] / 2)
@@ -645,7 +661,7 @@ def login(*args):
         label_qr = Label(main1_frame, image=_qr)
         label_qr.image = _qr
         # label_qr.pack(side=RIGHT, anchor=SE) # задумка на будущее
-        os.remove(files_dir + "/temp/QR.png")
+        remove(files_dir + "/temp/QR.png")
         menu_navigation("chat")
     except Exception as e:
         label_loading.place_forget()
@@ -688,7 +704,7 @@ def register():
             return
         if not check_input(psw, lgn):
             return
-        hashed_pass = bcrypt.hashpw(psw.encode("utf-8"), bcrypt.gensalt())
+        hashed_pass = hashpw(psw.encode("utf-8"), gensalt())
         hashed_pass = str(hashed_pass)[2:-1]
         res = create_user(lgn, hashed_pass, mail)
         if res is True:
@@ -786,8 +802,8 @@ def send_message():
             if ord(i) < 32 or ord(i) > 1366:
                 m_box.showerror("Input error", "Unsupported symbols")
                 return
-        encrypt_msg = encrypt(msg.encode("utf-8"), get_pubkey(current_chat))
-        encrypt_msg1 = encrypt(msg.encode("utf-8"), get_pubkey(user_id))
+        encrypt_msg = encrypt_message(msg.encode("utf-8"), get_pubkey(current_chat))
+        encrypt_msg1 = encrypt_message(msg.encode("utf-8"), get_pubkey(user_id))
         message_send(current_chat, encrypt_msg, encrypt_msg1)
         entry_msg.delete(0, END)
         get_message()
@@ -799,10 +815,10 @@ def send_doc():
     button_img.update()
     global current_chat
     try:
-        path = filedialog.askopenfilename(filetypes=[("All files", "*.*")])
-        if len(path) == 0:
+        local_path = filedialog.askopenfilename(filetypes=[("All files", "*.*")])
+        if len(local_path) == 0:
             return
-        doc_send(path, current_chat)
+        doc_send(local_path, current_chat)
         get_message()
     except Exception as e:
         exception_handler(e)
@@ -815,7 +831,6 @@ def get_message():
     except NotImplementedError:
         pass
     res = get_messages(current_chat, 0)
-    # print(res)
     if res is None:
         return
     cache_messages(res)
@@ -830,9 +845,9 @@ def get_message():
                     chat_nick = message['from_id']
                 nick = user_login if message['from_id'] == user_login else chat_nick
                 if message['from_id'] == user_login:
-                    decrypt_msg = decrypt(int2bytes(message['message1']))
+                    decrypt_msg = decrypt_message(int2bytes(message['message1']))
                 else:
-                    decrypt_msg = decrypt(int2bytes(message['message']))
+                    decrypt_msg = decrypt_message(int2bytes(message['message']))
                 date = datetime.strptime(message['date'], "%Y-%m-%dT%H:%M:%S")
                 canvas.insert(END, f"{str(date + utc_diff)[2:]} {nick}: ")
                 if "chat-b4ckend.herokuapp.com/file/get/file_" not in decrypt_msg:
@@ -846,26 +861,27 @@ def get_message():
         exception_handler(e)
 
 
-def encrypt(msg: bytes, pubkey):
+def encrypt_message(msg: bytes, pubkey):
     try:
         pubkey = pubkey.split(", ")
-        pubkey = rsa.PublicKey(int(pubkey[0]), int(pubkey[1]))
-        encrypt_message = rsa.encrypt(msg, pubkey)
-        return bytes2int(encrypt_message)
+        pubkey = PublicKey(int(pubkey[0]), int(pubkey[1]))
+        encrypted_message = encrypt(msg, pubkey)
+        return bytes2int(encrypted_message)
     except Exception as e:
         exception_handler(e)
 
 
-def decrypt(msg: bytes):
+def decrypt_message(msg: bytes):
     global private_key
     try:
-        decrypted_message = rsa.decrypt(msg, private_key)
+        decrypted_message = decrypt(msg, private_key)
         return decrypted_message.decode("utf-8")
     except Exception as e:
         exception_handler(e)
         return None
 
 
+# noinspection PyUnusedLocal
 def login_handler(*args):
     if len(entry_log.get()) == 0:
         m_box = CustomBox()
@@ -877,6 +893,7 @@ def login_handler(*args):
         entry_pass.focus_set()
 
 
+# noinspection PyUnusedLocal
 def send_message_handler(*args):
     global current_chat
     if str(root.focus_get()) == ".!labelframe2.!entry":
@@ -889,6 +906,7 @@ def send_message_handler(*args):
             entry_msg.focus_set()
 
 
+# noinspection PyUnusedLocal
 def change_pass_handler(*args):
     m_box = CustomBox()
     if str(root.focus_get()) == ".!labelframe3.!labelframe3.!labelframe.!entry":
@@ -913,9 +931,9 @@ def change_pass_handler(*args):
 def keys_generation():
     global private_key
     try:
-        (pubkey, privkey) = rsa.newkeys(1024)
+        (pubkey, privkey) = newkeys(1024)
         pubkey = str(pubkey)[10:-1]
-        keyring.set_password("datachat", "private_key", privkey.save_pkcs1().decode("ascii"))
+        set_password("datachat", "private_key", privkey.save_pkcs1().decode("ascii"))
         private_key = privkey
         return pubkey
     except Exception as e:
@@ -925,7 +943,7 @@ def keys_generation():
 def get_private_key():
     try:
         global private_key
-        private_key = rsa.PrivateKey.load_pkcs1(keyring.get_password("datachat", "private_key").encode("utf-8"))
+        private_key = PrivateKey.load_pkcs1(get_password("datachat", "private_key").encode("utf-8"))
     except Exception as e:
         exception_handler(e)
 
@@ -969,7 +987,7 @@ def send_chat_message():
             m_box.showerror("Input error", "Fill all input fields")
             return
         for i in get_chat_users(current_chat):
-            message_send_chat(current_chat, i[0], encrypt(message.encode("utf-8"), get_pubkey(i[0])))
+            message_send_chat(current_chat, i[0], encrypt_message(message.encode("utf-8"), get_pubkey(i[0])))
             entry_msg.delete(0, END)
         get_chat_message()
     except Exception as e:
@@ -980,11 +998,11 @@ def send_chat_doc():
     global user_id, current_chat
     button_img.update()
     try:
-        path = filedialog.askopenfilename(filetypes=[("All files", "*.*")])
-        if len(path) == 0:
+        local_path = filedialog.askopenfilename(filetypes=[("All files", "*.*")])
+        if len(local_path) == 0:
             return
         for i in get_chat_users(current_chat):
-            chat_send_doc(path, current_chat, user_id, i[0])
+            chat_send_doc(local_path, current_chat, user_id, i[0])
         get_chat_message()
     except Exception as e:
         exception_handler(e)
@@ -1006,7 +1024,7 @@ def get_chat_message():
         for i in range(res['count']):
             try:
                 message = res[f'item_{i}']
-                decrypt_msg = decrypt(int2bytes(message['message']))
+                decrypt_msg = decrypt_message(int2bytes(message['message']))
                 date = datetime.strptime(message['date'], "%Y-%m-%dT%H:%M:%S")
                 canvas.insert(END, f"{str(date + utc_diff)[2:]} {message['from_id']}: ")
                 if "chat-b4ckend.herokuapp.com/file/get/file_" not in decrypt_msg:
@@ -1024,7 +1042,7 @@ def invite_to_group():
     global user_id
     button_invite.update()
     inv_user = entry_inv_id.get()
-    inv_group = entry_gr_toinv.get()
+    inv_group = entry_gr_to_inv.get()
     m_box = CustomBox()
     if len(inv_user) == 0 and len(inv_group) == 0:
         m_box.showerror("Input error", "Entries length must be more than 0 characters")
@@ -1047,7 +1065,7 @@ def kick_from_group():
     global user_id
     button_kick.update()
     kick_user = entry_kick_id.get()
-    kick_group = entry_gr_tokick.get()
+    kick_group = entry_gr_to_kick.get()
     m_box = CustomBox()
     if len(kick_user) == 0 and len(kick_group) == 0:
         m_box.showerror("Input error", "Entries length must be more than 0 characters")
@@ -1120,7 +1138,7 @@ def change_password():
         if len(entry_old_pass.get()) == 0 or len(entry_new_pass.get()):
             m_box.showerror("Input error!", "Empty input field!")
             return
-        hashed_pass = bcrypt.hashpw(entry_new_pass.get().encode("utf-8"), bcrypt.gensalt())
+        hashed_pass = hashpw(entry_new_pass.get().encode("utf-8"), gensalt())
         hashed_pass = str(hashed_pass)[2:-1]
         res = update_password(entry_old_pass.get(), hashed_pass)
         if res:
@@ -1144,7 +1162,7 @@ def set_new_pass():
         if check_input(entry_new_p2.get(), entry_new_p.get()):
             if entry_new_p.get() == entry_new_p2.get():
                 m_box = CustomBox()
-                hashed_pass = bcrypt.hashpw(entry_new_p.get().encode("utf-8"), bcrypt.gensalt())
+                hashed_pass = hashpw(entry_new_p.get().encode("utf-8"), gensalt())
                 hashed_pass = str(hashed_pass)[2:-1]
                 res = validate_recovery(code, user_login, hashed_pass)
                 if res:
@@ -1230,7 +1248,7 @@ def cache_messages(messages):
     try:
         try:
             with open(files_dir + f"/cache/chat_{current_chat}_cache.json", "r") as file:
-                json_dict = json.load(file)
+                json_dict = load(file)
             count = json_dict['count']
             for i in range(messages['count']):
                 try:
@@ -1244,7 +1262,7 @@ def cache_messages(messages):
         except FileNotFoundError:
             json_dict = messages
         with open(files_dir + f"/cache/chat_{current_chat}_cache.json", "w") as file:
-            json.dump(json_dict, file, indent=2)
+            dump(json_dict, file, indent=2)
     except FileNotFoundError:
         pass
     except Exception as e:
@@ -1255,7 +1273,7 @@ def get_cache_messages():
     global current_chat
     try:
         with open(files_dir + f"/cache/chat_{current_chat}_cache.json", "r") as file:
-            res = json.load(file)
+            res = load(file)
         return res
     except FileNotFoundError:
         pass
@@ -1266,7 +1284,7 @@ def get_cache_messages():
 def get_browser_path():
     try:
         with open(files_dir + "/settings/config.json", "r") as file:
-            res = json.load(file)['browser_path']
+            res = load(file)['browser_path']
         if res is None:
             res = ""
         return res
@@ -1284,10 +1302,10 @@ def save_browser_path():
             m_box.showerror("Input error!", "Not .exe file")
             return
         with open(files_dir + "/settings/config.json", "r") as file:
-            json_file = json.load(file)
+            json_file = load(file)
         json_file['browser_path'] = entry_path.get()
         with open(files_dir + "/settings/config.json", "w") as file:
-            json.dump(json_file, file, indent=2)
+            dump(json_file, file, indent=2)
         m_box.showinfo("Success!", "Browser path saved")
     except Exception as e:
         exception_handler(e)
@@ -1297,12 +1315,12 @@ def save_theme():
     global theme_var
     m_box = CustomBox()
     with open(files_dir + "/settings/config.json", "r") as file:
-        json_file = json.load(file)
+        json_file = load(file)
     json_file['theme'] = theme_var.get()
     with open(files_dir + "/settings/config.json", "w") as file:
-        json.dump(json_file, file, indent=2)
+        dump(json_file, file, indent=2)
     if theme_var.get() == 2:
-        if not os.path.exists(files_dir + "/settings/theme.json"):
+        if not path.exists(files_dir + "/settings/theme.json"):
             create_theme_file()
         theme_editor()
     else:
@@ -1312,7 +1330,7 @@ def save_theme():
 def theme_editor():
     global relief, frames_relief, cursors
     with open(files_dir + "/settings/theme.json", "r") as file:
-        temp = json.load(file)
+        temp = load(file)
     relief.set(temp['relief'])
     label_wid_box.configure(relief=temp['relief'])
     frames_relief.set(temp['frame_relief'])
@@ -1408,7 +1426,7 @@ def theme_editor_save():
                        "button_bg_active": entry_b_act.get(),
                        "cursor": cursors.get()})
     with open(files_dir + "/settings/theme.json", "w") as file:
-        json.dump(theme_dict, file, indent=2)
+        dump(theme_dict, file, indent=2)
     theme_editor_window.withdraw()
     root.grab_set()
     m_box.showinfo("Success!", "Theme will be changed on next launch!")
@@ -1423,10 +1441,10 @@ def export_program_data():
         if destination == "":
             return
         with open(files_dir + "/settings/key.json", "w") as file:
-            json.dump({'key': keyring.get_password("datachat", "private_key")}, file)
-        for i in os.listdir(files_dir + "/settings"):
+            dump({'key': get_password("datachat", "private_key")}, file)
+        for i in listdir(files_dir + "/settings"):
             files.append(files_dir + "/settings/" + i)
-        for i in os.listdir(files_dir + "/cache"):
+        for i in listdir(files_dir + "/cache"):
             files.append(files_dir + "/cache/" + i)
         for i in range(len(files)):
             paths.append("\\")
@@ -1434,25 +1452,25 @@ def export_program_data():
     except Exception as e:
         exception_handler(e)
     finally:
-        os.remove(files_dir + "/settings/key.json")
+        remove(files_dir + "/settings/key.json")
 
 
 def import_program_data():
     global user_password
     import pyminizip
     try:
-        path = filedialog.askopenfilename(filetypes=[("Zip files", "*.zip")])
-        if path == "":
+        local_path = filedialog.askopenfilename(filetypes=[("Zip files", "*.zip")])
+        if local_path == "":
             return
-        pyminizip.uncompress(path, user_password, files_dir + "/temp", 0)
+        pyminizip.uncompress(local_path, user_password, files_dir + "/temp", 0)
         with open(files_dir + "/temp/key.json", "r") as file:
-            key = json.load(file)["key"]
-        keyring.set_password("datachat", "private_key", key)
-        os.replace(files_dir + "/temp/theme.json", files_dir + "/settings/theme.json")
-        os.replace(files_dir + "/temp/config.json", files_dir + "/settings/config.json")
-        os.remove(files_dir + "/temp/key.json")
-        for i in os.listdir(files_dir + "/temp"):
-            os.replace(files_dir + "/temp/" + i, files_dir + "/cache/" + i)
+            key = load(file)["key"]
+        set_password("datachat", "private_key", key)
+        replace(files_dir + "/temp/theme.json", files_dir + "/settings/theme.json")
+        replace(files_dir + "/temp/config.json", files_dir + "/settings/config.json")
+        remove(files_dir + "/temp/key.json")
+        for i in listdir(files_dir + "/temp"):
+            replace(files_dir + "/temp/" + i, files_dir + "/cache/" + i)
     except Exception as e:
         exception_handler(e)
 
@@ -1465,7 +1483,7 @@ def open_link(event):
             if event.widget.compare(start, '<=', index) and event.widget.compare(index, '<', end):
                 import webbrowser as web
                 with open(files_dir + "/settings/config.json", "r") as file:
-                    tmp = json.load(file)['browser_path']
+                    tmp = load(file)['browser_path']
                 if tmp is not None:
                     web.register("browser", None, web.BackgroundBrowser(tmp))
                     web.get(using="browser").open_new_tab(event.widget.get(start, end))
@@ -1500,7 +1518,7 @@ def open_download_page():
     try:
         import webbrowser as web
         with open(files_dir + "/settings/config.json", "r") as file:
-            tmp = json.load(file)['browser_path']
+            tmp = load(file)['browser_path']
         if tmp is not None:
             web.register("browser", None, web.BackgroundBrowser(tmp))
             web.get(using="browser").open_new_tab("https://github.com/Delivery-Klad/chat_desktop/releases")
@@ -1513,7 +1531,7 @@ def open_download_page():
 def get_update_time():
     global time_to_check
     with open(files_dir + "/settings/config.json", "r") as file:
-        time_to_check = json.load(file)['update']
+        time_to_check = load(file)['update']
     if int(time_to_check) == -1:
         label_check2.configure(text="Never")
     else:
@@ -1536,10 +1554,10 @@ def auto_check():
     label_check2.update()
     m_box.showinfo("Success!", "Notifications will be changed on next launch!")
     with open(files_dir + "/settings/config.json", "r") as file:
-        json_file = json.load(file)
+        json_file = load(file)
     json_file['update'] = str(time_to_check)
     with open(files_dir + "/settings/config.json", "w") as file:
-        json.dump(json_file, file, indent=2)
+        dump(json_file, file, indent=2)
 
 
 def loop_msg_func():
@@ -1565,13 +1583,14 @@ def loop_msg_func():
 
 
 def build(i):
+    print(i)
     global chat_labels
     name = i['username']
     if name[-3:] == "_gr":
         name = name[:-3] + " (Group)"
     while len(name) < 20:
         name += " "
-    message = decrypt(int2bytes(i['message']))[:20]
+    message = decrypt_message(int2bytes(i['message']))[:20]
     while len(message) < 20:
         message += " "
     chat_label = Label(menu_frame.scrollable_frame, font=theme['font_main'], bg="#606060", width=25, height=2,
@@ -1730,13 +1749,13 @@ label_code = Label(new_pass_frame, font=theme['font_main'], text="New Password:"
                    bg=theme['bg'], width=19, anchor=W)
 label_code.pack(side=TOP, anchor=S)
 entry_new_p = Entry(new_pass_frame, font=12, width=20, fg=theme['text_color'], bg=theme['entry'],
-                    cursor=theme['cursor'], show='•')
+                    cursor=theme['cursor'], relief=theme['relief'], show='•')
 entry_new_p.pack(side=TOP)
 label_code2 = Label(new_pass_frame, font=theme['font_main'], text="Repeat Password:", fg=theme['text_color'],
                     bg=theme['bg'], width=19, anchor=W)
 label_code2.pack(side=TOP, anchor=S)
 entry_new_p2 = Entry(new_pass_frame, font=12, width=20, fg=theme['text_color'], bg=theme['entry'],
-                     cursor=theme['cursor'], show='•')
+                     cursor=theme['cursor'], relief=theme['relief'], show='•')
 entry_new_p2.pack(side=TOP)
 button_code = Button(new_pass_frame, text="SET", activebackground=theme['button_bg_active'], relief=theme['relief'],
                      bg=theme['button_bg_positive'], width=11, command=lambda: set_new_pass(),
@@ -1848,12 +1867,12 @@ entry_inv_id = Entry(settings_frame9, font=12, width=20, fg=theme['text_color'],
 entry_inv_id.pack(side=TOP, anchor=CENTER)
 settings_frame10 = LabelFrame(settings_frame8, width=600, height=25, relief=FLAT, bg=theme['bg'])
 settings_frame10.pack(side=LEFT, pady=2, padx=158, anchor=N)
-label_gr_toinv = Label(settings_frame10, font=10, text="Group id:", fg=theme['text_color'], bg=theme['bg'], width=18,
-                       anchor=W)
-label_gr_toinv.pack(side=TOP, anchor=W)
-entry_gr_toinv = Entry(settings_frame10, font=12, width=20, fg=theme['text_color'], bg=theme['entry'],
-                       cursor=theme['cursor'], relief=theme['relief'])
-entry_gr_toinv.pack(side=TOP, anchor=CENTER)
+label_gr_to_inv = Label(settings_frame10, font=10, text="Group id:", fg=theme['text_color'], bg=theme['bg'], width=18,
+                        anchor=W)
+label_gr_to_inv.pack(side=TOP, anchor=W)
+entry_gr_to_inv = Entry(settings_frame10, font=12, width=20, fg=theme['text_color'], bg=theme['entry'],
+                        cursor=theme['cursor'], relief=theme['relief'])
+entry_gr_to_inv.pack(side=TOP, anchor=CENTER)
 button_invite = Button(settings_frame8, text="INVITE", activebackground=theme['button_bg_active'], width=15,
                        bg=theme['button_bg_positive'], relief=theme['relief'], command=lambda: invite_to_group())
 button_invite.pack(side=RIGHT, anchor=S)
@@ -1869,12 +1888,12 @@ entry_kick_id = Entry(settings_frame21, font=12, width=20, fg=theme['text_color'
 entry_kick_id.pack(side=TOP, anchor=CENTER)
 settings_frame10 = LabelFrame(settings_frame20, width=600, height=25, relief=FLAT, bg=theme['bg'])
 settings_frame10.pack(side=LEFT, pady=2, padx=158, anchor=N)
-label_gr_tokick = Label(settings_frame10, font=10, text="Group id:", fg=theme['text_color'], bg=theme['bg'],
-                        width=18, anchor=W)
-label_gr_tokick.pack(side=TOP, anchor=W)
-entry_gr_tokick = Entry(settings_frame10, font=12, width=20, fg=theme['text_color'], bg=theme['entry'],
-                        cursor=theme['cursor'], relief=theme['relief'])
-entry_gr_tokick.pack(side=TOP, anchor=CENTER)
+label_gr_to_kick = Label(settings_frame10, font=10, text="Group id:", fg=theme['text_color'], bg=theme['bg'],
+                         width=18, anchor=W)
+label_gr_to_kick.pack(side=TOP, anchor=W)
+entry_gr_to_kick = Entry(settings_frame10, font=12, width=20, fg=theme['text_color'], bg=theme['entry'],
+                         cursor=theme['cursor'], relief=theme['relief'])
+entry_gr_to_kick.pack(side=TOP, anchor=CENTER)
 button_kick = Button(settings_frame20, text="KICK", activebackground=theme['button_bg_active'], width=15,
                      bg=theme['button_bg_positive'], relief=theme['relief'], command=lambda: kick_from_group())
 button_kick.pack(side=RIGHT, anchor=S)
@@ -1933,7 +1952,7 @@ d_z = Label(settings_frame12, font=15, text="DANGER ZONE", fg="red", bg=theme['b
 d_z.pack(side=TOP, padx=5)
 button_delete = Button(settings_frame12, text="DELETE ACCOUNT DATA", bg=theme['button_bg_positive'],
                        activebackground=theme['button_bg_active'], width=113, relief=theme['relief'],
-                       command=lambda: export_program_data())
+                       command=lambda: delete_account())
 button_export = Button(settings_frame12, text="EXPORT DATA", bg=theme['button_bg_positive'],
                        activebackground=theme['button_bg_active'], width=113, relief=theme['relief'],
                        command=lambda: export_program_data())

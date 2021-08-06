@@ -7,10 +7,6 @@ Registration window
 
 # ![alt text](Images/register.png)
 
-Chat window
-
-# ![alt text](Images/chat.png)
-
 Group chats
 
 # ![alt text](Images/groups.png)
