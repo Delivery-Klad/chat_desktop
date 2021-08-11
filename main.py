@@ -2,7 +2,7 @@ from os import mkdir, remove, path, listdir, replace
 from sys import platform, exc_info
 from pathlib import Path
 from json import dump, load
-import requests
+from requests import request
 from datetime import datetime, timezone
 
 from PIL import Image
@@ -20,8 +20,7 @@ from tkinter import IntVar, StringVar, Toplevel, TOP, LEFT, RIGHT, CENTER, WORD,
 
 
 app_ver = 3.8
-backend_url = "https://chat-b4ckend.herokuapp.com/"
-# backend_url = "http://localhost:8000/"
+debug = False
 chats, theme = {}, {}
 current_chat = "-1"
 root = Tk()
@@ -35,6 +34,11 @@ private_key = PrivateKey(1, 2, 3, 4, 5)
 time_to_check = 60.0
 utc_diff = datetime.now(timezone.utc).astimezone().utcoffset()
 chat_labels = []
+
+if not debug:
+    backend_url = "https://chat-b4ckend.herokuapp.com/"
+else:
+    backend_url = "http://localhost:8000/"
 
 if "win" in platform.lower():
     from keyring.backends.Windows import WinVaultKeyring
@@ -274,9 +278,9 @@ def exception_handler(e):
         print(e)
 
 
-def request(method, url, req_json=None, files=None, headers=None):
+def backend_request(method, url, req_json=None, files=None, headers=None):
     try:
-        return requests.request(method=method, url=url, json=req_json, files=files, headers=headers)
+        return request(method=method, url=url, json=req_json, files=files, headers=headers)
     except Exception as e:
         exception_handler(e)
 
@@ -284,12 +288,12 @@ def request(method, url, req_json=None, files=None, headers=None):
 def response_handler(method, url, req_json=None, files=None, headers=None):
     global access_token, user_login, user_password
     try:
-        res = request(method, url, req_json, files, headers)
+        res = backend_request(method, url, req_json, files, headers)
         if res.status_code == 200:
             return res
         elif res.status_code == 401:
             access_token = check_password(user_login, user_password)
-            return request(method, url, req_json, headers={"Authorization": f"Bearer {access_token}"})
+            return backend_request(method, url, req_json, headers={"Authorization": f"Bearer {access_token}"})
         else:
             m_box = CustomBox()
             m_box.showerror("Something went wrong!", f"Response {res.status_code}")
@@ -329,7 +333,7 @@ def api_awake():
     global root
     root.update()
     try:
-        res = request(method="get", url=f"{backend_url}service/awake").json()
+        res = backend_request(method="get", url=f"{backend_url}service/awake").json()
         res = res.split(" ")
         get_updates(float(res[0]), float(res[1]))
     except Exception as e:
