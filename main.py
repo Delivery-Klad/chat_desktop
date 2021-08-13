@@ -196,10 +196,7 @@ def create_theme_file():
 
 def create_config_file():
     theme_dict = {}
-    theme_dict.update({"theme": "0",
-                       "pin1": None,
-                       "pin2": None,
-                       "pin3": None,
+    theme_dict.update({"theme": "1",
                        "update": 60,
                        "browser_path": None})
     with open(files_dir + "/settings/config.json", "w") as file:
