@@ -75,15 +75,15 @@ class CustomBox:
         local_h = int(res[2]) + int(int(resolution[1]) / 2) - 62
         self.box = Toplevel(root)
         self.box.withdraw()
-        self.box.geometry(f"250x125+{local_w}+{local_h}")
+        self.box.geometry(f"250x155+{local_w}+{local_h}")  # x125
         self.box.resizable(False, False)
         self.box.attributes("-topmost", True)
         self.box['bg'] = theme['bg']
         self.box.overrideredirect(1)
         self.bg = Label(self.box, width=50, height=30, bg="red")
         self.bg.place(x=0, y=0)
-        self.bg_footer = Label(self.box, height=2, bg=theme['bg'])
-        self.bg_footer.place(x=2, y=88, relwidth=0.985)
+        self.bg_footer = Label(self.box, height=3, bg=theme['bg'])
+        self.bg_footer.place(x=2, y=70, relwidth=0.985)
         self.line = Label(self.box, width=50, height=0)
         self.line.pack(side=TOP)
         self.text = Text(self.box, font=10, height=4, width=27, bg=theme['bg'], fg=theme['text_color'], relief="flat",
@@ -143,8 +143,8 @@ class CustomBox:
         self.box.grab_set()
         self.text.pack_forget()
         self.entry.pack(side=TOP, pady=25, padx=5)
-        self.line.configure(bg="#8B0000", text=title)
-        self.bg.configure(bg="#8B0000")
+        self.line.configure(bg="#1E90FF", text=title)
+        self.bg.configure(bg=theme['bg'])
         self.button.pack_forget()
         self.button.configure(text="Go", command=lambda: (func(self.entry.get()), self.destroy()))
         self.button.pack(side=TOP, padx=5, pady=1)
@@ -1203,7 +1203,9 @@ def pass_code():
 def open_chat(chat_id):
     global current_chat
     m_box = CustomBox()
-    if len(chat_id) == 0 or not chat_id.isnumeric():
+    if len(chat_id) == 0:
+        return
+    if not chat_id.isnumeric():
         current_chat = chat_id
         name = get_chat_name(current_chat)
         label_chat_id.configure(text="Current chat with: " + name)
@@ -1438,7 +1440,10 @@ def theme_editor_save():
 
 def export_program_data():
     global user_password
-    import pyminizip
+    try:
+        import pyminizip
+    except ModuleNotFoundError:
+        pass
     try:
         files, paths = [], []
         destination = filedialog.askdirectory()
@@ -1461,7 +1466,10 @@ def export_program_data():
 
 def import_program_data():
     global user_password
-    import pyminizip
+    try:
+        import pyminizip
+    except ModuleNotFoundError:
+        pass
     try:
         local_path = filedialog.askopenfilename(filetypes=[("Zip files", "*.zip")])
         if local_path == "":
@@ -1695,10 +1703,10 @@ top_frame.pack(side=TOP, pady=1, anchor=CENTER)
 top_frame.bind('<ButtonPress-1>', mouse_down)
 top_frame.bind('<B1-Motion>', mouse_drag)
 top_frame.bind('<ButtonRelease-1>', mouse_up)
-empty_top_frame = Label(top_frame, text=" ", relief=theme['relief'], bg=theme['bg'], width=1)
+empty_top_frame = Label(top_frame, text=" ", relief=FLAT, bg=theme['bg'], width=1)
 empty_top_frame.pack(side=LEFT, padx=80, anchor=W)
-button_close = Button(top_frame, text="✖", activebackground=theme['bg'], relief=theme['relief'],
-                      bg=theme['bg'], width=2, command=lambda: on_closing())
+button_close = Button(top_frame, text="✖", activebackground=theme['bg'], relief=FLAT, bg=theme['bg'], width=2,
+                      command=lambda: on_closing())
 button_close.pack(side=RIGHT, anchor=E)
 auth_frame = LabelFrame(root, width=200, height=130, relief=FLAT, bg=theme['bg'])
 auth_frame.pack(side=TOP, anchor=CENTER)
