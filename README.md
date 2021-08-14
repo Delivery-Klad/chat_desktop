@@ -1,4 +1,4 @@
-# Database Chat
+# Chat desktop
 Auth window
 
 # ![alt text](Images/auth.png)
