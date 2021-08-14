@@ -1,4 +1,4 @@
-# Database Chat (need update)
+# Database Chat
 Auth window
 
 # ![alt text](Images/auth.png)
@@ -22,6 +22,8 @@ Settings window
 Password's recovery
 
 # ![alt text](Images/recovery.png)
+
+### что это за ссылки?
 pyinstaller -F -c --hidden-import win32timezone main.py
 https://github.com/jaraco/keyring/issues/324
 https://github.com/jaraco/keyring/issues/468
