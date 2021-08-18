@@ -15,9 +15,8 @@ from rsa.transform import int2bytes, bytes2int
 from tkinter.font import Font
 from tkinter.ttk import Style, Treeview, Scrollbar
 from tkinter import IntVar, StringVar, Toplevel, TOP, LEFT, RIGHT, CENTER, WORD, END, FLAT, GROOVE, Y, N, W, E, S, NW, \
-    NO, BOTH, Canvas, PhotoImage, OptionMenu, Radiobutton, Checkbutton, LabelFrame, Label, Button, Frame, TclError,\
+    NO, BOTH, Canvas, PhotoImage, OptionMenu, Radiobutton, Checkbutton, LabelFrame, Label, Button, Frame, TclError, \
     Tk, Text, Entry, filedialog
-
 
 app_ver = 3.8
 debug = False
@@ -42,14 +41,17 @@ else:
 
 if "win" in platform.lower():
     from keyring.backends.Windows import WinVaultKeyring
+
     set_keyring(WinVaultKeyring())
     files_dir = str(Path.home()) + "/AppData/Roaming/PojiloiChat"
 elif "darwin" in platform.lower():
     from keyring.backends.macOS import Keyring
+
     set_keyring(Keyring)
     files_dir = str(Path.home()) + "/Library/Application Support/PojiloiChat"
 elif "linux" in platform.lower():
     from keyring.backends.kwallet import KeyringBackend
+
     set_keyring(KeyringBackend)
     files_dir = str(Path.home()) + "/.local/share/PojiloiChat"
 
@@ -570,9 +572,9 @@ def remove_data_request():
                                 headers={"Authorization": f"Bearer {access_token}"}).json()
     except Exception as e:
         exception_handler(e)
+
+
 # endregion
-
-
 def auto_login():
     try:
         lgn = get_password("datachat", "login")
@@ -612,11 +614,26 @@ def delete_account():
     m_box.askyesno("Delete account", "Are you sure? You will lose access to your account", remove_data_request)
 
 
+def update_left_bar():
+    global chat_labels
+    for i in chat_labels:
+        i[0].pack_forget()
+    chat_labels = []
+    local_chats = response_handler(method="get", url=f"{backend_url}chat/get_all",
+                                   headers={"Authorization": f"Bearer {access_token}"}).json()
+    for i in range(local_chats['count']):
+        try:
+            build(local_chats[f'item_{i}'])
+        except KeyError:
+            break
+
+
 # noinspection PyUnusedLocal
 def login(*args):
     global user_login, user_id, user_password, access_token
     label_loading.place(x=60, y=80)
     button_login.update()
+    api_awake()
     try:
         m_box = CustomBox()
         if len(entry_log.get()) == 0 or len(entry_pass.get()) == 0:
@@ -1581,19 +1598,20 @@ def loop_msg_func():
         if res is not None:
             m_box = CustomBox()
             m_box.showinfo("New Messages!", f"You have new messages in chats: {res}")
+        update_left_bar()
         if current_chat != "-1":
             if current_chat[0] != "g":
                 get_message()
             else:
                 get_chat_message()
-        root.after(int(time_to_check) * 1000, loop_msg_func)
+        root.after(int(time_to_check) * 60000, loop_msg_func)
     except Exception as e:
         exception_handler(e)
 
 
 def build(i):
-    print(i)
     global chat_labels
+    print(i)
     name = i['username']
     if name[-3:] == "_gr":
         name = name[:-3] + " (Group)"
@@ -1633,6 +1651,7 @@ def send_document():
 
 def get_all_messages():
     global current_chat
+    update_left_bar()
     if current_chat[0] != "g":
         get_message()
     else:
@@ -2172,7 +2191,7 @@ label_loading = Label(root, font=10, text="LOADING", fg=theme['text_color'], bg=
 get_update_time()
 if time_to_check is not None:
     if int(time_to_check) != -1:
-        root.after(int(time_to_check) * 1000, loop_msg_func)
+        root.after(int(time_to_check) * 60000, loop_msg_func)
 # print(root.winfo_children())
 root.after(570000, refresh_token)
 if __name__ == "__main__":
@@ -2182,6 +2201,5 @@ if __name__ == "__main__":
     root.resizable(False, False)
     root['bg'] = theme['bg']
     auto_login()
-    api_awake()
     root.protocol("WM_DELETE_WINDOW", on_closing)
     root.mainloop()
