@@ -1786,10 +1786,10 @@ start_new_chat = Label(menu_frame.scrollable_frame, font=theme['font_main'], bg=
                        fg=theme['text_color'], text=f"+ Add new chat", anchor=CENTER)
 start_new_chat.pack(side=TOP, anchor=N, pady=2)
 start_new_chat.bind("<Button-1>", lambda e: (menu_navigation("chat"), start_chat()))
-button_chat = Button(top_frame, text="💬", activebackground=theme['button_bg_active'],
+button_chat = Button(top_frame, text="#", activebackground=theme['button_bg_active'],
                      relief=theme['relief'], font=theme['button_font'],
                      bg=theme['button_bg_positive'], width=2, command=lambda: menu_navigation("chat"))
-button_info = Button(top_frame, text="🔍", activebackground=theme['button_bg_active'],
+button_info = Button(top_frame, text="？", activebackground=theme['button_bg_active'],
                      bg=theme['button_bg'], font=theme['button_font'],
                      width=2, relief=theme['relief'], command=lambda: menu_navigation("info"))
 button_settings = Button(top_frame, text="⚙", activebackground=theme['button_bg_active'],
