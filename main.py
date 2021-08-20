@@ -30,9 +30,13 @@ code, user_id, email, user_login, user_password, access_token = "", "", "", "", 
 remember_var, theme_var = IntVar(), IntVar()
 relief, frames_relief, cursors = StringVar(), StringVar(), StringVar()
 private_key = PrivateKey(1, 2, 3, 4, 5)
-time_to_check = 60.0
 utc_diff = datetime.now(timezone.utc).astimezone().utcoffset()
+update_bar_time = 15
 chat_labels = []
+# region local machine keys
+local_pub = PublicKey(572536591295117, 65537)
+local_priv = PrivateKey(572536591295117, 65537, 444229717838273, 36352469, 15749593)
+# endregion
 
 if not debug:
     backend_url = "https://chat-b4ckend.herokuapp.com/"
@@ -199,7 +203,6 @@ def create_theme_file():
 def create_config_file():
     theme_dict = {}
     theme_dict.update({"theme": "1",
-                       "update": 60,
                        "browser_path": None})
     with open(files_dir + "/settings/config.json", "w") as file:
         dump(theme_dict, file, indent=2)
@@ -397,15 +400,6 @@ def message_send(chat_id, message, message1):
     try:
         return response_handler(method="post", url=f"{backend_url}message/send",
                                 req_json={"destination": chat_id, "message": message, "message1": message1},
-                                headers={"Authorization": f"Bearer {access_token}"}).json()
-    except Exception as e:
-        exception_handler(e)
-
-
-def message_loop():
-    global access_token
-    try:
-        return response_handler(method="get", url=f"{backend_url}message/loop",
                                 headers={"Authorization": f"Bearer {access_token}"}).json()
     except Exception as e:
         exception_handler(e)
@@ -615,7 +609,7 @@ def delete_account():
 
 
 def update_left_bar():
-    global chat_labels
+    global chat_labels, access_token
     for i in chat_labels:
         i[0].pack_forget()
     chat_labels = []
@@ -825,6 +819,7 @@ def send_message():
         message_send(current_chat, encrypt_msg, encrypt_msg1)
         entry_msg.delete(0, END)
         get_message()
+        update_left_bar()
     except Exception as e:
         exception_handler(e)
 
@@ -838,6 +833,7 @@ def send_doc():
             return
         doc_send(local_path, current_chat)
         get_message()
+        update_left_bar()
     except Exception as e:
         exception_handler(e)
 
@@ -914,14 +910,11 @@ def login_handler(*args):
 # noinspection PyUnusedLocal
 def send_message_handler(*args):
     global current_chat
-    if str(root.focus_get()) == ".!labelframe2.!entry":
-        if len(entry_msg.get()) != 0:
-            if current_chat[0] != "g":
-                send_message()
-            else:
-                send_chat_message()
+    if len(entry_msg.get()) != 0:
+        if current_chat[0] != "g":
+            send_message()
         else:
-            entry_msg.focus_set()
+            send_chat_message()
 
 
 # noinspection PyUnusedLocal
@@ -1008,6 +1001,7 @@ def send_chat_message():
             message_send_chat(current_chat, i[0], encrypt_message(message.encode("utf-8"), get_pubkey(i[0])))
             entry_msg.delete(0, END)
         get_chat_message()
+        update_left_bar()
     except Exception as e:
         exception_handler(e)
 
@@ -1022,6 +1016,7 @@ def send_chat_doc():
         for i in get_chat_users(current_chat):
             chat_send_doc(local_path, current_chat, user_id, i[0])
         get_chat_message()
+        update_left_bar()
     except Exception as e:
         exception_handler(e)
 
@@ -1103,8 +1098,9 @@ def kick_from_group():
 
 
 def logout():
-    global w, h, chat_labels
+    global w, h, chat_labels, access_token
     w += 200
+    access_token = ""
     menu_navigation("chat")
     button_chat.pack_forget()
     button_info.pack_forget()
@@ -1554,64 +1550,15 @@ def open_download_page():
         exception_handler(e)
 
 
-def get_update_time():
-    global time_to_check
-    with open(files_dir + "/settings/config.json", "r") as file:
-        time_to_check = load(file)['update']
-    if int(time_to_check) == -1:
-        label_check2.configure(text="Never")
-    else:
-        label_check2.configure(text=f"{time_to_check} Sec")
-    label_check2.update()
-
-
-def auto_check():
-    global time_to_check
-    m_box = CustomBox()
-    time_to_check = int(time_to_check) + 15
-    if time_to_check < 15:
-        time_to_check = 15
-        label_check2.configure(text="15 Sec")
-    elif time_to_check > 60:
-        time_to_check = -1
-        label_check2.configure(text="Never")
-    else:
-        label_check2.configure(text=f"{time_to_check} Sec")
-    label_check2.update()
-    m_box.showinfo("Success!", "Notifications will be changed on next launch!")
-    with open(files_dir + "/settings/config.json", "r") as file:
-        json_file = load(file)
-    json_file['update'] = str(time_to_check)
-    with open(files_dir + "/settings/config.json", "w") as file:
-        dump(json_file, file, indent=2)
-
-
-def loop_msg_func():
-    global time_to_check
-    if time_to_check == -1:
-        return
-    print('check')
-    try:
-        if access_token == '':
-            return
-        res = message_loop()
-        if res is not None:
-            m_box = CustomBox()
-            m_box.showinfo("New Messages!", f"You have new messages in chats: {res}")
+def loop_update_bar():
+    global access_token, update_bar_time
+    if access_token != '':
         update_left_bar()
-        if current_chat != "-1":
-            if current_chat[0] != "g":
-                get_message()
-            else:
-                get_chat_message()
-        root.after(int(time_to_check) * 60000, loop_msg_func)
-    except Exception as e:
-        exception_handler(e)
+    root.after(update_bar_time * 1000, loop_update_bar)
 
 
 def build(i):
     global chat_labels
-    print(i)
     name = i['username']
     if name[-3:] == "_gr":
         name = name[:-3] + " (Group)"
@@ -1856,16 +1803,6 @@ button_send = Button(main_frame, text="SEND", activebackground=theme['button_bg_
 button_send.pack(side=LEFT, anchor=E, padx=3)
 # endregion
 # region settings
-settings_frame_2 = LabelFrame(settings_frame, width=600, height=25, relief=FLAT, bg=theme['bg'])
-settings_frame_2.pack(side=TOP, pady=2, anchor=N)
-label_check = Label(settings_frame_2, font=10, text="  Update frequency:", fg=theme['text_color'], bg=theme['bg'],
-                    width=18, anchor=W)
-label_check.pack(side=LEFT, anchor=W)
-label_check2 = Label(settings_frame_2, font=12, text="1 min", width=20, fg=theme['text_color'], bg=theme['bg'])
-label_check2.pack(side=LEFT, padx=170, anchor=CENTER)
-button_check_msg = Button(settings_frame_2, text="UPDATE", activebackground=theme['button_bg_active'], width=15,
-                          bg=theme['button_bg_positive'], relief=theme['relief'], command=lambda: auto_check())
-button_check_msg.pack(side=RIGHT, anchor=E)
 settings_frame7 = LabelFrame(settings_frame, width=600, height=25, relief=FLAT, bg=theme['bg'])
 settings_frame7.pack(side=TOP, pady=2, anchor=N)
 label_chat = Label(settings_frame7, font=10, text="  Create chat:", fg=theme['text_color'], bg=theme['bg'], width=18,
@@ -2188,11 +2125,8 @@ canvas_users.column(2, width=200, stretch=NO)
 canvas_users.tag_configure("users_tag", background=theme['entry'], foreground=theme['text_color'])
 label_loading = Label(root, font=10, text="LOADING", fg=theme['text_color'], bg=theme['bg'])
 # endregion
-get_update_time()
-if time_to_check is not None:
-    if int(time_to_check) != -1:
-        root.after(int(time_to_check) * 60000, loop_msg_func)
 # print(root.winfo_children())
+root.after(update_bar_time * 1000, loop_update_bar)
 root.after(570000, refresh_token)
 if __name__ == "__main__":
     root.title("Chat")
