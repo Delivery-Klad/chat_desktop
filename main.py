@@ -18,7 +18,7 @@ from tkinter import IntVar, StringVar, Toplevel, TOP, LEFT, RIGHT, CENTER, WORD,
     NO, BOTH, Canvas, PhotoImage, OptionMenu, Radiobutton, Checkbutton, LabelFrame, Label, Button, Frame, TclError, \
     Tk, Text, Entry, filedialog
 
-app_ver = 3.8
+app_ver = 4.0
 debug = False
 chats, theme = {}, {}
 current_chat = "-1"
@@ -34,8 +34,10 @@ utc_diff = datetime.now(timezone.utc).astimezone().utcoffset()
 update_bar_time = 15
 chat_labels = []
 # region local machine keys
-local_pub = PublicKey(572536591295117, 65537)
-local_priv = PrivateKey(572536591295117, 65537, 444229717838273, 36352469, 15749593)
+local_pub = PublicKey(15049509030952083278666101600713569448824656007572906706479549891512407119, 65537)
+local_priv = PrivateKey(15049509030952083278666101600713569448824656007572906706479549891512407119, 65537,
+                        917616584336855894861677250964362433854474492036872405600057505598524513,
+                        673146469521390393905835854479266324211, 22356960501705281671981512243455029)
 # endregion
 
 if not debug:
@@ -316,8 +318,14 @@ def check_input(password: str, log: str):
     if len(log) < 5:
         m_box.showerror("Input error", "Login length must be more than 5 characters")
         return False
+    if len(log) > 20:
+        m_box.showerror("Input error", "Login length must be less than 20 characters")
+        return False
     if len(password) < 8:
         m_box.showerror("Input error", 'Password does not meet the requirements')
+        return False
+    if len(password) > 20:
+        m_box.showerror("Input error", "Password length must be less than 20 characters")
         return False
     for i in password:
         if ord(i) < 45 or ord(i) > 122:
@@ -570,12 +578,13 @@ def remove_data_request():
 
 # endregion
 def auto_login():
+    global local_priv
     try:
         lgn = get_password("datachat", "login")
         psw = get_password("datachat", "password")
         if lgn is not None and psw is not None:
-            entry_log.insert(0, lgn)
-            entry_pass.insert(0, psw)
+            entry_log.insert(0, decrypt(int2bytes(int(lgn)), local_priv).decode("utf-8"))
+            entry_pass.insert(0, decrypt(int2bytes(int(psw)), local_priv).decode("utf-8"))
             remember_var.set(1)
             login()
     except Exception as e:
@@ -594,8 +603,9 @@ def clear_auto_login():
 
 
 def fill_auto_login_file(lgn: str, psw: str):
-    set_password("datachat", "login", lgn)
-    set_password("datachat", "password", psw)
+    global local_pub
+    set_password("datachat", "login", str(bytes2int(encrypt(lgn.encode('utf-8'), local_pub))))
+    set_password("datachat", "password", str(bytes2int(encrypt(psw.encode('utf-8'), local_pub))))
 
 
 def regenerate_encryption_keys():
@@ -615,11 +625,8 @@ def update_left_bar():
     chat_labels = []
     local_chats = response_handler(method="get", url=f"{backend_url}chat/get_all",
                                    headers={"Authorization": f"Bearer {access_token}"}).json()
-    for i in range(local_chats['count']):
-        try:
-            build(local_chats[f'item_{i}'])
-        except KeyError:
-            break
+    for i in local_chats:
+        build(i)
 
 
 # noinspection PyUnusedLocal
@@ -655,11 +662,8 @@ def login(*args):
         get_private_key()
         local_chats = response_handler(method="get", url=f"{backend_url}chat/get_all",
                                        headers={"Authorization": f"Bearer {access_token}"}).json()
-        for i in range(local_chats['count']):
-            try:
-                build(local_chats[f'item_{i}'])
-            except KeyError:
-                break
+        for i in local_chats:
+            build(i)
         hide_auth_menu()
         label_loading.place_forget()
         qr = make(private_key)
@@ -748,7 +752,7 @@ def hide_auth_menu():
 
 
 def menu_navigation(menu: str):
-    global current_chat, chats, spacing, spacing_2, private_key, user_id
+    global current_chat, chats, spacing, spacing_2, private_key
     if menu == "chat":
         button_chat.update()
         for key in chats:
@@ -960,7 +964,6 @@ def get_private_key():
 
 
 def create_chat():
-    global user_id
     button_c_chat.update()
     try:
         name = entry_chat.get()
@@ -989,7 +992,7 @@ def create_chat():
 
 
 def send_chat_message():
-    global user_id, current_chat
+    global current_chat
     button_send.update()
     message = entry_msg.get()
     try:
@@ -1007,7 +1010,7 @@ def send_chat_message():
 
 
 def send_chat_doc():
-    global user_id, current_chat
+    global current_chat
     button_img.update()
     try:
         local_path = filedialog.askopenfilename(filetypes=[("All files", "*.*")])
@@ -1052,7 +1055,6 @@ def get_chat_message():
 
 
 def invite_to_group():
-    global user_id
     button_invite.update()
     inv_user = entry_inv_id.get()
     inv_group = entry_gr_to_inv.get()
@@ -1075,7 +1077,6 @@ def invite_to_group():
 
 
 def kick_from_group():
-    global user_id
     button_kick.update()
     kick_user = entry_kick_id.get()
     kick_group = entry_gr_to_kick.get()
@@ -1567,8 +1568,11 @@ def build(i):
     message = decrypt_message(int2bytes(i['message']))[:20]
     while len(message) < 20:
         message += " "
+    read = "*"
+    if i['read'] == 1:
+        read = ""
     chat_label = Label(menu_frame.scrollable_frame, font=theme['font_main'], bg="#606060", width=25, height=2,
-                       fg=theme['text_color'], text=f"{name}\n{' ' * 6}{message}", justify=LEFT,
+                       fg=theme['text_color'], text=f"{name}\n{' ' * 5}{read} {message}", justify=LEFT,
                        anchor=NW)
     chat_label.pack(side=TOP, anchor=N, pady=2, fill=BOTH)
     chat_label.bind("<Button-1>", lambda e: (menu_navigation("chat"), open_chat(i['user_id'])))
@@ -1610,9 +1614,9 @@ def mouse_down(event):
     x, y = event.x, event.y
 
 
+# noinspection PyUnusedLocal
 def mouse_up(event):
     global x, y
-    print(f"{event.x} {event.y}")
     x, y = None, None
 
 
