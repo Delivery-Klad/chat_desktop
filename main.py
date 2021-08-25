@@ -19,7 +19,8 @@ from tkinter import IntVar, StringVar, Toplevel, TOP, LEFT, RIGHT, CENTER, WORD,
     Tk, Text, Entry, filedialog
 
 app_ver = 4.0
-debug = False
+debug = True
+keyring_environment = "datachat"
 chats, theme = {}, {}
 current_chat = "-1"
 root = Tk()
@@ -578,10 +579,10 @@ def remove_data_request():
 
 # endregion
 def auto_login():
-    global local_priv
+    global local_priv, keyring_environment
     try:
-        lgn = get_password("datachat", "login")
-        psw = get_password("datachat", "password")
+        lgn = get_password(keyring_environment, "login")
+        psw = get_password(keyring_environment, "password")
         if lgn is not None and psw is not None:
             entry_log.insert(0, decrypt(int2bytes(int(lgn)), local_priv).decode("utf-8"))
             entry_pass.insert(0, decrypt(int2bytes(int(psw)), local_priv).decode("utf-8"))
@@ -592,20 +593,21 @@ def auto_login():
 
 
 def clear_auto_login():
+    global keyring_environment
     try:
-        delete_password("datachat", "login")
+        delete_password(keyring_environment, "login")
     except errors.PasswordDeleteError:
         pass
     try:
-        delete_password("datachat", "password")
+        delete_password(keyring_environment, "password")
     except errors.PasswordDeleteError:
         pass
 
 
 def fill_auto_login_file(lgn: str, psw: str):
-    global local_pub
-    set_password("datachat", "login", str(bytes2int(encrypt(lgn.encode('utf-8'), local_pub))))
-    set_password("datachat", "password", str(bytes2int(encrypt(psw.encode('utf-8'), local_pub))))
+    global local_pub, keyring_environment
+    set_password(keyring_environment, "login", str(bytes2int(encrypt(lgn.encode('utf-8'), local_pub))))
+    set_password(keyring_environment, "password", str(bytes2int(encrypt(psw.encode('utf-8'), local_pub))))
 
 
 def regenerate_encryption_keys():
@@ -790,17 +792,15 @@ def menu_navigation(menu: str):
         settings_frame.pack_forget()
         group_frame.pack_forget()
         main1_frame.pack(side=LEFT, anchor=NW)
-        users_list = get_random_users()
         for i in canvas_users.get_children():
             canvas_users.delete(i)
-        for i in range(users_list['count']):
+        for i in get_random_users():
             try:
-                user = users_list[f'user_{i}']
                 try:
-                    date = str(datetime.strptime(user["last_activity"], "%Y-%m-%dT%H:%M:%S") + utc_diff)[2:]
+                    date = str(datetime.strptime(i["last_activity"], "%Y-%m-%dT%H:%M:%S") + utc_diff)[2:]
                 except TypeError:
                     date = ""
-                canvas_users.insert(parent='', index=END, values=(user['id'], user['login'], date), tags=("users_tag",))
+                canvas_users.insert(parent='', index=END, values=(i['id'], i['login'], date), tags=("users_tag",))
             except KeyError:
                 break
 
@@ -944,11 +944,11 @@ def change_pass_handler(*args):
 
 
 def keys_generation():
-    global private_key
+    global private_key, keyring_environment
     try:
         (pubkey, privkey) = newkeys(1024)
         pubkey = str(pubkey)[10:-1]
-        set_password("datachat", "private_key", privkey.save_pkcs1().decode("ascii"))
+        set_password(keyring_environment, "private_key", privkey.save_pkcs1().decode("ascii"))
         private_key = privkey
         return pubkey
     except Exception as e:
@@ -956,9 +956,10 @@ def keys_generation():
 
 
 def get_private_key():
+    global keyring_environment
     try:
         global private_key
-        private_key = PrivateKey.load_pkcs1(get_password("datachat", "private_key").encode("utf-8"))
+        private_key = PrivateKey.load_pkcs1(get_password(keyring_environment, "private_key").encode("utf-8"))
     except Exception as e:
         exception_handler(e)
 
@@ -1243,17 +1244,15 @@ def search_user():
         res = entry_user_search.get()
         if len(res) == 0:
             return
-        users_list = find_user(res)
         for i in canvas_users.get_children():
             canvas_users.delete(i)
-        for i in range(users_list['count']):
+        for i in find_user(res):
             try:
-                user = users_list[f'user_{i}']
                 try:
-                    date = str(datetime.strptime(user['last_activity'], "%Y-%m-%dT%H:%M:%S") + utc_diff)[2:]
+                    date = str(datetime.strptime(i['last_activity'], "%Y-%m-%dT%H:%M:%S") + utc_diff)[2:]
                 except TypeError:
                     date = ""
-                canvas_users.insert(parent='', index=END, values=(user['id'], user['login'], date), tags=("users_tag",))
+                canvas_users.insert(parent='', index=END, values=(i['id'], i['login'], date), tags=("users_tag",))
             except KeyError:
                 break
     except Exception as e:
@@ -1450,7 +1449,7 @@ def theme_editor_save():
 
 
 def export_program_data():
-    global user_password
+    global user_password, keyring_environment
     try:
         import pyminizip
     except ModuleNotFoundError:
@@ -1461,7 +1460,7 @@ def export_program_data():
         if destination == "":
             return
         with open(files_dir + "/settings/key.json", "w") as file:
-            dump({'key': get_password("datachat", "private_key")}, file)
+            dump({'key': get_password(keyring_environment, "private_key")}, file)
         for i in listdir(files_dir + "/settings"):
             files.append(files_dir + "/settings/" + i)
         for i in listdir(files_dir + "/cache"):
@@ -1476,7 +1475,7 @@ def export_program_data():
 
 
 def import_program_data():
-    global user_password
+    global user_password, keyring_environment
     try:
         import pyminizip
     except ModuleNotFoundError:
@@ -1488,7 +1487,7 @@ def import_program_data():
         pyminizip.uncompress(local_path, user_password, files_dir + "/temp", 0)
         with open(files_dir + "/temp/key.json", "r") as file:
             key = load(file)["key"]
-        set_password("datachat", "private_key", key)
+        set_password(keyring_environment, "private_key", key)
         replace(files_dir + "/temp/theme.json", files_dir + "/settings/theme.json")
         replace(files_dir + "/temp/config.json", files_dir + "/settings/config.json")
         remove(files_dir + "/temp/key.json")
