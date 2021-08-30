@@ -25,6 +25,6 @@ executables = [Executable("main.py", base=base)]
 setup(name="Chat",                              # bdist_msi, bdist_mac
       author="Delivery Klad",
       options=options,
-      version="3.8",
+      version="4.2",
       description='Encrypted chat',
       executables=executables)

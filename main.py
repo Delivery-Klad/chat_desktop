@@ -18,8 +18,8 @@ from tkinter import IntVar, StringVar, Toplevel, TOP, LEFT, RIGHT, CENTER, WORD,
     NO, BOTH, Canvas, PhotoImage, OptionMenu, Radiobutton, Checkbutton, LabelFrame, Label, Button, Frame, TclError, \
     Tk, Text, Entry, filedialog
 
-app_ver = 4.0
-debug = True
+app_ver = 4.2
+debug = False
 keyring_environment = "datachat"
 chats, theme = {}, {}
 current_chat = "-1"
@@ -344,7 +344,7 @@ def api_awake():
     global root
     root.update()
     try:
-        res = backend_request(method="get", url=f"{backend_url}service/awake").json()
+        res = backend_request(method="get", url=f"{backend_url}service/").json()
         res = res.split(" ")
         get_updates(float(res[0]), float(res[1]))
     except Exception as e:
@@ -353,53 +353,52 @@ def api_awake():
 
 def check_password(log, pas):
     try:
-        return response_handler(method="post", url=f"{backend_url}auth/login", req_json={"login": log,
-                                                                                         "password": pas}).json()
+        return response_handler(method="get", url=f"{backend_url}auth/?login={log}&password={pas}").json()
     except Exception as e:
         exception_handler(e)
 
 
 def create_user(lgn, hashed_pass, mail):
     try:
-        return response_handler(method="post", url=f"{backend_url}auth/register", req_json={"login": lgn,
-                                                                                            "password": hashed_pass,
-                                                                                            "pubkey": keys_generation(),
-                                                                                            "email": mail}).json()
+        return response_handler(method="post", url=f"{backend_url}auth/", req_json={"login": lgn,
+                                                                                    "password": hashed_pass,
+                                                                                    "pubkey": keys_generation(),
+                                                                                    "email": mail}).json()
     except Exception as e:
         exception_handler(e)
 
 
 def get_id(log):
     try:
-        return response_handler(method="get", url=f"{backend_url}user/get_id?login={log}").json()
+        return response_handler(method="get", url=f"{backend_url}user/?user_id=True&login={log}").json()
     except Exception as e:
         exception_handler(e)
 
 
 def find_user(user):
     try:
-        return response_handler(method="get", url=f"{backend_url}user/find?login={user}").json()
+        return response_handler(method="get", url=f"{backend_url}user/?find=True&login={user}").json()
     except Exception as e:
         exception_handler(e)
 
 
 def get_user_nickname(user):
     try:
-        return response_handler(method="get", url=f"{backend_url}user/get_nickname?id={user}").json()
+        return response_handler(method="get", url=f"{backend_url}user/?name=True&id={user}").json()
     except Exception as e:
         exception_handler(e)
 
 
 def get_random_users():
     try:
-        return response_handler(method="get", url=f"{backend_url}user/get_random").json()
+        return response_handler(method="get", url=f"{backend_url}user/?random=True").json()
     except Exception as e:
         exception_handler(e)
 
 
 def get_pubkey(user):
     try:
-        return response_handler(method="get", url=f"{backend_url}user/get_pubkey?id={user}").json()
+        return response_handler(method="get", url=f"{backend_url}user/?pubkey=True&id={user}").json()
     except Exception as e:
         exception_handler(e)
 
@@ -407,8 +406,10 @@ def get_pubkey(user):
 def message_send(chat_id, message, message1):
     global access_token
     try:
-        return response_handler(method="post", url=f"{backend_url}message/send",
-                                req_json={"destination": chat_id, "message": message, "message1": message1},
+        return response_handler(method="post", url=f"{backend_url}messages/", req_json={"is_chat": False,
+                                                                                        "destination": chat_id,
+                                                                                        "message": message,
+                                                                                        "message1": message1},
                                 headers={"Authorization": f"Bearer {access_token}"}).json()
     except Exception as e:
         exception_handler(e)
@@ -417,8 +418,8 @@ def message_send(chat_id, message, message1):
 def message_send_chat(chat, target, message):
     global access_token
     try:
-        return response_handler(method="post", url=f"{backend_url}message/send/chat",
-                                req_json={"sender": chat, "destination": target, "message": message},
+        return response_handler(method="post", url=f"{backend_url}messages/",
+                                req_json={"is_chat": True, "sender": chat, "destination": target, "message": message},
                                 headers={"Authorization": f"Bearer {access_token}"}).json()
     except Exception as e:
         exception_handler(e)
@@ -427,8 +428,8 @@ def message_send_chat(chat, target, message):
 def doc_send(file_path, chat):
     global access_token
     try:
-        return response_handler(method="get",
-                                url=f"{backend_url}file/shorter?url={upload_file(file_path)}&destination={chat}",
+        return response_handler(method="patch",
+                                url=f"{backend_url}file/?url={upload_file(file_path)}&destination={chat}",
                                 headers={"Authorization": f"Bearer {access_token}"}).json()
     except Exception as e:
         exception_handler(e)
@@ -437,8 +438,8 @@ def doc_send(file_path, chat):
 def chat_send_doc(file_path, chat, user, target):
     global access_token
     try:
-        return response_handler(method="get",
-                                url=f"{backend_url}file/shorter/chat?url={upload_file(file_path)}&sender={chat}_{user}&"
+        return response_handler(method="put",
+                                url=f"{backend_url}file/?url={upload_file(file_path)}&sender={chat}_{user}&"
                                     f"destination={target}", headers={"Authorization": f"Bearer {access_token}"}).json()
     except Exception as e:
         exception_handler(e)
@@ -453,7 +454,7 @@ def get_messages(cur_chat, is_chat):
         max_id = 0
     try:
         try:
-            return response_handler(method="get", url=f"{backend_url}message/get?chat_id={cur_chat}&is_chat={is_chat}&"
+            return response_handler(method="get", url=f"{backend_url}messages/?chat_id={cur_chat}&is_chat={is_chat}&"
                                                       f"max_id={max_id}",
                                     headers={"Authorization": f"Bearer {access_token}"}).json()
         except AttributeError:
@@ -467,8 +468,7 @@ def regenerate_keys():
     global user_login, user_password, access_token
     try:
         m_box = CustomBox()
-        res = response_handler(method="put", url=f"{backend_url}user/update_pubkey",
-                               req_json={'pubkey': keys_generation()},
+        res = response_handler(method="put", url=f"{backend_url}user/", req_json={'pubkey': keys_generation()},
                                headers={"Authorization": f"Bearer {access_token}"}).json()
         if res:
             m_box.showinfo("Success", "Regeneration successful!")
@@ -481,7 +481,7 @@ def regenerate_keys():
 def chat_create(name):
     global access_token
     try:
-        return response_handler(method="post", url=f"{backend_url}chat/create", req_json={"name": name},
+        return response_handler(method="post", url=f"{backend_url}chat/", req_json={"name": name},
                                 headers={"Authorization": f"Bearer {access_token}"}).json()
     except Exception as e:
         exception_handler(e)
@@ -489,21 +489,21 @@ def chat_create(name):
 
 def get_chat_id(name: str):
     try:
-        return response_handler(method="get", url=f"{backend_url}chat/get_id?name={name}").json()
+        return response_handler(method="get", url=f"{backend_url}chat/?chat_id=True&name={name}").json()
     except Exception as e:
         exception_handler(e)
 
 
 def get_chat_name(group_id: str):
     try:
-        return response_handler(method="get", url=f"{backend_url}chat/get_name?group_id={group_id}").json()
+        return response_handler(method="get", url=f"{backend_url}chat/?chat_name=True&id={group_id}").json()
     except Exception as e:
         exception_handler(e)
 
 
 def get_user_groups(user: int):
     try:
-        return response_handler(method="get", url=f"{backend_url}user/get_groups?user_id={user}").json()
+        return response_handler(method="get", url=f"{backend_url}user/?groups=True&user_id={user}").json()
     except Exception as e:
         exception_handler(e)
 
@@ -511,7 +511,7 @@ def get_user_groups(user: int):
 def get_chat_users(group_id: str):
     global access_token
     try:
-        return response_handler(method="get", url=f"{backend_url}chat/get_users?group_id={group_id}",
+        return response_handler(method="put", url=f"{backend_url}chat/?chat_users=True&id={group_id}",
                                 headers={"Authorization": f"Bearer {access_token}"}).json()
     except Exception as e:
         exception_handler(e)
@@ -519,7 +519,7 @@ def get_chat_users(group_id: str):
 
 def upload_file(file_path: str):
     try:
-        return response_handler(method="post", url=f"{backend_url}file/upload",
+        return response_handler(method="post", url=f"{backend_url}file/",
                                 files={"file": open(file_path, "rb")}).json()
     except Exception as e:
         exception_handler(e)
@@ -527,14 +527,14 @@ def upload_file(file_path: str):
 
 def send_recovery(user: str):
     try:
-        return response_handler(method="post", url=f"{backend_url}recovery/send?login={user}").json()
+        return response_handler(method="get", url=f"{backend_url}recovery/?login={user}").json()
     except Exception as e:
         exception_handler(e)
 
 
 def validate_recovery(local_code: str, lgn: str, hashed_pass=None):
     try:
-        return response_handler(method="post", url=f"{backend_url}recovery/validate",
+        return response_handler(method="post", url=f"{backend_url}recovery/",
                                 req_json={"code": local_code, "login": lgn, "password": hashed_pass}).json()
     except Exception as e:
         exception_handler(e)
@@ -543,7 +543,7 @@ def validate_recovery(local_code: str, lgn: str, hashed_pass=None):
 def update_password(old_pass: str, new_pass: str):
     global access_token
     try:
-        return response_handler(method="put", url=f"{backend_url}user/update_password",
+        return response_handler(method="patch", url=f"{backend_url}user/",
                                 req_json={"old_password": old_pass, "new_password": new_pass},
                                 headers={"Authorization": f"Bearer {access_token}"}).json()
     except Exception as e:
@@ -553,7 +553,7 @@ def update_password(old_pass: str, new_pass: str):
 def user_invite(name: str, user: int):
     global access_token
     try:
-        return response_handler(method="post", url=f"{backend_url}chat/invite", req_json={"name": name, "user": user},
+        return response_handler(method="patch", url=f"{backend_url}chat/", req_json={"name": name, "user": user},
                                 headers={"Authorization": f"Bearer {access_token}"}).json()
     except Exception as e:
         exception_handler(e)
@@ -562,7 +562,7 @@ def user_invite(name: str, user: int):
 def user_kick(name: str, user: int):
     global access_token
     try:
-        return response_handler(method="post", url=f"{backend_url}chat/kick", req_json={"name": name, "user": user},
+        return response_handler(method="delete", url=f"{backend_url}chat/", req_json={"name": name, "user": user},
                                 headers={"Authorization": f"Bearer {access_token}"}).json()
     except Exception as e:
         exception_handler(e)
@@ -571,7 +571,16 @@ def user_kick(name: str, user: int):
 def remove_data_request():
     global access_token
     try:
-        return response_handler(method="delete", url=f"{backend_url}user/remove",
+        return response_handler(method="delete", url=f"{backend_url}user/",
+                                headers={"Authorization": f"Bearer {access_token}"}).json()
+    except Exception as e:
+        exception_handler(e)
+
+
+def get_local_chats():
+    global access_token
+    try:
+        return response_handler(method="put", url=f"{backend_url}chat/?all=True",
                                 headers={"Authorization": f"Bearer {access_token}"}).json()
     except Exception as e:
         exception_handler(e)
@@ -625,8 +634,7 @@ def update_left_bar():
     for i in chat_labels:
         i[0].pack_forget()
     chat_labels = []
-    local_chats = response_handler(method="get", url=f"{backend_url}chat/get_all",
-                                   headers={"Authorization": f"Bearer {access_token}"}).json()
+    local_chats = get_local_chats()
     for i in local_chats:
         build(i)
 
@@ -662,8 +670,7 @@ def login(*args):
         user_login = entry_log.get()
         user_id = get_id(user_login)
         get_private_key()
-        local_chats = response_handler(method="get", url=f"{backend_url}chat/get_all",
-                                       headers={"Authorization": f"Bearer {access_token}"}).json()
+        local_chats = get_local_chats()
         for i in local_chats:
             build(i)
         hide_auth_menu()
@@ -868,7 +875,7 @@ def get_message():
                     decrypt_msg = decrypt_message(int2bytes(message['message']))
                 date = datetime.strptime(message['date'], "%Y-%m-%dT%H:%M:%S")
                 canvas.insert(END, f"{str(date + utc_diff)[2:]} {nick}: ")
-                if "chat-b4ckend.herokuapp.com/file/get/file_" not in decrypt_msg:
+                if "chat-b4ckend.herokuapp.com/file/" not in decrypt_msg:
                     canvas.insert(END, f"{decrypt_msg}\n")
                 else:
                     canvas.insert(END, f"{decrypt_msg}\n", "url_tag")
@@ -1044,7 +1051,7 @@ def get_chat_message():
                 decrypt_msg = decrypt_message(int2bytes(message['message']))
                 date = datetime.strptime(message['date'], "%Y-%m-%dT%H:%M:%S")
                 canvas.insert(END, f"{str(date + utc_diff)[2:]} {message['from_id']}: ")
-                if "chat-b4ckend.herokuapp.com/file/get/file_" not in decrypt_msg:
+                if "chat-b4ckend.herokuapp.com/file/" not in decrypt_msg:
                     canvas.insert(END, f"{decrypt_msg}\n")
                 else:
                     canvas.insert(END, f"{decrypt_msg}\n", "url_tag")
@@ -1632,7 +1639,7 @@ def mouse_drag(event):
 def refresh_token():
     global access_token
     print("refresh")
-    access_token = response_handler(method="put", url=f"{backend_url}auth/refresh",
+    access_token = response_handler(method="patch", url=f"{backend_url}auth/",
                                     headers={"Authorization": f"Bearer {access_token}"}).json()
     root.after(570000, refresh_token)
 
