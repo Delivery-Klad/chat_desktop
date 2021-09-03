@@ -50,17 +50,17 @@ if "win" in platform.lower():
     from keyring.backends.Windows import WinVaultKeyring
 
     set_keyring(WinVaultKeyring())
-    files_dir = str(Path.home()) + "/AppData/Roaming/PojiloiChat"
+    files_dir = str(Path.home()) + "/AppData/Roaming/CorporationChat"
 elif "darwin" in platform.lower():
     from keyring.backends.macOS import Keyring
 
     set_keyring(Keyring)
-    files_dir = str(Path.home()) + "/Library/Application Support/PojiloiChat"
+    files_dir = str(Path.home()) + "/Library/Application Support/CorporationChat"
 elif "linux" in platform.lower():
     from keyring.backends.kwallet import KeyringBackend
 
     set_keyring(KeyringBackend)
-    files_dir = str(Path.home()) + "/.local/share/PojiloiChat"
+    files_dir = str(Path.home()) + "/.local/share/CorporationChat"
 
 
 class ScrollableFrame(Frame):
@@ -173,6 +173,16 @@ def folders():
         pass
     try:
         mkdir(files_dir + "/cache")
+    except FileExistsError:
+        pass
+    try:
+        mkdir(files_dir + "/alert")
+        from urllib.request import urlretrieve
+
+        urlretrieve("https://github.com/Delivery-Klad/chat_desktop/releases/download/4.0/alert.exe",
+                    f"{files_dir}/alert/alert.exe")
+        urlretrieve("https://github.com/Delivery-Klad/chat_desktop/releases/download/4.0/alert.mp3",
+                    f"{files_dir}/alert/alert.mp3")
     except FileExistsError:
         pass
     try:
