@@ -1,5 +1,5 @@
-from os import mkdir, remove, path, listdir, replace
-from sys import platform, exc_info
+from os import mkdir, remove, path, listdir, replace, system
+from sys import platform, exc_info, exit
 from pathlib import Path
 from json import dump, load
 from requests import request
@@ -16,7 +16,7 @@ from tkinter.font import Font
 from tkinter.ttk import Style, Treeview, Scrollbar
 from tkinter import IntVar, StringVar, Toplevel, TOP, LEFT, RIGHT, CENTER, WORD, END, FLAT, GROOVE, Y, N, W, E, S, NW, \
     NO, BOTH, Canvas, PhotoImage, OptionMenu, Radiobutton, Checkbutton, LabelFrame, Label, Button, Frame, TclError, \
-    Tk, Text, Entry, filedialog
+    Tk, Text, Entry, filedialog, messagebox
 
 app_ver = 4.2
 debug = False
@@ -50,17 +50,17 @@ if "win" in platform.lower():
     from keyring.backends.Windows import WinVaultKeyring
 
     set_keyring(WinVaultKeyring())
-    files_dir = str(Path.home()) + "/AppData/Roaming/CorporationChat"
+    files_dir = str(Path.home()) + "\\AppData\\Roaming\\CorporationChat"
 elif "darwin" in platform.lower():
     from keyring.backends.macOS import Keyring
 
     set_keyring(Keyring)
-    files_dir = str(Path.home()) + "/Library/Application Support/CorporationChat"
+    files_dir = str(Path.home()) + "\\Library\\Application Support\\CorporationChat"
 elif "linux" in platform.lower():
     from keyring.backends.kwallet import KeyringBackend
 
     set_keyring(KeyringBackend)
-    files_dir = str(Path.home()) + "/.local/share/CorporationChat"
+    files_dir = str(Path.home()) + "\\.local\\share\\CorporationChat"
 
 
 class ScrollableFrame(Frame):
@@ -175,22 +175,55 @@ def folders():
         mkdir(files_dir + "/cache")
     except FileExistsError:
         pass
-    try:
-        mkdir(files_dir + "/alert")
-        from urllib.request import urlretrieve
+    if "win" in platform.lower():
+        try:
+            mkdir(files_dir + "/alert")
+            from urllib.request import urlretrieve
 
-        urlretrieve("https://github.com/Delivery-Klad/chat_desktop/releases/download/4.0/alert.exe",
-                    f"{files_dir}/alert/alert.exe")
-        urlretrieve("https://github.com/Delivery-Klad/chat_desktop/releases/download/4.0/alert.mp3",
-                    f"{files_dir}/alert/alert.mp3")
-    except FileExistsError:
-        pass
+            urlretrieve("https://github.com/Delivery-Klad/chat_service/releases/download/1.0/alert.exe",
+                        f"{files_dir}/alert/alert.exe")
+            urlretrieve("https://github.com/Delivery-Klad/chat_service/releases/download/1.0/alert.mp3",
+                        f"{files_dir}/alert/alert.mp3")
+            urlretrieve("https://github.com/Delivery-Klad/chat_service/releases/download/1.0/AlertService.zip",
+                        f"{files_dir}/alert/AlertService.zip")
+            createService()
+        except FileExistsError:
+            createService()
     try:
         mkdir(files_dir + "/settings")
         create_theme_file()
         create_config_file()
     except FileExistsError:
         pass
+
+
+def createService():
+    result = system("sc queryex AlertService")
+    if result == 1060:
+        print("Installing service")
+        import zipfile
+        try:
+            mkdir(files_dir + "/alert/AlertService")
+            with zipfile.ZipFile(f"{files_dir}/alert/AlertService.zip", "r") as file:
+                file.extractall(f"{files_dir}/alert/AlertService")
+        except FileExistsError:
+            pass
+        try:
+            remove(f"{files_dir}/alert/AlertService.zip")
+        except FileNotFoundError:
+            pass
+        res = system("mkdir C:\\Users\\Default\\AppData\\Roaming\\CorporationChat")
+        if res != 0:
+            messagebox.showerror("Access denied", "Reload program as administrator")
+            exit(0)
+        with open("C:\\Users\\Default\\AppData\\Roaming\\CorporationChat\\path.txt", "w") as file:
+            file.write(files_dir)
+        res = system(f"sc create AlertService binPath={files_dir}/alert/AlertService/AlertService.exe "
+                     f"DisplayName=AlertService type=own start=auto")
+        system("sc start AlertService")
+        if res == 5:
+            messagebox.showerror("Access denied", "Reload program as administrator")
+            exit(0)
 
 
 def create_theme_file():
@@ -216,7 +249,8 @@ def create_theme_file():
 def create_config_file():
     theme_dict = {}
     theme_dict.update({"theme": "1",
-                       "browser_path": None})
+                       "browser_path": None,
+                       "groups": []})
     with open(files_dir + "/settings/config.json", "w") as file:
         dump(theme_dict, file, indent=2)
 
