@@ -715,8 +715,13 @@ def login(*args):
         user_id = get_id(user_login)
         get_private_key()
         local_chats = get_local_chats()
+        alert_chats = ""
         for i in local_chats:
+            if i['user_id'][0] == "g":
+                alert_chats += i['user_id'] + ","
             build(i)
+        with open(files_dir + "/alert/groups.json", "w") as alert_groups:
+            alert_groups.write(alert_chats[:-1])
         hide_auth_menu()
         label_loading.place_forget()
         qr = make(private_key)
@@ -820,6 +825,7 @@ def menu_navigation(menu: str):
         main_frame.pack(side=LEFT, anchor=CENTER)
         canvas.delete(0.0, END)
         current_chat = "-1"
+        button_alert.pack_forget()
         label_chat_id.configure(text="Current chat with: ")
         spacing, spacing_2 = 0, 0
         button_send.configure(state='disabled')
@@ -1274,11 +1280,13 @@ def open_chat(chat_id):
         label_chat_id.configure(text="Current chat with: " + name)
         button_send.configure(state="normal")
         button_img.configure(state="normal")
+        button_alert.pack(side=RIGHT, anchor=E, padx=3)
         canvas.delete(0.0, END)
         get_chat_message()
         return
     nick = get_user_nickname(int(chat_id))
     if nick is not None:
+        button_alert.pack_forget()
         label_chat_id.configure(text="Current chat with: " + nick)
     else:
         m_box.showerror("Input error", "User not found")
@@ -1629,6 +1637,17 @@ def build(i):
     chat_labels.append([chat_label, i['user_id']])
 
 
+def alert():
+    if current_chat[0] != "g":
+        return
+    m_box = CustomBox()
+    try:
+        if response_handler(method="post", url=f"{backend_url}alert/?group_id={current_chat}").status_code == 200:
+            m_box.showinfo("Success!", "Alert created!")
+    except Exception as e:
+        exception_handler(e)
+
+
 def start_chat():
     m_box = CustomBox()
     m_box.askentry("Enter user id", open_chat)
@@ -1830,8 +1849,10 @@ main2_frame2.pack(side=TOP, anchor=CENTER)
 chat_frame = LabelFrame(main2_frame, width=600, height=25, relief=FLAT, bg=theme['bg'])
 chat_frame.pack(side=TOP, pady=2, anchor=W)
 label_chat_id = Label(chat_frame, font=theme['font_main'], text="Current chat with: ", fg=theme['text_color'],
-                      bg=theme['bg'], width=25, anchor=W)
+                      bg=theme['bg'], width=75, anchor=W)
 label_chat_id.pack(side=LEFT, anchor=W)
+button_alert = Button(chat_frame, text="ALERT", activebackground=theme['button_bg_active'], relief=theme['relief'],
+                      bg=theme['button_bg_negative'], width=25, command=lambda: alert())
 frame = Frame(main2_frame, width=850, height=450)
 frame.pack()
 canvas = Text(frame, fg=theme['text_color'], bg=theme['entry'], width=105, cursor='arrow',
